@@ -15,6 +15,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+
       - name: Contract language
         run: |
           python3 prout.py check examples/refund_fixed.prout
