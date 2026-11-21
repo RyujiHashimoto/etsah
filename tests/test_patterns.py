@@ -160,6 +160,10 @@ class TestSlots(unittest.TestCase):
             "labels": {"entity", "vocabulary"},
             "survey": {"entity", "scale"},
             "work_queue": {"entity", "priority"},
+            "timesheet": {"entity", "approver"},
+            "dispatch_contract": {"entity", "staff", "client", "start_date", "end_date", "conflict_date"},
+            "staffing_billing": {"entity", "timesheet", "bill_rate", "pay_rate"},
+            "matching": {"staff", "opening", "skills"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():

@@ -1,0 +1,79 @@
+# 契約層で書ける派遣の検査。
+# 時間単価は整数円（Int）。Money には金額リテラルが無く、整数を渡すと型エラーになる。
+# 日付は 1970-01-01 からの通算日（Int）。2026-04-01 は字句の上では減算になり、Date リテラルではない。
+#   2026-04-01 = 20544、2027-03-31 = 20908、2029-04-01 = 21640。
+# 抵触日は通知された日の通算日であり、開始日に3年を足した結果ではない。
+# フィールドを渡す flow は実行時ガード（警告）になる。定数の flow は静的に通る。
+
+type Id
+type Money
+type Status
+
+type Invoice {
+  id: Id
+  amount: Money
+  status: Status
+}
+
+type DispatchContract {
+  id: Id
+  bill_yen: Int
+  pay_yen: Int
+  end_day: Int
+  conflict_day: Int
+  client_approved: Bool
+}
+
+op yen(amount: Int) -> Money
+  doc "整数円をMoneyにする。契約層に金額リテラルはない"
+  impl native
+
+op invoice_amount(rate: Money, hours: Int) -> Money
+  doc "請求額。時間は整数。小数時間は未対応"
+  impl rate * hours
+
+op accept_rates(bill_yen: Int, pay_yen: Int) -> Bool
+  doc "請求単価は支払単価以上。小数円はパターン層のRate。同一労働同一賃金は見ない"
+  pre bill_yen >= pay_yen
+  impl native
+
+op accept_term(end_day: Int, conflict_day: Int) -> Bool
+  doc "終了日は抵触日以前。通算日でありDate型ではない"
+  pre end_day <= conflict_day
+  impl native
+
+op accept_approval(client_approved: Bool) -> Bool
+  doc "派遣先承認が真であること。承認の手続き自体は検査しない"
+  pre client_approved == true
+  impl native
+
+op contracts.get(id: Id) -> DispatchContract
+  doc "個別契約を取得する"
+  eff read(contracts)
+  impl native
+
+op billing.issue(amount: Money) -> Invoice
+  doc "請求と給与を起票する"
+  eff write(invoices), write(payroll), emit(audit)
+  post result.status == "issued"
+  impl native
+
+flow close_quoted() -> Bool
+  doc "妥当な定数は静的に通る"
+  let rates_ok = accept_rates(2800, 1800)
+  let term_ok = accept_term(20908, 21640)
+  let approved_ok = accept_approval(true)
+  return rates_ok && term_ok && approved_ok
+
+flow close_month(contract_id: Id) -> Invoice
+  doc "保存済みの契約は実行時ガード。単価差の式だけは型が付く"
+  summary "契約を読み、単価と抵触日と派遣先承認を確認してから請求する。"
+  eff read(contracts), write(invoices), write(payroll), emit(audit)
+  let contract = contracts.get(contract_id)
+  # 次の3つはフィールド比較なので実行時ガード。定数での証明は close_quoted。
+  let rates_ok = accept_rates(contract.bill_yen, contract.pay_yen)
+  let term_ok = accept_term(contract.end_day, contract.conflict_day)
+  let approved_ok = accept_approval(contract.client_approved)
+  let amount = invoice_amount(yen(contract.bill_yen), 160)
+  let invoice = billing.issue(amount)
+  return invoice

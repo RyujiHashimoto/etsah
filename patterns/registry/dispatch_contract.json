@@ -1,0 +1,104 @@
+{
+  "name": "dispatch_contract",
+  "version": "0.1.0",
+  "intent": "派遣の個別契約と就業条件の明示を、開始日・終了日・抵触日つきで管理する",
+  "tags": [
+    "dispatch",
+    "contract",
+    "派遣契約",
+    "個別契約",
+    "就業条件明示",
+    "抵触日",
+    "期間制限"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "個別契約のエンティティ"
+    },
+    "staff": {
+      "type": "entity",
+      "required": true,
+      "desc": "派遣スタッフのエンティティ"
+    },
+    "client": {
+      "type": "entity",
+      "required": true,
+      "desc": "派遣先企業のエンティティ"
+    },
+    "start_date": {
+      "type": "date",
+      "required": true,
+      "desc": "契約開始日。YYYY-MM-DD"
+    },
+    "end_date": {
+      "type": "date",
+      "required": true,
+      "desc": "契約終了日。YYYY-MM-DD"
+    },
+    "conflict_date": {
+      "type": "date",
+      "required": true,
+      "desc": "抵触日。YYYY-MM-DD。派遣先が通知した日を設定する"
+    },
+    "exempt": {
+      "type": "enum",
+      "values": ["none", "indefinite", "age60"],
+      "required": false,
+      "desc": "期間制限の例外。none、無期雇用の indefinite、60歳以上の age60。例外でも法令判断はしない"
+    }
+  },
+  "requires_fields": {
+    "duties": "String",
+    "workplace": "String",
+    "status": "String"
+  },
+  "field_types": {
+    "start_date": "Date",
+    "end_date": "Date",
+    "conflict_date": "Date"
+  },
+  "constraints": [
+    {
+      "id": "start_on_or_before_end",
+      "left": "start_date",
+      "op": "<=",
+      "right": "end_date",
+      "kind": "date",
+      "message": "contract start_date must be on or before end_date"
+    },
+    {
+      "id": "end_on_or_before_conflict",
+      "left": "end_date",
+      "op": "<=",
+      "right": "conflict_date",
+      "kind": "date",
+      "message": "contract end_date is after the 抵触日",
+      "note": "設定された日付の比較だけを行う。開始日に3年を足す計算、クーリング、法定の例外列挙はしない。",
+      "exempt_slot": "exempt",
+      "exempt_values": ["indefinite", "age60"]
+    }
+  ],
+  "effects": ["read(contracts)", "write(contracts)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#dispatch_contracts", "kind": "SQL", "lines": 24, "desc": "個別契約、就業条件、抵触日"},
+    {"path": "api/dispatch-contracts/route.ts", "kind": "API", "lines": 65, "desc": "契約の作成と一覧"},
+    {"path": "api/dispatch-contracts/[id]/route.ts", "kind": "API", "lines": 50, "desc": "契約の更新と期間の検査"},
+    {"path": "app/(admin)/dispatch-contracts/page.tsx", "kind": "UI", "lines": 85, "desc": "個別契約と就業条件の画面"},
+    {"path": "lib/dispatch/term.ts", "kind": "TS", "lines": 40, "desc": "開始日、終了日、抵触日の比較"},
+    {"path": "tests/dispatch-contracts.test.ts", "kind": "TEST", "lines": 60, "desc": "抵触日と例外スロットのテスト"}
+  ],
+  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "notes": [
+    "抵触日は派遣先からの通知をスロットに書く。言語は end_date <= conflict_date だけを見る。開始日に3年を足す計算はしない。",
+    "就業条件明示の全文（指揮命令者、就業日、責任の程度など）はフィールドの一部だけを必須にしている。残りはエンティティに足す。",
+    "exempt が indefinite または age60 のとき、抵触日超過はエラーではなく警告になる。警告は法令意見ではない。"
+  ],
+  "provenance": {
+    "author": "PROUT staffing prototype",
+    "date": "2026-11-21",
+    "extracted_from": ["staffing", "staffing_desk"],
+    "note": "個別契約と就業条件。期間制限は通知された抵触日との比較に限る。"
+  }
+}

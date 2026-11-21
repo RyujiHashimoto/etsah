@@ -1,0 +1,36 @@
+# 意図的に壊した契約。次の3つの事前条件が静的に偽になる。
+# 1. 請求 1500 円 < 支払 1800 円
+# 2. 終了日 21641（2029-04-02）> 抵触日 21640（2029-04-01）
+# 3. 派遣先承認が false
+
+type Id
+type Money
+type Status
+
+type Invoice {
+  id: Id
+  amount: Money
+  status: Status
+}
+
+op accept_rates(bill_yen: Int, pay_yen: Int) -> Bool
+  doc "請求単価は支払単価以上"
+  pre bill_yen >= pay_yen
+  impl native
+
+op accept_term(end_day: Int, conflict_day: Int) -> Bool
+  doc "終了日は抵触日以前"
+  pre end_day <= conflict_day
+  impl native
+
+op accept_approval(client_approved: Bool) -> Bool
+  doc "派遣先承認が真であること"
+  pre client_approved == true
+  impl native
+
+flow close_broken() -> Bool
+  doc "単価の逆転、抵触日超過、承認なしを一度に踏む"
+  let rates_ok = accept_rates(1500, 1800)
+  let term_ok = accept_term(21641, 21640)
+  let approved_ok = accept_approval(false)
+  return rates_ok && term_ok && approved_ok

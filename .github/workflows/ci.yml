@@ -21,6 +21,7 @@ jobs:
       - name: Contract language
         run: |
           python3 prout.py check examples/refund_fixed.prout
+          python3 prout.py check examples/staffing.prout
           python3 render.py
           test -s human-view.html
 
@@ -30,6 +31,13 @@ jobs:
             echo "broken example unexpectedly passed"
             exit 1
           fi
+          if python3 prout.py check examples/staffing_broken.prout > /tmp/staffing-contract.txt 2>&1; then
+            echo "broken staffing contract unexpectedly passed"
+            exit 1
+          fi
+          grep -q "1500 >= 1800" /tmp/staffing-contract.txt
+          grep -q "21641 <= 21640" /tmp/staffing-contract.txt
+          grep -q "false == true" /tmp/staffing-contract.txt
 
       - name: Pattern registry
         working-directory: patterns
@@ -40,6 +48,17 @@ jobs:
           python3 proutc.py build examples/shop.prout
           python3 proutc.py build examples/expense.prout
           python3 proutc.py build bench/pc_lending.prout
+          python3 proutc.py build examples/staffing.prout
+          python3 proutc.py build examples/staffing_desk.prout
+          python3 proutc.py find "勤怠" | grep -q timesheet
+          python3 proutc.py find "抵触日" | grep -q dispatch_contract
+          if python3 proutc.py build examples/staffing_broken.prout > /tmp/staffing-pattern.txt 2>&1; then
+            echo "broken staffing spec unexpectedly passed"
+            exit 1
+          fi
+          grep -q "抵触日" /tmp/staffing-pattern.txt
+          grep -q "approver" /tmp/staffing-pattern.txt
+          grep -q "bill rate is below pay rate" /tmp/staffing-pattern.txt
 
       - name: Build service desk examples
         working-directory: patterns

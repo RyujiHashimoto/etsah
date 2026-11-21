@@ -21,8 +21,10 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_REGISTRY = ROOT / "registry"
@@ -259,9 +261,16 @@ class PatternManifest:
     examples: list[str] = field(default_factory=list)
     provenance: dict = field(default_factory=dict)
     requires_fields: dict[str, str] = field(default_factory=dict)
+    # Enforced field types. `requires_fields` stays name-only: existing
+    # manifests say `status: String` while specs use `ApprovalStatus`.
+    field_types: dict[str, str] = field(default_factory=dict)
+    constraints: list[dict] = field(default_factory=list)
+    requires_patterns: list[str] = field(default_factory=list)
+    requires_reason: str = ""
+    notes: list[str] = field(default_factory=list)
 
     def to_index(self) -> dict:
-        return {
+        data = {
             "name": self.name,
             "version": self.version,
             "intent": self.intent,
@@ -275,6 +284,15 @@ class PatternManifest:
             "examples": self.examples,
             "path": f"registry/{self.name}.json",
         }
+        if self.field_types:
+            data["field_types"] = self.field_types
+        if self.constraints:
+            data["constraints"] = [
+                {"id": c.get("id", ""), "message": c.get("message", "")} for c in self.constraints
+            ]
+        if self.requires_patterns:
+            data["requires_patterns"] = self.requires_patterns
+        return data
 
 
 def manifest_from_dict(data: dict) -> PatternManifest:
@@ -292,6 +310,11 @@ def manifest_from_dict(data: dict) -> PatternManifest:
         examples=data.get("examples", []),
         provenance=data.get("provenance", {}),
         requires_fields=data.get("requires_fields", {}),
+        field_types=data.get("field_types", {}),
+        constraints=data.get("constraints", []),
+        requires_patterns=data.get("requires_patterns", []),
+        requires_reason=data.get("requires_reason", ""),
+        notes=data.get("notes", []),
     )
 
 
@@ -320,6 +343,26 @@ def validate_manifest(m: PatternManifest) -> list[str]:
                 errors.append(f"transition to unknown state {t.get('to')!r}")
             if not t.get("on"):
                 errors.append("transition is missing an event name")
+    measure_kinds = {"date", "rate", "duration"}
+    comparisons = {">=", ">", "<=", "<", "==", "!="}
+    for slot_name, spec in m.slots.items():
+        if spec.get("type") == "enum" and not spec.get("values"):
+            errors.append(f"slot {slot_name!r} enum needs values")
+    for fname, ftype in m.field_types.items():
+        if not isinstance(ftype, str) or not re.fullmatch(r"[A-Za-z_]\w*", ftype):
+            errors.append(f"field {fname!r} has a bad type {ftype!r}")
+    for constraint in m.constraints:
+        cid = constraint.get("id") or "?"
+        if constraint.get("kind") not in measure_kinds:
+            errors.append(f"constraint {cid} kind must be date, rate, or duration")
+        if constraint.get("op") not in comparisons:
+            errors.append(f"constraint {cid} has an unknown comparison")
+        for key in ("left", "right", "message"):
+            if not constraint.get(key):
+                errors.append(f"constraint {cid} is missing {key}")
+    for name in m.requires_patterns:
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
+            errors.append(f"requires_patterns entry {name!r} is not a pattern name")
     return errors
 
 
@@ -334,6 +377,13 @@ def load_registry(path: Path) -> dict[str, PatternManifest]:
         if errors:
             raise ValueError(f"invalid manifest {p.name}: {'; '.join(errors)}")
         registry[m.name] = m
+    missing: list[str] = []
+    for manifest in registry.values():
+        for name in manifest.requires_patterns:
+            if name not in registry:
+                missing.append(f"{manifest.name} requires unknown pattern {name}")
+    if missing:
+        raise ValueError("registry references: " + "; ".join(missing))
     return registry
 
 
@@ -346,6 +396,194 @@ def write_index(registry_dir: Path) -> Path:
     out = registry_dir / "index.json"
     out.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     return out
+
+
+# ---------------------------------------------------------------------------
+# Measures: dates, decimal rates, durations
+# ---------------------------------------------------------------------------
+
+Measure = Union[date, Decimal]
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
+_DECIMAL = re.compile(r"\d+(\.\d+)?\Z")
+_CLOCK = re.compile(r"(\d+)h(\d{1,2})m\Z")
+_COMPARISONS = {
+    ">=": lambda left, right: left >= right,
+    ">": lambda left, right: left > right,
+    "<=": lambda left, right: left <= right,
+    "<": lambda left, right: left < right,
+    "==": lambda left, right: left == right,
+    "!=": lambda left, right: left != right,
+}
+
+
+def parse_date(value: str) -> Optional[date]:
+    """ISO calendar date. `2026-4-1` and impossible days are rejected."""
+    value = value.strip()
+    if not _DATE.fullmatch(value):
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def parse_rate(value: str) -> Optional[Decimal]:
+    """Non-negative decimal hourly rate. No exponent and no leading sign."""
+    value = value.strip()
+    if not _DECIMAL.fullmatch(value):
+        return None
+    return Decimal(value)
+
+
+def parse_duration(value: str) -> Optional[Decimal]:
+    """Hours as a decimal (`7.5`) or a clock (`7h30m`). Minutes must be < 60."""
+    value = value.strip()
+    clock = _CLOCK.fullmatch(value)
+    if clock:
+        minutes = int(clock.group(2))
+        if minutes >= 60:
+            return None
+        return Decimal(clock.group(1)) + (Decimal(minutes) / Decimal(60))
+    if not _DECIMAL.fullmatch(value):
+        return None
+    return Decimal(value)
+
+
+def parse_measure(kind: str, value: str) -> Optional[Measure]:
+    if kind == "date":
+        return parse_date(value)
+    if kind == "rate":
+        return parse_rate(value)
+    if kind == "duration":
+        return parse_duration(value)
+    return None
+
+
+def _resolve_measure(token: str, slots: dict[str, str], declared: dict, kind: str) -> tuple[Optional[Measure], str]:
+    """Return (value, status). Status is ok, absent, invalid, or unknown."""
+    if token in declared:
+        if token not in slots:
+            return None, "absent"
+        parsed = parse_measure(kind, slots[token])
+        return (parsed, "ok") if parsed is not None else (None, "invalid")
+    parsed = parse_measure(kind, token)
+    if parsed is not None:
+        return parsed, "ok"
+    return None, "unknown"
+
+
+def check_pattern_policy(
+    app: App,
+    pattern: PatternUse,
+    manifest: PatternManifest,
+    entity: Optional[Entity],
+    err,
+    warn,
+) -> None:
+    """Slot shapes and manifest constraints. Empty on patterns that declare none."""
+    names = {item.name for item in app.entities}
+    if entity is not None:
+        for fname, expected in manifest.field_types.items():
+            actual = entity.fields.get(fname)
+            if actual is None:
+                err(
+                    "E-ENTITY",
+                    f"{entity.name} needs a `{fname}: {expected}` field for {pattern.name}",
+                    pattern.line,
+                )
+            elif actual != expected:
+                err(
+                    "E-TYPE",
+                    f"{entity.name}.{fname} must be {expected} for {pattern.name}, got {actual}",
+                    pattern.line,
+                )
+    for slot_name, spec in manifest.slots.items():
+        if slot_name not in pattern.slots:
+            continue
+        raw = pattern.slots[slot_name]
+        kind = spec.get("type")
+        if kind == "entity" and slot_name != "entity" and raw not in names:
+            err("E-TARGET", f"slot {slot_name} references unknown entity {raw!r}", pattern.line)
+        elif kind in ("date", "rate", "duration") and parse_measure(kind, raw) is None:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a {kind}, got {raw!r}",
+                pattern.line,
+            )
+        elif kind == "enum" and raw not in (spec.get("values") or []):
+            allowed = ", ".join(spec.get("values") or [])
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be one of {allowed}; got {raw!r}",
+                pattern.line,
+            )
+        elif kind == "field":
+            owner_name = pattern.slots.get(spec.get("of", ""), "")
+            owner = next((item for item in app.entities if item.name == owner_name), None)
+            if owner is not None and raw not in owner.fields:
+                err(
+                    "E-ENTITY",
+                    f"{owner.name} needs field {raw!r} for {pattern.name} slot {slot_name}",
+                    pattern.line,
+                )
+    for slot_name, spec in manifest.slots.items():
+        if spec.get("type") != "field" or slot_name in pattern.slots or spec.get("required"):
+            continue
+        default = spec.get("default")
+        owner_name = pattern.slots.get(spec.get("of", ""), "")
+        owner = next((item for item in app.entities if item.name == owner_name), None)
+        if default and owner is not None and default not in owner.fields:
+            err(
+                "E-ENTITY",
+                f"{owner.name} needs field {default!r} for {pattern.name} slot {slot_name}",
+                pattern.line,
+            )
+    for constraint in manifest.constraints:
+        _check_constraint(pattern, manifest, constraint, err, warn)
+    for needed in manifest.requires_patterns:
+        if not any(other.name == needed for other in app.patterns):
+            reason = f"; {manifest.requires_reason}" if manifest.requires_reason else ""
+            err(
+                "E-POLICY",
+                f"{pattern.name} requires pattern {needed!r}{reason}",
+                pattern.line,
+            )
+
+
+def _check_constraint(pattern: PatternUse, manifest: PatternManifest, constraint: dict, err, warn) -> None:
+    kind = constraint.get("kind", "")
+    op = constraint.get("op", "")
+    compare = _COMPARISONS.get(op)
+    if compare is None or kind not in ("date", "rate", "duration"):
+        return
+    left_token = str(constraint.get("left", ""))
+    right_token = str(constraint.get("right", ""))
+    left, left_status = _resolve_measure(left_token, pattern.slots, manifest.slots, kind)
+    right, right_status = _resolve_measure(right_token, pattern.slots, manifest.slots, kind)
+    if left_status == "absent" or right_status == "absent":
+        return
+    cid = constraint.get("id") or pattern.name
+    if left_status == "unknown" or right_status == "unknown":
+        err(
+            "E-POLICY",
+            f"{pattern.name}.{cid} references an unknown value",
+            pattern.line,
+        )
+        return
+    if left is None or right is None or left_status == "invalid" or right_status == "invalid":
+        return
+    if compare(left, right):
+        return
+    message = (
+        f"{pattern.name}.{cid}: {constraint.get('message', 'constraint failed')} "
+        f"({left_token} {op} {right_token} is false; {left} {op} {right})"
+    )
+    exempt_slot = constraint.get("exempt_slot")
+    exempt_values = constraint.get("exempt_values") or []
+    if exempt_slot and pattern.slots.get(exempt_slot) in exempt_values:
+        warn("W-POLICY", message + " (exempt slot is set; this is not a legal opinion)", pattern.line)
+        return
+    err("E-POLICY", message, pattern.line)
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +606,9 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
 
     def err(code: str, message: str, line: int = 0) -> None:
         diags.append(Diagnostic(code, message, line))
+
+    def warn(code: str, message: str, line: int = 0) -> None:
+        diags.append(Diagnostic(code, message, line, "warning"))
 
     if not app.stack:
         err("E-STACK", "stack is required; declare at least one target")
@@ -436,6 +677,7 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             for fname in m.requires_fields:
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
+        check_pattern_policy(app, p, m, entity, err, warn)
         hook_spec = m.hooks.get("on_approved")
         hook_raw = p.slots.get("on_approved")
         if hook_spec and hook_raw:
@@ -640,6 +882,10 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         "notify": "通知",
         "upload": "アップロード",
         "approval": "承認ワークフロー",
+        "timesheet": "勤怠承認",
+        "dispatch_contract": "派遣契約",
+        "staffing_billing": "請求と給与",
+        "matching": "マッチング",
         "custom": "カスタム",
     }
 
