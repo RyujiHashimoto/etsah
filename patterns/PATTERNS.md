@@ -94,7 +94,7 @@ open build/expense/demo.html
 
 `approval` のマニフェストは `states` と `transitions` を持つ。`draft` から `pending`、`approved`、`returned`、`rejected` への遷移がデータとして定義され、`validate()` は遷移元・遷移先が `states` に含まれることを検査する。
 
-`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。
+`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。この検査は `on_approved` だけでなく、`checkout.success` など `type: hook` のスロットすべてに適用される。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。
 
 `approval` のフックは `notify` を想定しており、`channel` と `recipient` を引数として要求する。`notify` の `channel` が `email` / `slack` 以外なら `E-HOOK-ARG`、`recipient` が `auth.roles` に含まれなければ `E-HOOK-ARG` になる。`notify` を適用していない場合や、複数回適用して参照先が曖昧な場合も `E-HOOK` で止まる。
 

@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在118件で、意図的な未実装2件は `expectedFailure` として記録しています。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在119件で、意図的な未実装2件は `expectedFailure` として記録しています。
 
 ```bash
 python3 -m unittest discover -s tests -v

@@ -374,6 +374,7 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
 
     seen_patterns: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
+    applied_patterns = {p.name for p in app.patterns}
     auth_count = 0
     auth_roles: set[str] = set()
     for p in app.patterns:
@@ -387,6 +388,22 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         for slot_name, spec in m.slots.items():
             if spec.get("required") and slot_name not in p.slots:
                 err("E-SLOT", f"pattern {p.name} requires slot {slot_name!r}", p.line)
+            hook_raw = p.slots.get(slot_name)
+            if spec.get("type") == "hook" and hook_raw:
+                hook = slot_value(hook_raw)
+                if hook not in custom_names:
+                    if hook not in registry:
+                        err(
+                            "E-HOOK",
+                            f"{p.name}.{slot_name}: {hook!r} is not a custom block or registered pattern",
+                            p.line,
+                        )
+                    elif hook not in applied_patterns:
+                        err(
+                            "E-HOOK",
+                            f"{p.name}.{slot_name}: add `pattern {hook}` to use this hook",
+                            p.line,
+                        )
         for slot_name in p.slots:
             if slot_name not in m.slots:
                 diags.append(
@@ -412,64 +429,52 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         hook_raw = p.slots.get("on_approved")
         if hook_spec and hook_raw:
             hook = slot_value(hook_raw)
-            if hook in custom_names:
+            uses = [other for other in app.patterns if other.name == hook]
+            if hook in custom_names or hook not in registry or not uses:
+                # The generic hook-slot check above already reported these.
                 pass
-            elif hook not in registry:
+            elif len(uses) > 1:
                 err(
                     "E-HOOK",
-                    f"on_approved {hook!r} is not a custom block or registered pattern",
+                    f"on_approved pattern {hook!r} is applied {len(uses)} times; the hook target is ambiguous",
                     p.line,
                 )
             else:
-                uses = [other for other in app.patterns if other.name == hook]
-                if not uses:
+                expected = hook_spec.get("pattern")
+                if expected and hook != expected:
                     err(
                         "E-HOOK",
-                        f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
-                        p.line,
-                    )
-                elif len(uses) > 1:
-                    err(
-                        "E-HOOK",
-                        f"on_approved pattern {hook!r} is applied {len(uses)} times; the hook target is ambiguous",
+                        f"on_approved must reference the {expected!r} pattern, got {hook!r}",
                         p.line,
                     )
                 else:
-                    expected = hook_spec.get("pattern")
-                    if expected and hook != expected:
-                        err(
-                            "E-HOOK",
-                            f"on_approved must reference the {expected!r} pattern, got {hook!r}",
-                            p.line,
-                        )
-                    else:
-                        use = uses[0]
-                        for arg in hook_spec.get("args", []):
-                            if arg not in use.slots:
-                                err(
-                                    "E-HOOK-ARG",
-                                    f"on_approved {hook!r} requires argument {arg!r}",
-                                    p.line,
-                                )
-                        target = registry[hook]
-                        for arg, raw in use.slots.items():
-                            spec = target.slots.get(arg)
-                            if not spec:
-                                continue
-                            value = slot_value(raw)
-                            allowed = spec.get("enum")
-                            if allowed and value not in allowed:
-                                err(
-                                    "E-HOOK-ARG",
-                                    f"on_approved {hook}.{arg} must be one of {', '.join(allowed)}; got {value!r}",
-                                    use.line,
-                                )
-                            if spec.get("type") == "role" and auth_roles and value not in auth_roles:
-                                err(
-                                    "E-HOOK-ARG",
-                                    f"on_approved {hook}.{arg} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
-                                    use.line,
-                                )
+                    use = uses[0]
+                    for arg in hook_spec.get("args", []):
+                        if arg not in use.slots:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook!r} requires argument {arg!r}",
+                                p.line,
+                            )
+                    target = registry[hook]
+                    for arg, raw in use.slots.items():
+                        spec = target.slots.get(arg)
+                        if not spec:
+                            continue
+                        value = slot_value(raw)
+                        allowed = spec.get("enum")
+                        if allowed and value not in allowed:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook}.{arg} must be one of {', '.join(allowed)}; got {value!r}",
+                                use.line,
+                            )
+                        if spec.get("type") == "role" and auth_roles and value not in auth_roles:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook}.{arg} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
+                                use.line,
+                            )
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:

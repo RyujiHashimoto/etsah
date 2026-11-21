@@ -626,6 +626,46 @@ class TestHooks(unittest.TestCase):
         diags = validate(app, self.registry)
         self.assertIn("E-HOOK", _codes(diags))
 
+    def test_all_hook_slots_are_checked(self) -> None:
+        valid = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity Order
+                    id: Id
+                    total: Money
+                  pattern checkout
+                    entity: Order
+                    payment: stripe
+                    success: fulfill
+                  custom fulfill
+                    why "after payment"
+                    lines 4
+                """
+            )
+        )
+        self.assertEqual(validate(valid, self.registry), [])
+
+        invalid = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity Order
+                    id: Id
+                    total: Money
+                  pattern checkout
+                    entity: Order
+                    payment: stripe
+                    success: notify
+                """
+            )
+        )
+        diags = validate(invalid, self.registry)
+        self.assertIn("E-HOOK", _codes(diags))
+        self.assertTrue(any("checkout.success" in d.message for d in diags))
+
 
 class TestBuild(unittest.TestCase):
     @classmethod
