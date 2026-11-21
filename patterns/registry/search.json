@@ -1,0 +1,18 @@
+{
+  "name": "search",
+  "version": "0.1.0",
+  "intent": "複数フィールドを横断する検索とフィルタを追加する",
+  "tags": ["search", "filter", "query", "検索", "フィルタ"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "検索対象のエンティティ"},
+    "fields": {"type": "list", "required": true, "desc": "検索対象のフィールド"}
+  },
+  "effects": ["read(entity)"],
+  "artifacts": [
+    {"path": "api/search/route.ts", "kind": "API", "lines": 55, "desc": "検索API"},
+    {"path": "app/(admin)/search/page.tsx", "kind": "UI", "lines": 70, "desc": "検索とフィルタ"},
+    {"path": "lib/search.ts", "kind": "TS", "lines": 30, "desc": "クエリビルダ"}
+  ],
+  "examples": [],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

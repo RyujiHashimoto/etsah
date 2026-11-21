@@ -1,0 +1,29 @@
+{
+  "name": "approval",
+  "version": "0.1.0",
+  "intent": "申請を承認者に回し、承認・差し戻し・却下の状態遷移を管理する。承認後の処理は on_approved フックで接続する",
+  "tags": ["approval", "workflow", "request", "review", "申請", "承認", "差し戻し", "ワークフロー", "稟議"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "申請対象のエンティティ"},
+    "approver": {"type": "role", "required": true, "desc": "承認ロール"},
+    "on_approved": {"type": "hook", "required": false, "desc": "承認後に呼ぶ処理（custom または別パターン）"}
+  },
+  "requires_fields": {"status": "String"},
+  "effects": ["write(approvals)", "notify(approver)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#approvals", "kind": "SQL", "lines": 18, "desc": "approvals, approval_steps, audit_log"},
+    {"path": "api/approvals/route.ts", "kind": "API", "lines": 70, "desc": "申請の作成と一覧"},
+    {"path": "api/approvals/[id]/route.ts", "kind": "API", "lines": 55, "desc": "承認・差し戻し・却下"},
+    {"path": "app/(admin)/approvals/page.tsx", "kind": "UI", "lines": 85, "desc": "承認待ち一覧"},
+    {"path": "app/(admin)/approvals/[id]/page.tsx", "kind": "UI", "lines": 70, "desc": "申請詳細と承認ボタン"},
+    {"path": "lib/workflows/approval.ts", "kind": "TS", "lines": 60, "desc": "状態遷移と on_approved フック"},
+    {"path": "tests/approval.test.ts", "kind": "TEST", "lines": 75, "desc": "承認フローの契約テスト"}
+  ],
+  "examples": ["examples/expense.prout", "examples/pc_lending.prout"],
+  "provenance": {
+    "author": "橋元 龍二",
+    "date": "2026-11-22",
+    "extracted_from": ["expense", "pc_lending"],
+    "note": "経費精算とPC貸出の共通部分（申請→承認→差し戻し）を抽出した"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "checkout",
+  "version": "0.1.0",
+  "intent": "決済セッション、Webhook、チェックアウト画面を追加する",
+  "tags": ["checkout", "payment", "stripe", "webhook", "決済", "支払い"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "注文エンティティ"},
+    "payment": {"type": "string", "required": true, "desc": "stripe など"},
+    "success": {"type": "hook", "required": false, "desc": "決済成功後の処理"},
+    "cancel": {"type": "string", "required": false, "desc": "キャンセル時の戻り先"}
+  },
+  "requires_fields": {"total": "Money"},
+  "effects": ["write(orders)", "net(payment)"],
+  "artifacts": [
+    {"path": "api/checkout/route.ts", "kind": "API", "lines": 80, "desc": "Checkout Sessionの作成"},
+    {"path": "api/webhooks/stripe/route.ts", "kind": "API", "lines": 70, "desc": "Webhook検証と履行"},
+    {"path": "app/(shop)/checkout/page.tsx", "kind": "UI", "lines": 90, "desc": "チェックアウト画面"},
+    {"path": "lib/payments.ts", "kind": "TS", "lines": 55, "desc": "Stripeクライアントと冪等性"}
+  ],
+  "examples": ["examples/shop.prout"],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

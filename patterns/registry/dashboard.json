@@ -1,0 +1,19 @@
+{
+  "name": "dashboard",
+  "version": "0.1.0",
+  "intent": "売上・返金・保留などの指標を集計し、ダッシュボードで可視化する",
+  "tags": ["dashboard", "metrics", "analytics", "chart", "ダッシュボード", "指標", "集計"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "集計対象のエンティティ"},
+    "metrics": {"type": "list", "required": true, "desc": "表示する指標"},
+    "range": {"type": "string", "required": false, "default": "30d", "desc": "集計期間"}
+  },
+  "effects": ["read(entity)"],
+  "artifacts": [
+    {"path": "app/(admin)/dashboard/page.tsx", "kind": "UI", "lines": 90, "desc": "指標カードと推移グラフ"},
+    {"path": "lib/metrics.ts", "kind": "TS", "lines": 65, "desc": "集計クエリ"},
+    {"path": "api/metrics/route.ts", "kind": "API", "lines": 40, "desc": "指標API"}
+  ],
+  "examples": ["examples/shop.prout"],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

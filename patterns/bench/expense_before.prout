@@ -1,0 +1,30 @@
+# パターン追加前：承認フローを一から実装する
+app expense_before
+  stack nextjs, postgres
+  freedom open
+
+  entity Employee
+    id: Id
+    name: String
+    email: Email
+
+  entity Expense
+    id: Id
+    applicant: Employee
+    amount: Money
+    status: ApprovalStatus
+    note: String
+
+  pattern auth
+    provider: clerk
+    roles: employee, manager, finance
+
+  pattern crud Expenses
+    entity: Expense
+    access: employee
+    search: [id, status, applicant.email]
+    paginate: 20
+
+  custom approval_flow
+    why "申請・承認・差し戻し・支払いを一から実装する"
+    lines 180

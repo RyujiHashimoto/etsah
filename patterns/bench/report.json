@@ -1,0 +1,43 @@
+[
+  {
+    "case": "expense_before",
+    "spec_lines": 24,
+    "custom_lines": 180,
+    "ai_authored_lines": 204,
+    "generated_lines": 981,
+    "reuse_ratio": 4.8,
+    "patterns": [
+      "auth",
+      "crud"
+    ],
+    "errors": 0
+  },
+  {
+    "case": "expense_after",
+    "spec_lines": 28,
+    "custom_lines": 30,
+    "ai_authored_lines": 58,
+    "generated_lines": 1264,
+    "reuse_ratio": 21.8,
+    "patterns": [
+      "auth",
+      "crud",
+      "approval"
+    ],
+    "errors": 0
+  },
+  {
+    "case": "pc_lending",
+    "spec_lines": 28,
+    "custom_lines": 35,
+    "ai_authored_lines": 63,
+    "generated_lines": 1269,
+    "reuse_ratio": 20.1,
+    "patterns": [
+      "auth",
+      "crud",
+      "approval"
+    ],
+    "errors": 0
+  }
+]

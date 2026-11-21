@@ -1,0 +1,35 @@
+# パターン追加後：approval パターンを使う
+app expense_after
+  stack nextjs, postgres
+  freedom guided
+
+  entity Employee
+    id: Id
+    name: String
+    email: Email
+
+  entity Expense
+    id: Id
+    applicant: Employee
+    amount: Money
+    status: ApprovalStatus
+    note: String
+
+  pattern auth
+    provider: clerk
+    roles: employee, manager, finance
+
+  pattern crud Expenses
+    entity: Expense
+    access: employee
+    search: [id, status, applicant.email]
+    paginate: 20
+
+  pattern approval Expense
+    entity: Expense
+    approver: manager
+    on_approved: reimburse
+
+  custom reimburse
+    why "承認後に経費を支払い、仕訳を起票する"
+    lines 30

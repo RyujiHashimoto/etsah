@@ -1,0 +1,22 @@
+{
+  "name": "refund",
+  "version": "0.1.0",
+  "intent": "注文に対する返金を作成し、上限と権限を検証し、監査ログを残す",
+  "tags": ["refund", "payment", "stripe", "admin", "返金", "監査"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "返金対象の注文エンティティ"},
+    "payment": {"type": "string", "required": true, "desc": "stripe など"},
+    "policy": {"type": "string", "required": false, "default": "admin_only", "desc": "返金を許す権限"},
+    "max": {"type": "string", "required": false, "desc": "返金上限の式"}
+  },
+  "requires_fields": {"total": "Money", "status": "String"},
+  "effects": ["write(payments)", "net(payment)", "emit(audit)"],
+  "artifacts": [
+    {"path": "api/refunds/route.ts", "kind": "API", "lines": 75, "desc": "返金の作成と一覧"},
+    {"path": "app/(admin)/{plural}/[id]/refund-button.tsx", "kind": "UI", "lines": 45, "desc": "返金ボタンと確認ダイアログ"},
+    {"path": "lib/refunds.ts", "kind": "TS", "lines": 60, "desc": "返金ポリシー、上限、監査ログ"},
+    {"path": "tests/refunds.test.ts", "kind": "TEST", "lines": 70, "desc": "返金の契約テスト"}
+  ],
+  "examples": ["examples/shop.prout"],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

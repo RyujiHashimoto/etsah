@@ -1,0 +1,58 @@
+# レジストリ：AIがパターンを見つける入口
+
+このディレクトリは、PROUT Patternsのパターン定義をJSONで保持する。AIはコードを読む前に `index.json` を読み、`intent` と `tags` で候補を絞り、必要なマニフェストだけを開く。
+
+## 探索の手順
+
+```bash
+cd patterns
+
+# 1. 索引を読む（全パターンの intent / tags / slots が入っている）
+cat registry/index.json
+
+# 2. やりたいことで検索する（日本語でも英語でもよい）
+python3 proutc.py find "申請 承認"
+python3 proutc.py find "refund payment"
+
+# 3. 候補のマニフェストを読む
+cat registry/approval.json
+
+# 4. 仕様に適用してビルドする
+python3 proutc.py build examples/expense.prout
+```
+
+`find` は `intent`、`tags`、`name`、スロット説明の一致を点数化する。上位3件と、必須スロット・任意スロット・効果を表示する。
+
+## マニフェストの読み方
+
+| フィールド | AIが判断すること |
+|---|---|
+| `intent` | このパターンが解決する問題。依頼文との一致を見る |
+| `tags` | 別名・日本語・英語。検索の再現率を上げる |
+| `slots` | 埋めるべき値。`required: true` は必須 |
+| `requires_fields` | 対象エンティティが持つべきフィールド |
+| `effects` | このパターンが起こす副作用。契約検査に渡す |
+| `artifacts` | 生成されるファイルと行数。実装の形を予測する |
+| `examples` | 実際にビルドが通る使用例 |
+| `provenance` | どのアプリから抽出したか。信頼性の判断材料 |
+
+## 新しいパターンの追加
+
+```bash
+cp registry/approval.json registry/my_pattern.json
+# name, version, intent, tags, slots, artifacts, examples, provenance を編集
+python3 proutc.py index
+python3 proutc.py build examples/your_app.prout
+```
+
+追加の基準とレビューは `../../CONTRIBUTING.md` を参照。
+
+## 索引の再生成
+
+`index.json` は手で編集しない。マニフェストを変更したら次を実行する。
+
+```bash
+python3 proutc.py index
+```
+
+CIは索引がマニフェストと一致しているかを確認する。

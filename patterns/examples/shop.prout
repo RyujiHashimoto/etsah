@@ -1,0 +1,49 @@
+# PROUT Patterns v0.1 — shop
+# 40行で、認証・CRUD・決済・返金を展開する。
+
+app shop
+  stack nextjs, postgres, stripe
+  freedom guided
+
+  entity Customer
+    id: Id
+    email: Email
+    name: String
+
+  entity Order
+    id: Id
+    customer: Customer
+    total: Money
+    status: OrderStatus
+    created_at: DateTime
+
+  pattern auth
+    provider: clerk
+    roles: customer, admin
+
+  pattern crud Orders
+    entity: Order
+    access: admin
+    search: [id, status, customer.email]
+    paginate: 20
+
+  pattern checkout
+    entity: Order
+    payment: stripe
+    success: fulfill
+    cancel: /cart
+
+  pattern refund
+    entity: Order
+    payment: stripe
+    policy: admin_only
+    max: order.total
+
+  pattern dashboard Orders
+    entity: Order
+    metrics: [revenue, refunds, pending]
+    range: 30d
+
+  custom fulfill
+    why "在庫引き当てとメール送信は既存の業務ロジックを呼ぶ"
+    lines 40

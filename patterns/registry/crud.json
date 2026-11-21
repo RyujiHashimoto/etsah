@@ -1,0 +1,25 @@
+{
+  "name": "crud",
+  "version": "0.1.0",
+  "intent": "エンティティの一覧・詳細・作成・更新・削除を、管理画面とAPIで提供する",
+  "tags": ["crud", "admin", "list", "detail", "管理画面", "一覧", "検索", "ページネーション"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "対象のエンティティ"},
+    "access": {"type": "role", "required": false, "default": "admin", "desc": "アクセスを許すロール"},
+    "search": {"type": "list", "required": false, "desc": "検索対象のフィールド"},
+    "paginate": {"type": "int", "required": false, "default": "20", "desc": "1ページの件数"}
+  },
+  "effects": ["read(entity)", "write(entity)"],
+  "artifacts": [
+    {"path": "api/{plural}/route.ts", "kind": "API", "lines": 65, "desc": "{Entity}の一覧・作成"},
+    {"path": "api/{plural}/[id]/route.ts", "kind": "API", "lines": 50, "desc": "{Entity}の取得・更新・削除"},
+    {"path": "app/(admin)/{plural}/page.tsx", "kind": "UI", "lines": 95, "desc": "{Entity}一覧画面（検索・ページネーション）"},
+    {"path": "app/(admin)/{plural}/[id]/page.tsx", "kind": "UI", "lines": 75, "desc": "{Entity}詳細画面"},
+    {"path": "lib/validation/{entity_lower}.ts", "kind": "TS", "lines": 15, "per_field": 2, "desc": "Zodスキーマ"},
+    {"path": "lib/permissions.ts", "kind": "TS", "lines": 25, "desc": "ロールとアクセス制御"},
+    {"path": "tests/{plural}.test.ts", "kind": "TEST", "lines": 85, "desc": "CRUDの契約テスト"},
+    {"path": "db/schema.sql#{plural}", "kind": "SQL", "lines": 6, "per_field": 2, "desc": "{Entity}テーブル"}
+  ],
+  "examples": ["examples/shop.prout"],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

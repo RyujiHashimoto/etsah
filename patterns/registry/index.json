@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "name": "approval",
+      "version": "0.1.0",
+      "intent": "申請を承認者に回し、承認・差し戻し・却下の状態遷移を管理する。承認後の処理は on_approved フックで接続する",
+      "tags": [
+        "approval",
+        "workflow",
+        "request",
+        "review",
+        "申請",
+        "承認",
+        "差し戻し",
+        "ワークフロー",
+        "稟議"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "申請対象のエンティティ"
+        },
+        "approver": {
+          "required": true,
+          "desc": "承認ロール"
+        },
+        "on_approved": {
+          "required": false,
+          "desc": "承認後に呼ぶ処理（custom または別パターン）"
+        }
+      },
+      "effects": [
+        "write(approvals)",
+        "notify(approver)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/expense.prout",
+        "examples/pc_lending.prout"
+      ],
+      "path": "registry/approval.json"
+    },
+    {
+      "name": "auth",
+      "version": "0.1.0",
+      "intent": "サインイン、セッション、ロールによるルート保護を追加する",
+      "tags": [
+        "auth",
+        "login",
+        "session",
+        "role",
+        "認証",
+        "ログイン",
+        "権限"
+      ],
+      "slots": {
+        "provider": {
+          "required": true,
+          "desc": "Clerk, Auth0, Supabase など"
+        },
+        "roles": {
+          "required": false,
+          "desc": "アプリで使うロール"
+        }
+      },
+      "effects": [
+        "read(users)",
+        "write(sessions)"
+      ],
+      "examples": [
+        "examples/shop.prout",
+        "examples/expense.prout"
+      ],
+      "path": "registry/auth.json"
+    },
+    {
+      "name": "checkout",
+      "version": "0.1.0",
+      "intent": "決済セッション、Webhook、チェックアウト画面を追加する",
+      "tags": [
+        "checkout",
+        "payment",
+        "stripe",
+        "webhook",
+        "決済",
+        "支払い"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "注文エンティティ"
+        },
+        "payment": {
+          "required": true,
+          "desc": "stripe など"
+        },
+        "success": {
+          "required": false,
+          "desc": "決済成功後の処理"
+        },
+        "cancel": {
+          "required": false,
+          "desc": "キャンセル時の戻り先"
+        }
+      },
+      "effects": [
+        "write(orders)",
+        "net(payment)"
+      ],
+      "examples": [
+        "examples/shop.prout"
+      ],
+      "path": "registry/checkout.json"
+    },
+    {
+      "name": "crud",
+      "version": "0.1.0",
+      "intent": "エンティティの一覧・詳細・作成・更新・削除を、管理画面とAPIで提供する",
+      "tags": [
+        "crud",
+        "admin",
+        "list",
+        "detail",
+        "管理画面",
+        "一覧",
+        "検索",
+        "ページネーション"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象のエンティティ"
+        },
+        "access": {
+          "required": false,
+          "desc": "アクセスを許すロール"
+        },
+        "search": {
+          "required": false,
+          "desc": "検索対象のフィールド"
+        },
+        "paginate": {
+          "required": false,
+          "desc": "1ページの件数"
+        }
+      },
+      "effects": [
+        "read(entity)",
+        "write(entity)"
+      ],
+      "examples": [
+        "examples/shop.prout"
+      ],
+      "path": "registry/crud.json"
+    },
+    {
+      "name": "dashboard",
+      "version": "0.1.0",
+      "intent": "売上・返金・保留などの指標を集計し、ダッシュボードで可視化する",
+      "tags": [
+        "dashboard",
+        "metrics",
+        "analytics",
+        "chart",
+        "ダッシュボード",
+        "指標",
+        "集計"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "集計対象のエンティティ"
+        },
+        "metrics": {
+          "required": true,
+          "desc": "表示する指標"
+        },
+        "range": {
+          "required": false,
+          "desc": "集計期間"
+        }
+      },
+      "effects": [
+        "read(entity)"
+      ],
+      "examples": [
+        "examples/shop.prout"
+      ],
+      "path": "registry/dashboard.json"
+    },
+    {
+      "name": "notify",
+      "version": "0.1.0",
+      "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
+      "tags": [
+        "notify",
+        "email",
+        "slack",
+        "notification",
+        "通知",
+        "メール"
+      ],
+      "slots": {
+        "channel": {
+          "required": true,
+          "desc": "email または slack"
+        },
+        "template": {
+          "required": false,
+          "desc": "テンプレート名"
+        }
+      },
+      "effects": [
+        "net(channel)",
+        "read(templates)"
+      ],
+      "examples": [],
+      "path": "registry/notify.json"
+    },
+    {
+      "name": "refund",
+      "version": "0.1.0",
+      "intent": "注文に対する返金を作成し、上限と権限を検証し、監査ログを残す",
+      "tags": [
+        "refund",
+        "payment",
+        "stripe",
+        "admin",
+        "返金",
+        "監査"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "返金対象の注文エンティティ"
+        },
+        "payment": {
+          "required": true,
+          "desc": "stripe など"
+        },
+        "policy": {
+          "required": false,
+          "desc": "返金を許す権限"
+        },
+        "max": {
+          "required": false,
+          "desc": "返金上限の式"
+        }
+      },
+      "effects": [
+        "write(payments)",
+        "net(payment)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/shop.prout"
+      ],
+      "path": "registry/refund.json"
+    },
+    {
+      "name": "search",
+      "version": "0.1.0",
+      "intent": "複数フィールドを横断する検索とフィルタを追加する",
+      "tags": [
+        "search",
+        "filter",
+        "query",
+        "検索",
+        "フィルタ"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "検索対象のエンティティ"
+        },
+        "fields": {
+          "required": true,
+          "desc": "検索対象のフィールド"
+        }
+      },
+      "effects": [
+        "read(entity)"
+      ],
+      "examples": [],
+      "path": "registry/search.json"
+    },
+    {
+      "name": "upload",
+      "version": "0.1.0",
+      "intent": "署名付きURLでファイルをアップロードし、ウイルススキャンと保存を管理する",
+      "tags": [
+        "upload",
+        "file",
+        "s3",
+        "storage",
+        "アップロード",
+        "ファイル"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "ファイルを紐づけるエンティティ"
+        },
+        "field": {
+          "required": true,
+          "desc": "ファイルURLを保持するフィールド"
+        }
+      },
+      "effects": [
+        "write(storage)",
+        "net(storage)"
+      ],
+      "examples": [],
+      "path": "registry/upload.json"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "upload",
+  "version": "0.1.0",
+  "intent": "署名付きURLでファイルをアップロードし、ウイルススキャンと保存を管理する",
+  "tags": ["upload", "file", "s3", "storage", "アップロード", "ファイル"],
+  "slots": {
+    "entity": {"type": "entity", "required": true, "desc": "ファイルを紐づけるエンティティ"},
+    "field": {"type": "string", "required": true, "desc": "ファイルURLを保持するフィールド"}
+  },
+  "effects": ["write(storage)", "net(storage)"],
+  "artifacts": [
+    {"path": "api/uploads/route.ts", "kind": "API", "lines": 60, "desc": "署名付きURLの発行"},
+    {"path": "components/upload.tsx", "kind": "UI", "lines": 50, "desc": "アップロードUI"},
+    {"path": "lib/storage.ts", "kind": "TS", "lines": 40, "desc": "S3クライアント"}
+  ],
+  "examples": [],
+  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+}

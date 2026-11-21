@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Contract language
+        run: |
+          python3 prout.py check examples/refund_fixed.prout
+          python3 render.py
+          test -s human-view.html
+
+      - name: Broken example must fail
+        run: |
+          if python3 prout.py check examples/refund_broken.prout; then
+            echo "broken example unexpectedly passed"
+            exit 1
+          fi
+
+      - name: Pattern registry
+        working-directory: patterns
+        run: |
+          python3 proutc.py index
+          git diff --exit-code registry/index.json
+          python3 proutc.py find "申請 承認" | grep -q approval
+          python3 proutc.py build examples/shop.prout
+          python3 proutc.py build examples/expense.prout
+          python3 proutc.py build examples/pc_lending.prout
+
+      - name: Benchmark
+        working-directory: patterns
+        run: |
+          python3 proutc.py bench
+          python3 growth_report.py
+          test -s build/growth.html
+
+      - name: Benchmark regression guard
+        working-directory: patterns
+        run: |
+          python3 - <<'PY'
+          import json
+          report = json.load(open("bench/report.json"))
+          rows = {r["case"]: r for r in report}
+          after = rows["expense_after"]
+          before = rows["expense_before"]
+          assert after["ai_authored_lines"] < before["ai_authored_lines"], "reuse did not reduce AI lines"
+          assert after["reuse_ratio"] > before["reuse_ratio"], "reuse ratio did not improve"
+          print(f'{before["ai_authored_lines"]} -> {after["ai_authored_lines"]} lines, {before["reuse_ratio"]}x -> {after["reuse_ratio"]}x')
+          PY
