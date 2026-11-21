@@ -1084,6 +1084,7 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
         intent = m.intent.lower()
         tags = [t.lower() for t in m.tags]
         slots = [s.lower() for s in m.slots]
+        descriptions = [str(v.get("desc", "")).lower() for v in m.slots.values()]
         for token in tokens:
             if token in name:
                 score += 5
@@ -1094,6 +1095,9 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
                     score += 3
             for slot in slots:
                 if token in slot:
+                    score += 1
+            for description in descriptions:
+                if token in description:
                     score += 1
         if score:
             results.append((score, m))
@@ -1199,8 +1203,9 @@ def cmd_find(args: argparse.Namespace) -> int:
     if not results:
         print(f"no patterns matched {args.query!r}")
         return 1
-    print(f"query: {args.query!r}  ({len(results)} match(es))")
-    for score, m in results:
+    shown = results[:3]
+    print(f"query: {args.query!r}  ({len(results)} match(es), showing {len(shown)})")
+    for score, m in shown:
         required = [k for k, v in m.slots.items() if v.get("required")]
         optional = [k for k, v in m.slots.items() if not v.get("required")]
         print()
@@ -1208,6 +1213,7 @@ def cmd_find(args: argparse.Namespace) -> int:
         print(f"    intent: {m.intent}")
         print(f"    required: {', '.join(required) or '-'}")
         print(f"    optional: {', '.join(optional) or '-'}")
+        print(f"    effects: {', '.join(m.effects) or '-'}")
         print(f"    tags: {', '.join(m.tags)}")
         if m.examples:
             print(f"    examples: {', '.join(m.examples)}")

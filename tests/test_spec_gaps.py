@@ -62,22 +62,20 @@ class TestSpecGaps(unittest.TestCase):
         )
         self.assertIn("E-EFF", codes(diags, "error"))
 
-    @unittest.expectedFailure
     def test_find_scores_slot_descriptions(self) -> None:
         """patterns/registry/README.md: find は intent、tags、name、スロット説明の一致を点数化する。
 
         ``Supabase`` occurs only in the description of auth's ``provider`` slot.
-        ``find_patterns`` matches slot names, not descriptions, so auth scores 0.
+        ``find_patterns`` scores slot descriptions as well as slot names.
         """
         found = [item.name for _score, item in find_patterns("Supabase", load_registry(DEFAULT_REGISTRY))]
         self.assertIn("auth", found)
 
-    @unittest.expectedFailure
     def test_find_command_shows_effects(self) -> None:
         """patterns/registry/README.md: 上位3件と、必須スロット・任意スロット・効果を表示する。
 
-        ``proutc find`` prints required slots, optional slots, and tags. It does
-        not print the manifest's ``effects``.
+        ``proutc find`` prints at most three matches, with required slots,
+        optional slots, effects, and tags.
         """
         proc = subprocess.run(
             [sys.executable, str(PATTERNS / "proutc.py"), "find", "auth"],
@@ -89,6 +87,8 @@ class TestSpecGaps(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("read(users)", proc.stdout)
         self.assertIn("write(sessions)", proc.stdout)
+        self.assertIn("showing", proc.stdout)
+        self.assertLessEqual(proc.stdout.count("score="), 3)
 
 
 if __name__ == "__main__":

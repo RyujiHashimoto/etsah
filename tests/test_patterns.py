@@ -448,11 +448,11 @@ class TestFind(unittest.TestCase):
         approval = {"approval": _manifest("approval", intent="no")}
         self.assertGreaterEqual(find_patterns("app", approval)[0][0], 5)
 
-    def test_documented_query_returns_approval_at_score_12(self) -> None:
+    def test_documented_query_returns_approval_at_score_15(self) -> None:
         found = find_patterns("申請 承認", load_registry(DEFAULT_REGISTRY))
         self.assertTrue(found)
         self.assertEqual(found[0][1].name, "approval")
-        self.assertEqual(found[0][0], 12)
+        self.assertEqual(found[0][0], 15)
 
     def test_find_command(self) -> None:
         proc = subprocess.run(
@@ -464,7 +464,7 @@ class TestFind(unittest.TestCase):
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("approval", proc.stdout)
-        self.assertIn("score=12", proc.stdout)
+        self.assertIn("score=15", proc.stdout)
 
         missing = subprocess.run(
             [sys.executable, str(PATTERNS / "proutc.py"), "find", "no-such-pattern"],
