@@ -1,0 +1,15 @@
+app fraction_quiz
+  stack html
+  pattern scene question
+    title: 半分と同じ量は？
+    body: 同じ大きさのパンを4等分しました。半分になるのは何切れ？
+    choices: [["1切れ", "hint"], ["2切れ", "answer"]]
+
+  pattern scene hint
+    title: もう一度考える
+    body: 4切れを2人で同じ数ずつ分けてみましょう。
+    choices: [["問題に戻る", "question"]]
+
+  pattern scene answer
+    title: 正解
+    body: 4切れのうち2切れを取ると半分です。2/4 と 1/2 は同じ量です。

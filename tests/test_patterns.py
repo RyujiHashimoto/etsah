@@ -149,6 +149,7 @@ class TestSlots(unittest.TestCase):
             "notify": {"channel"},
             "upload": {"entity", "field"},
             "approval": {"entity", "approver"},
+            "scene": {"title", "body"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():

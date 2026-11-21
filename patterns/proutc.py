@@ -352,6 +352,17 @@ def write_index(registry_dir: Path) -> Path:
 # Validation
 # ---------------------------------------------------------------------------
 
+def scene_choices(scene: PatternUse) -> list:
+    choices = json.loads(scene.slots.get("choices", "[]"))
+    if not isinstance(choices, list) or not all(
+        isinstance(pair, list) and len(pair) == 2
+        and all(isinstance(value, str) and value.strip() for value in pair)
+        for pair in choices
+    ):
+        raise ValueError("choices must be an array of [label, scene ID] pairs")
+    return choices
+
+
 def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]:
     diags: list[Diagnostic] = []
 
@@ -497,6 +508,22 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         if app.freedom == "guided" and not c.why:
             err("E-CUSTOM", f"custom {c.name} needs a `why` in guided mode", c.line)
 
+    scenes = [p for p in app.patterns if p.name == "scene"]
+    scene_ids = {p.target for p in scenes}
+    seen_scenes = set()
+    for scene in scenes:
+        if not scene.target or scene.target in seen_scenes:
+            err("E-SCENE", "each scene requires a unique scene ID", scene.line)
+        seen_scenes.add(scene.target)
+        try:
+            choices = scene_choices(scene)
+        except ValueError as ex:
+            err("E-SCENE", str(ex), scene.line)
+            continue
+        for label, destination in choices:
+            if destination not in scene_ids:
+                err("E-SCENE", f"{label!r} links to unknown scene {destination!r}", scene.line)
+
     return diags
 
 
@@ -555,12 +582,17 @@ def expand(app: App, registry: dict[str, PatternManifest]) -> list[Artifact]:
     arts.append(Artifact("shared", "lib/types.ts", "TS", type_lines, "共有型とブランド型"))
     arts.append(Artifact("shared", "README.md", "MD", 30, "セットアップと環境変数の手順"))
 
+    if not app.entities and app.patterns and all(p.name == "scene" for p in app.patterns):
+        arts.clear()
+
     for p in app.patterns:
         m = registry.get(p.name)
         if not m:
             continue
         entity = entity_for(app, p)
         ctx = template_context(entity)
+        if p.name == "scene":
+            ctx["Entity"] = p.target
         for t in m.artifacts:
             path = substitute(t.get("path", ""), ctx)
             desc = substitute(t.get("desc", ""), ctx)
@@ -682,6 +714,10 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         )
     else:
         human_panel = '<p style="font-size:12.5px;color:var(--muted);">エンティティが定義されていない。</p>'
+
+    if any(p.name == "scene" for p in app.patterns) and not errors:
+        link = '<p><a class="demo-link" href="story.html">作品を開く →</a></p>'
+        human_panel = human_panel + link if approval or preview_entity else link
 
     freedom_text = {
         "strict": "パターンのみ。最速・最も検証しやすい。",
@@ -858,6 +894,37 @@ def sample_value(name: str, typ: str) -> str:
     if "name" in n:
         return "山田 太郎"
     return "サンプル"
+
+
+def render_story(scenes: list[PatternUse]) -> str:
+    start = scenes[0]
+    sections = []
+    # Keep the default scene last so a targeted sibling can hide it without JS.
+    for scene in [*scenes[1:], start]:
+        choices = scene_choices(scene) or [("最初から", start.target)]
+        links = "".join(
+            f'<a href="#scene-{esc(target)}">{esc(label)}</a>'
+            for label, target in choices
+        )
+        sections.append(
+            f'<section id="scene-{esc(scene.target)}" tabindex="-1">'
+            f'<h1>{esc(scene.slots["title"])}</h1><p>{esc(scene.slots["body"])}</p>'
+            f'<nav aria-label="選択肢">{links}</nav></section>'
+        )
+    css = """
+    body{margin:0;background:#f6f2e9;color:#243b38;font:1.15rem/1.8 system-ui,sans-serif}
+    main{max-width:36rem;margin:10vh auto;padding:1.5rem}
+    h1{line-height:1.3}section{display:none}section:last-child,section:target{display:block}
+    section:target~section:last-child{display:none}
+    nav{display:grid;gap:.7rem;margin-top:2rem}
+    a{display:block;padding:.6rem 1rem;background:#234e48;color:white;border-radius:.4rem}
+    """
+    return (
+        '<!doctype html><html lang="ja"><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f'<title>{esc(start.slots["title"])}</title><style>{css}</style>'
+        f'<main>{"".join(sections)}</main></html>'
+    )
 
 
 def render_demo(app: App, arts: list[Artifact]) -> str:
@@ -1253,6 +1320,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     demo = "" if has_errors else render_demo(app, arts)
     if demo:
         (out / "demo.html").write_text(demo, encoding="utf-8")
+
+    scenes = [p for p in app.patterns if p.name == "scene"]
+    story = out / "story.html"
+    if scenes and not has_errors:
+        story.write_text(render_story(scenes), encoding="utf-8")
+        print(f"wrote {story}")
+    else:
+        story.unlink(missing_ok=True)
 
     manifest = {
         "app": app.name,

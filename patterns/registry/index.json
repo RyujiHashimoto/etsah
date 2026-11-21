@@ -281,6 +281,42 @@
       "path": "registry/refund.json"
     },
     {
+      "name": "scene",
+      "version": "0.1.0",
+      "intent": "選択肢で場面を移動するゲームブックや分岐教材をHTMLで体験する",
+      "tags": [
+        "scene",
+        "story",
+        "quiz",
+        "ゲームブック",
+        "物語",
+        "教材",
+        "クイズ",
+        "分岐"
+      ],
+      "slots": {
+        "title": {
+          "required": true,
+          "desc": "見出し（プレーンテキスト）"
+        },
+        "body": {
+          "required": true,
+          "desc": "場面の本文"
+        },
+        "choices": {
+          "required": false,
+          "desc": "JSON配列。各項目は [表示名, 移動先の場面ID]"
+        }
+      },
+      "states": [],
+      "effects": [],
+      "examples": [
+        "examples/moon_garden.prout",
+        "examples/fraction_quiz.prout"
+      ],
+      "path": "registry/scene.json"
+    },
+    {
       "name": "search",
       "version": "0.1.0",
       "intent": "複数フィールドを横断する検索とフィルタを追加する",
