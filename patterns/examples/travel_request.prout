@@ -29,16 +29,12 @@ app travel_request
     search: [id, status, applicant.email, destination]
     paginate: 20
 
-  pattern approval TravelRequest
-    entity: TravelRequest
-    approver: manager
-    on_approved: notify_accounting
-
   pattern notify
     channel: email
     recipient: accounting
     template: travel_approved
 
-  custom notify_accounting
-    why "上長の承認後に、出張申請の内容と概算費用を経理ロールへメールで通知し、監査ログに記録する"
-    lines 40
+  pattern approval TravelRequest
+    entity: TravelRequest
+    approver: manager
+    on_approved: notify

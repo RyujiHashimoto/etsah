@@ -28,31 +28,31 @@
   },
   {
     "case": "travel_request",
-    "spec_lines": 36,
-    "custom_lines": 40,
-    "ai_authored_lines": 76,
-    "generated_lines": 1426,
-    "reuse_ratio": 18.8,
+    "spec_lines": 33,
+    "custom_lines": 0,
+    "ai_authored_lines": 33,
+    "generated_lines": 1386,
+    "reuse_ratio": 42.0,
     "patterns": [
       "auth",
       "crud",
-      "approval",
-      "notify"
+      "notify",
+      "approval"
     ],
     "errors": 0
   },
   {
     "case": "equipment_purchase",
-    "spec_lines": 37,
-    "custom_lines": 40,
-    "ai_authored_lines": 77,
-    "generated_lines": 1434,
-    "reuse_ratio": 18.6,
+    "spec_lines": 34,
+    "custom_lines": 0,
+    "ai_authored_lines": 34,
+    "generated_lines": 1394,
+    "reuse_ratio": 41.0,
     "patterns": [
       "auth",
       "crud",
-      "approval",
-      "notify"
+      "notify",
+      "approval"
     ],
     "errors": 0
   },

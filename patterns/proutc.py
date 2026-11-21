@@ -136,6 +136,22 @@ def parse_string(s: str, line: int) -> str:
     return json.loads(s)
 
 
+def slot_value(raw: str) -> str:
+    """Return a slot value without its optional JSON string quotes."""
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] == '"':
+        try:
+            return parse_string(raw, 0)
+        except ValueError:
+            return raw[1:-1]
+    return raw
+
+
+def role_names(raw: str) -> set[str]:
+    """Parse the comma-separated `roles` slot of an auth pattern."""
+    return {part.strip().strip('"') for part in slot_value(raw).split(",") if part.strip()}
+
+
 def parse_app(text: str) -> App:
     lines = preprocess(text)
     if not lines:
@@ -359,6 +375,10 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
     seen_patterns: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
     auth_count = 0
+    auth_roles: set[str] = set()
+    for p in app.patterns:
+        if p.name == "auth" and "roles" in p.slots:
+            auth_roles |= role_names(p.slots["roles"])
     for p in app.patterns:
         m = registry.get(p.name)
         if not m:
@@ -389,20 +409,67 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
         hook_spec = m.hooks.get("on_approved")
-        hook = p.slots.get("on_approved")
-        if hook_spec and hook:
-            if hook not in custom_names and hook not in registry:
+        hook_raw = p.slots.get("on_approved")
+        if hook_spec and hook_raw:
+            hook = slot_value(hook_raw)
+            if hook in custom_names:
+                pass
+            elif hook not in registry:
                 err(
                     "E-HOOK",
                     f"on_approved {hook!r} is not a custom block or registered pattern",
                     p.line,
                 )
-            elif hook in registry and not any(other.name == hook for other in app.patterns):
-                err(
-                    "E-HOOK",
-                    f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
-                    p.line,
-                )
+            else:
+                uses = [other for other in app.patterns if other.name == hook]
+                if not uses:
+                    err(
+                        "E-HOOK",
+                        f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
+                        p.line,
+                    )
+                elif len(uses) > 1:
+                    err(
+                        "E-HOOK",
+                        f"on_approved pattern {hook!r} is applied {len(uses)} times; the hook target is ambiguous",
+                        p.line,
+                    )
+                else:
+                    expected = hook_spec.get("pattern")
+                    if expected and hook != expected:
+                        err(
+                            "E-HOOK",
+                            f"on_approved must reference the {expected!r} pattern, got {hook!r}",
+                            p.line,
+                        )
+                    else:
+                        use = uses[0]
+                        for arg in hook_spec.get("args", []):
+                            if arg not in use.slots:
+                                err(
+                                    "E-HOOK-ARG",
+                                    f"on_approved {hook!r} requires argument {arg!r}",
+                                    p.line,
+                                )
+                        target = registry[hook]
+                        for arg, raw in use.slots.items():
+                            spec = target.slots.get(arg)
+                            if not spec:
+                                continue
+                            value = slot_value(raw)
+                            allowed = spec.get("enum")
+                            if allowed and value not in allowed:
+                                err(
+                                    "E-HOOK-ARG",
+                                    f"on_approved {hook}.{arg} must be one of {', '.join(allowed)}; got {value!r}",
+                                    use.line,
+                                )
+                            if spec.get("type") == "role" and auth_roles and value not in auth_roles:
+                                err(
+                                    "E-HOOK-ARG",
+                                    f"on_approved {hook}.{arg} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
+                                    use.line,
+                                )
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:
@@ -797,10 +864,18 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
     entity_name = approval.slots.get("entity") or approval.target
     entity = next((e for e in app.entities if e.name == entity_name), None)
     approver = approval.slots.get("approver", "approver")
-    on_approved = approval.slots.get("on_approved", "")
+    on_approved = slot_value(approval.slots.get("on_approved", ""))
     custom = next((c for c in app.customs if c.name == on_approved), None)
+    hook_use = next((p for p in app.patterns if p.name == on_approved), None)
     if custom and custom.why:
         action = custom.why
+    elif hook_use and on_approved == "notify":
+        channel = slot_value(hook_use.slots.get("channel", "email"))
+        recipient = slot_value(hook_use.slots.get("recipient", "approver"))
+        template = slot_value(hook_use.slots.get("template", ""))
+        action = f"{channel} で {recipient} ロールに承認結果を通知する"
+        if template:
+            action += f"（テンプレート: {template}）"
     elif on_approved:
         action = f"{on_approved} を実行する"
     else:
