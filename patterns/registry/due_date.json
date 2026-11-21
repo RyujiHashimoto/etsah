@@ -1,0 +1,53 @@
+{
+  "name": "due_date",
+  "version": "0.1.0",
+  "intent": "対応期限と現在時刻を比較して期限超過を表示する",
+  "tags": [
+    "due_date",
+    "期限管理",
+    "deadline",
+    "期日"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "deadline": {
+      "type": "string",
+      "required": true,
+      "desc": "対応期限を保持する項目"
+    }
+  },
+  "effects": [
+    "read(entity)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/due_date.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の期限超過の判定"
+    },
+    {
+      "path": "tests/{plural}/due_date.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "期限当日の境界値"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

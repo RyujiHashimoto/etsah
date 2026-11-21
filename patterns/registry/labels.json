@@ -1,0 +1,54 @@
+{
+  "name": "labels",
+  "version": "0.1.0",
+  "intent": "案件に複数の分類ラベルを付け外しする",
+  "tags": [
+    "labels",
+    "ラベル",
+    "tags",
+    "分類"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "vocabulary": {
+      "type": "string",
+      "required": true,
+      "desc": "使用するラベル集合"
+    }
+  },
+  "effects": [
+    "read(labels)",
+    "write(labels)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/labels.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の分類ラベルの付与と解除"
+    },
+    {
+      "path": "tests/{plural}/labels.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "同じラベルの重複防止"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

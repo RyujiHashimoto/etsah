@@ -1,0 +1,53 @@
+{
+  "name": "work_queue",
+  "version": "0.1.0",
+  "intent": "未処理案件を優先度順に並べて作業一覧にする",
+  "tags": [
+    "work_queue",
+    "作業キュー",
+    "queue",
+    "待ち行列"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "priority": {
+      "type": "string",
+      "required": true,
+      "desc": "優先順位を保持する項目"
+    }
+  },
+  "effects": [
+    "read(entity)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/work_queue.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の優先順位順の一覧"
+    },
+    {
+      "path": "tests/{plural}/work_queue.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "同順位の安定した表示順"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

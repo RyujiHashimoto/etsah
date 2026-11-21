@@ -1,0 +1,54 @@
+{
+  "name": "activity_log",
+  "version": "0.1.0",
+  "intent": "案件の変更イベントを追記し時系列で表示する",
+  "tags": [
+    "activity_log",
+    "操作履歴",
+    "timeline",
+    "監査ログ"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "events": {
+      "type": "list",
+      "required": true,
+      "desc": "記録するイベント名"
+    }
+  },
+  "effects": [
+    "write(events)",
+    "read(events)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/activity_log.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の時系列イベントの追記と表示"
+    },
+    {
+      "path": "tests/{plural}/activity_log.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "過去イベントを保持した追記"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "name": "csv_export",
+  "version": "0.1.0",
+  "intent": "指定した列を一定の順序でCSVとして書き出す",
+  "tags": [
+    "csv_export",
+    "CSV出力",
+    "export",
+    "書き出し"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "columns": {
+      "type": "list",
+      "required": true,
+      "desc": "出力する項目と順序"
+    }
+  },
+  "effects": [
+    "read(entity)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/csv_export.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の列順を保つCSV出力"
+    },
+    {
+      "path": "tests/{plural}/csv_export.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "引用符・改行を含む値"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

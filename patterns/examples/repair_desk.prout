@@ -1,0 +1,52 @@
+# 機器修理の受付から完了後の評価まで
+app repair_desk
+  stack nextjs, postgres
+  freedom guided
+
+  entity Repair
+    id: Id
+    serial_number: String
+    owner_id: Id
+    priority: Int
+    due_at: DateTime
+    archived_at: DateTime
+
+  pattern assignment Repair
+    entity: Repair
+    assignee: owner_id
+
+  pattern work_queue Repair
+    entity: Repair
+    priority: priority
+
+  pattern due_date Repair
+    entity: Repair
+    deadline: due_at
+
+  pattern checklist Repair
+    entity: Repair
+    template: repair_desk_checks
+
+  pattern comment_thread Repair
+    entity: Repair
+    author: user_id
+
+  pattern labels Repair
+    entity: Repair
+    vocabulary: repair_desk_categories
+
+  pattern activity_log Repair
+    entity: Repair
+    events: [created, assigned, closed]
+
+  pattern csv_export Repair
+    entity: Repair
+    columns: [id, serial_number, priority]
+
+  pattern archive Repair
+    entity: Repair
+    timestamp: archived_at
+
+  pattern survey Repair
+    entity: Repair
+    scale: 5

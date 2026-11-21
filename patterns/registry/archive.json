@@ -1,0 +1,54 @@
+{
+  "name": "archive",
+  "version": "0.1.0",
+  "intent": "完了した案件を通常一覧から外し、必要に応じて復元する",
+  "tags": [
+    "archive",
+    "アーカイブ",
+    "archive",
+    "保管"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "timestamp": {
+      "type": "string",
+      "required": true,
+      "desc": "保管日時を保持する項目"
+    }
+  },
+  "effects": [
+    "read(entity)",
+    "write(entity)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/archive.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の案件の保管と復元"
+    },
+    {
+      "path": "tests/{plural}/archive.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "復元後の通常一覧への再表示"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

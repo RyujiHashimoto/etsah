@@ -38,6 +38,12 @@ jobs:
           python3 proutc.py build examples/expense.prout
           python3 proutc.py build examples/pc_lending.prout
 
+      - name: Build service desk examples
+        working-directory: patterns
+        run: |
+          python3 proutc.py build examples/repair_desk.prout
+          python3 proutc.py build examples/support_desk.prout
+
       - name: Benchmark
         working-directory: patterns
         run: |

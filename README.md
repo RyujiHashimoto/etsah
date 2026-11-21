@@ -157,7 +157,7 @@ examples/                壊れた初稿と修正版
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              9個のパターンマニフェストと index.json
+  registry/              19個のパターンマニフェストと index.json
   examples/              ショップ、経費精算、出張申請、備品購入の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、承認デモの demo.html）
