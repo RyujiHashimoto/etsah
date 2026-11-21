@@ -37,6 +37,7 @@ jobs:
           python3 proutc.py build examples/shop.prout
           python3 proutc.py build examples/expense.prout
           python3 proutc.py build examples/pc_lending.prout
+          python3 proutc.py build examples/travel_request.prout
 
       - name: Benchmark
         working-directory: patterns
