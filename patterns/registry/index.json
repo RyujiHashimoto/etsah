@@ -2,6 +2,37 @@
   "version": 1,
   "patterns": [
     {
+      "name": "activity_log",
+      "version": "0.1.0",
+      "intent": "案件の変更イベントを追記し時系列で表示する",
+      "tags": [
+        "activity_log",
+        "操作履歴",
+        "timeline",
+        "監査ログ"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "events": {
+          "required": true,
+          "desc": "記録するイベント名"
+        }
+      },
+      "states": [],
+      "effects": [
+        "write(events)",
+        "read(events)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/activity_log.json"
+    },
+    {
       "name": "approval",
       "version": "0.3.0",
       "intent": "申請を承認者に回し、承認・差し戻し・却下の状態遷移を管理する。承認後の処理は on_approved フックで接続する",
@@ -51,6 +82,68 @@
       "path": "registry/approval.json"
     },
     {
+      "name": "archive",
+      "version": "0.1.0",
+      "intent": "完了した案件を通常一覧から外し、必要に応じて復元する",
+      "tags": [
+        "archive",
+        "アーカイブ",
+        "archive",
+        "保管"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "timestamp": {
+          "required": true,
+          "desc": "保管日時を保持する項目"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(entity)",
+        "write(entity)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/archive.json"
+    },
+    {
+      "name": "assignment",
+      "version": "0.1.0",
+      "intent": "案件の担当者を割り当て、変更履歴を残す",
+      "tags": [
+        "assignment",
+        "担当割当",
+        "assign",
+        "担当者"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "assignee": {
+          "required": true,
+          "desc": "担当者の識別子を保持する項目"
+        }
+      },
+      "states": [],
+      "effects": [
+        "write(entity)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/assignment.json"
+    },
+    {
       "name": "auth",
       "version": "0.1.0",
       "intent": "サインイン、セッション、ロールによるルート保護を追加する",
@@ -83,6 +176,37 @@
         "examples/expense.prout"
       ],
       "path": "registry/auth.json"
+    },
+    {
+      "name": "checklist",
+      "version": "0.1.0",
+      "intent": "案件ごとの確認項目と完了状態を記録する",
+      "tags": [
+        "checklist",
+        "チェックリスト",
+        "checklist",
+        "点検項目"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "template": {
+          "required": true,
+          "desc": "使用する点検項目セット"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(checks)",
+        "write(checks)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/checklist.json"
     },
     {
       "name": "checkout",
@@ -123,6 +247,37 @@
         "examples/shop.prout"
       ],
       "path": "registry/checkout.json"
+    },
+    {
+      "name": "comment_thread",
+      "version": "0.1.0",
+      "intent": "案件ごとの時系列に沿ってコメントを追加・閲覧する",
+      "tags": [
+        "comment_thread",
+        "コメント",
+        "discussion",
+        "申し送り"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "author": {
+          "required": true,
+          "desc": "投稿者を識別する方法"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(comments)",
+        "write(comments)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/comment_thread.json"
     },
     {
       "name": "crud",
@@ -167,6 +322,36 @@
       "path": "registry/crud.json"
     },
     {
+      "name": "csv_export",
+      "version": "0.1.0",
+      "intent": "指定した列を一定の順序でCSVとして書き出す",
+      "tags": [
+        "csv_export",
+        "CSV出力",
+        "export",
+        "書き出し"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "columns": {
+          "required": true,
+          "desc": "出力する項目と順序"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(entity)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/csv_export.json"
+    },
+    {
       "name": "dashboard",
       "version": "0.1.0",
       "intent": "売上・返金・保留などの指標を集計し、ダッシュボードで可視化する",
@@ -201,6 +386,67 @@
         "examples/shop.prout"
       ],
       "path": "registry/dashboard.json"
+    },
+    {
+      "name": "due_date",
+      "version": "0.1.0",
+      "intent": "対応期限と現在時刻を比較して期限超過を表示する",
+      "tags": [
+        "due_date",
+        "期限管理",
+        "deadline",
+        "期日"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "deadline": {
+          "required": true,
+          "desc": "対応期限を保持する項目"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(entity)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/due_date.json"
+    },
+    {
+      "name": "labels",
+      "version": "0.1.0",
+      "intent": "案件に複数の分類ラベルを付け外しする",
+      "tags": [
+        "labels",
+        "ラベル",
+        "tags",
+        "分類"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "vocabulary": {
+          "required": true,
+          "desc": "使用するラベル集合"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(labels)",
+        "write(labels)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/labels.json"
     },
     {
       "name": "notify",
@@ -345,6 +591,37 @@
       "path": "registry/search.json"
     },
     {
+      "name": "survey",
+      "version": "0.1.0",
+      "intent": "対応を終えた案件に評価を記録して集計する",
+      "tags": [
+        "survey",
+        "満足度調査",
+        "feedback",
+        "アンケート"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "scale": {
+          "required": true,
+          "desc": "評価段階数"
+        }
+      },
+      "states": [],
+      "effects": [
+        "write(responses)",
+        "read(responses)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/survey.json"
+    },
+    {
       "name": "upload",
       "version": "0.1.0",
       "intent": "署名付きURLでファイルをアップロードし、ウイルススキャンと保存を管理する",
@@ -373,6 +650,36 @@
       ],
       "examples": [],
       "path": "registry/upload.json"
+    },
+    {
+      "name": "work_queue",
+      "version": "0.1.0",
+      "intent": "未処理案件を優先度順に並べて作業一覧にする",
+      "tags": [
+        "work_queue",
+        "作業キュー",
+        "queue",
+        "待ち行列"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "対象の案件"
+        },
+        "priority": {
+          "required": true,
+          "desc": "優先順位を保持する項目"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(entity)"
+      ],
+      "examples": [
+        "examples/repair_desk.prout",
+        "examples/support_desk.prout"
+      ],
+      "path": "registry/work_queue.json"
     }
   ]
 }

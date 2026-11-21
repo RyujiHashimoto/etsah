@@ -182,10 +182,10 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              パターンマニフェストと index.json
-  examples/              ショップ、経費精算、出張申請、備品購入の仕様
+  registry/              20個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブックの仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
-  build/                 生成物（report.html、承認デモの demo.html）
+  build/                 生成物（report.html、demo.html、story.html）
   growth_report.py       成長ループのHTMLレポート
 .github/workflows/ci.yml 単体テスト、契約検査、索引整合、ビルド、ベンチ、回帰ガード
 CONTRIBUTING.md          パターン提案とレビューの基準
@@ -199,6 +199,16 @@ CONTRIBUTING.md          パターン提案とレビューの基準
 cd patterns
 python3 proutc.py build examples/moon_garden.prout --out build/garden
 python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```
+
+## 修理受付・顧客サポートをパターンで組む
+
+`repair_desk` と `support_desk` の2例から、担当割当、作業キュー、期限、チェックリスト、コメント、ラベル、操作履歴、CSV出力、アーカイブ、評価の10パターンを抽出しました。どちらの仕様も52行で、業務固有の記述をパターンの適用に置き換えています。
+
+```sh
+cd patterns
+python3 proutc.py build examples/repair_desk.prout --out build/repair
+python3 proutc.py build examples/support_desk.prout --out build/support
 ```
 
 ## 参加する
