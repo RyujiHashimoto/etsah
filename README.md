@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在120件で、意図的な未実装2件は `expectedFailure` として記録しています。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在133件で、意図的な未実装2件は `expectedFailure` として記録しています。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -212,6 +212,19 @@ python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
 cd patterns
 python3 proutc.py build examples/repair_desk.prout --out build/repair
 python3 proutc.py build examples/support_desk.prout --out build/support
+```
+
+## 人材派遣の勤怠・契約・単価を検査する
+
+`timesheet`（勤怠と派遣先承認）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
+
+法令の数値は言語に埋め込まず、設定された値の整合だけを見ます。抵触日の3年計算、36協定の上限、社会保険料率、同一労働同一賃金の判断は対象外です。設計と限界は [docs/staffing.md](docs/staffing.md) にまとめています。
+
+```sh
+cd patterns
+python3 proutc.py build examples/staffing.prout --out build/staffing
+python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
+python3 proutc.py find "勤怠"
 ```
 
 ## 参加する
