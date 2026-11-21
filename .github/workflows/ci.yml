@@ -31,6 +31,7 @@ jobs:
       - name: Pattern registry
         working-directory: patterns
         run: |
+          python3 -m unittest test_hooks
           python3 proutc.py index
           git diff --exit-code registry/index.json
           python3 proutc.py find "申請 承認" | grep -q approval

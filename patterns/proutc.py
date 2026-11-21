@@ -358,6 +358,7 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
 
     seen_patterns: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
+    applied_patterns = {p.name for p in app.patterns}
     auth_count = 0
     for p in app.patterns:
         m = registry.get(p.name)
@@ -367,6 +368,13 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         for slot_name, spec in m.slots.items():
             if spec.get("required") and slot_name not in p.slots:
                 err("E-SLOT", f"pattern {p.name} requires slot {slot_name!r}", p.line)
+            hook = p.slots.get(slot_name)
+            if spec.get("type") != "hook" or not hook or hook in custom_names:
+                continue
+            if hook not in registry:
+                err("E-HOOK", f"{p.name}.{slot_name}: {hook!r} is not a custom block or registered pattern", p.line)
+            elif hook not in applied_patterns:
+                err("E-HOOK", f"{p.name}.{slot_name}: add `pattern {hook}` to use this hook", p.line)
         for slot_name in p.slots:
             if slot_name not in m.slots:
                 diags.append(
@@ -388,21 +396,6 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             for fname in m.requires_fields:
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
-        hook_spec = m.hooks.get("on_approved")
-        hook = p.slots.get("on_approved")
-        if hook_spec and hook:
-            if hook not in custom_names and hook not in registry:
-                err(
-                    "E-HOOK",
-                    f"on_approved {hook!r} is not a custom block or registered pattern",
-                    p.line,
-                )
-            elif hook in registry and not any(other.name == hook for other in app.patterns):
-                err(
-                    "E-HOOK",
-                    f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
-                    p.line,
-                )
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:
