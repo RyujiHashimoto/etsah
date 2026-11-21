@@ -60,6 +60,16 @@ app shop
 | `upload` | 署名付きURL、アップロードUI、ウイルススキャン | entity, field |
 | `approval` | 承認テーブル、申請/承認API、承認画面、状態遷移、テスト | entity, approver |
 | `scene` | 選択肢で移動するHTMLの場面 | title, body |
+| `activity_log` | 時系列イベントの追記・表示、テスト | entity, events |
+| `archive` | アーカイブ状態、一覧からの除外、復元 | entity, timestamp |
+| `assignment` | 担当者の割り当て、変更履歴 | entity, assignee |
+| `checklist` | 確認項目、完了状態、テンプレート | entity, template |
+| `comment_thread` | コメントの追加、時系列表示 | entity, author |
+| `csv_export` | 列を指定したCSV出力 | entity, columns |
+| `due_date` | 期限の表示、期限超過の判定 | entity, deadline |
+| `labels` | 複数ラベルの付け外し、絞り込み | entity, vocabulary |
+| `survey` | 対応後の評価記録、集計 | entity, scale |
+| `work_queue` | 優先度順の作業一覧 | entity, priority |
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 
