@@ -224,7 +224,7 @@ class ExprParser:
     def parse_unary(self) -> Expr:
         if self.peek()[1] == "!":
             op = self.advance()
-            return Expr("bin", line=op[2], name="!", left=self.parse_unary())
+            return Expr("unary", line=op[2], name="!", left=self.parse_unary())
         if self.peek()[1] == "-":
             op = self.advance()
             return Expr("bin", line=op[2], name="-", left=Expr("lit", line=op[2], name="int", value=0), right=self.parse_unary())
@@ -522,6 +522,8 @@ def expr_key(e: Expr) -> str:
         return e.name + "(" + ",".join(expr_key(a) for a in e.args) + ")"
     if e.kind == "bin":
         return "(" + expr_key(e.left) + e.name + expr_key(e.right) + ")"  # type: ignore[arg-type]
+    if e.kind == "unary":
+        return "(" + e.name + expr_key(e.left) + ")"  # type: ignore[arg-type]
     return "?"
 
 
@@ -542,6 +544,8 @@ def fmt_expr(e: Optional[Expr]) -> str:
         return e.name + "(" + ", ".join(fmt_expr(a) for a in e.args) + ")"
     if e.kind == "bin":
         return f"({fmt_expr(e.left)} {e.name} {fmt_expr(e.right)})"
+    if e.kind == "unary":
+        return f"({e.name}{fmt_expr(e.left)})"
     return "?"
 
 
@@ -602,11 +606,13 @@ def evaluate(e: Optional[Expr]) -> Optional[bool]:
         if e.name == "bool":
             return bool(e.value)
         return None
-    if e.kind == "bin":
-        op = e.name
-        if op == "!":
+    if e.kind == "unary":
+        if e.name == "!":
             v = evaluate(e.left)
             return None if v is None else not v
+        return None
+    if e.kind == "bin":
+        op = e.name
         if op == "&&":
             l = evaluate(e.left)
             r = evaluate(e.right)
@@ -662,6 +668,8 @@ def subst(e: Optional[Expr], mapping: dict[str, Expr]) -> Optional[Expr]:
         return Expr("field", line=e.line, base=subst(e.base, mapping), name=e.name)
     if e.kind == "call":
         return Expr("call", line=e.line, name=e.name, args=[subst(a, mapping) for a in e.args])  # type: ignore[list-item]
+    if e.kind == "unary":
+        return Expr("unary", line=e.line, name=e.name, left=subst(e.left, mapping))
     if e.kind == "bin":
         return Expr("bin", line=e.line, name=e.name, left=subst(e.left, mapping), right=subst(e.right, mapping))
     return e
@@ -765,11 +773,33 @@ class Checker:
                 if at != "Unknown" and not self.compatible(ptype, at):
                     self.error("E-TYPE", f"argument {pname!r} of {e.name} expects {ptype}, got {at}", arg.line or e.line)
             return op.ret
+        if e.kind == "unary":
+            lt = self.type_of(e.left, env)
+            if e.name == "!":
+                if lt not in ("Bool", "Unknown"):
+                    self.error("E-TYPE", f"operator ! expects a Bool operand, got {lt}", e.line)
+                return "Bool"
+            return "Unknown"
         if e.kind == "bin":
             op = e.name
-            if op in ("==", "!=", "<", "<=", ">", ">="):
-                self.type_of(e.left, env)
-                self.type_of(e.right, env)
+            if op in ("==", "!="):
+                lt = self.type_of(e.left, env)
+                rt = self.type_of(e.right, env)
+                if (
+                    lt != "Unknown"
+                    and rt != "Unknown"
+                    and not self.compatible(lt, rt)
+                    and not self.compatible(rt, lt)
+                ):
+                    self.error("E-TYPE", f"cannot compare {lt} and {rt} with {op}", e.line)
+                return "Bool"
+            if op in ("<", "<=", ">", ">="):
+                lt = self.type_of(e.left, env)
+                rt = self.type_of(e.right, env)
+                if lt != "Unknown" and rt != "Unknown":
+                    orderable = {lt, rt} <= {"Int", "Money"} or (lt == rt and lt in ("Int", "Money", "String"))
+                    if not orderable:
+                        self.error("E-TYPE", f"cannot compare {lt} and {rt} with {op}", e.line)
                 return "Bool"
             lt = self.type_of(e.left, env)
             rt = self.type_of(e.right, env)
@@ -833,6 +863,8 @@ class Checker:
             return out
         if e.kind == "bin":
             return self.calls_in(e.left) + self.calls_in(e.right)
+        if e.kind == "unary":
+            return self.calls_in(e.left)
         if e.kind == "field":
             return self.calls_in(e.base)
         return []
@@ -887,7 +919,16 @@ class Checker:
             self.check_type_exists(t, flow.line, f"parameter {n}")
         self.check_type_exists(flow.ret, flow.line, "return type")
         inferred: set[tuple[str, str]] = set()
+        seen_return = False
         for stmt in flow.body:
+            if seen_return:
+                self.error(
+                    "E-FLOW",
+                    f"statement after return in flow {flow.name} is unreachable",
+                    stmt.line,
+                    fix="move this statement before the return, or remove it",
+                )
+                continue
             if stmt.kind == "let":
                 t = self.type_of(stmt.expr, env)
                 if stmt.name in env:
@@ -897,12 +938,20 @@ class Checker:
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
             elif stmt.kind == "return":
+                seen_return = True
                 t = self.type_of(stmt.expr, env)
                 if t != "Unknown" and not self.compatible(flow.ret, t):
                     self.error("E-TYPE", f"return expects {flow.ret}, got {t}", stmt.line)
                 inferred |= self.effects_of_expr(stmt.expr)
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
+        if not seen_return:
+            self.error(
+                "E-FLOW",
+                f"flow {flow.name} must end with a return statement",
+                flow.line,
+                fix=f"add a return statement that produces {flow.ret}",
+            )
         declared = set(flow.effects)
         if declared != inferred:
             missing = inferred - declared
@@ -974,6 +1023,9 @@ def expr_to_dict(e: Optional[Expr]) -> Optional[dict]:
         d["op"] = e.name
         d["left"] = expr_to_dict(e.left)
         d["right"] = expr_to_dict(e.right)
+    elif e.kind == "unary":
+        d["op"] = e.name
+        d["expr"] = expr_to_dict(e.left)
     return d
 
 
