@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在119件で、意図的な未実装2件は `expectedFailure` として記録しています。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在120件で、意図的な未実装2件は `expectedFailure` として記録しています。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -191,6 +191,16 @@ patterns/
 CONTRIBUTING.md          パターン提案とレビューの基準
 ```
 
+## ゲームブック・分岐教材を作る
+
+`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
+
+```sh
+cd patterns
+python3 proutc.py build examples/moon_garden.prout --out build/garden
+python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```
+
 ## 参加する
 
 新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
@@ -200,13 +210,3 @@ CONTRIBUTING.md          パターン提案とレビューの基準
 ## ライセンス
 
 MIT。Copyright (c) 2026 橋元 龍二（Ryuji Hashimoto）。
-
-### ゲームブック・分岐教材を作る
-
-`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
-
-```sh
-cd patterns
-python3 proutc.py build examples/moon_garden.prout --out build/garden
-python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
-```
