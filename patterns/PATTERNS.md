@@ -59,11 +59,21 @@ app shop
 | `notify` | メール/Slack通知、テンプレート | channel |
 | `upload` | 署名付きURL、アップロードUI、ウイルススキャン | entity, field |
 | `approval` | 承認テーブル、申請/承認API、承認画面、状態遷移、テスト | entity, approver |
+| `scene` | 選択肢で移動するHTMLの場面 | title, body |
+| `activity_log` | 時系列イベントの追記・表示、テスト | entity, events |
+| `archive` | アーカイブ状態、一覧からの除外、復元 | entity, timestamp |
+| `assignment` | 担当者の割り当て、変更履歴 | entity, assignee |
+| `checklist` | 確認項目、完了状態、テンプレート | entity, template |
+| `comment_thread` | コメントの追加、時系列表示 | entity, author |
+| `csv_export` | 列を指定したCSV出力 | entity, columns |
+| `due_date` | 期限の表示、期限超過の判定 | entity, deadline |
+| `labels` | 複数ラベルの付け外し、絞り込み | entity, vocabulary |
+| `survey` | 対応後の評価記録、集計 | entity, scale |
+| `work_queue` | 優先度順の作業一覧 | entity, priority |
 | `timesheet` | 勤怠の提出、派遣先承認、時間外上限のスロット | entity, approver |
 | `dispatch_contract` | 個別契約、就業条件、抵触日との比較 | entity, staff, client, start_date, end_date, conflict_date |
 | `staffing_billing` | 請求と給与、請求単価 >= 支払単価、勤怠承認の必須 | entity, timesheet, bill_rate, pay_rate |
 | `matching` | スタッフと案件をスキル欄で結ぶ候補一覧 | staff, opening, skills |
-
 `Date`（`YYYY-MM-DD`）、`Duration`（`7.5` または `7h30m`）、`Rate`（非負の十進数、円の時間単価）はパターン層のフィールド型とスロット型である。マニフェストの `constraints` がスロットの値を比較し、`field_types` がエンティティの型を見る。`requires_patterns` は、請求のように他のパターン（勤怠承認）が同じ仕様に無いとエラーにする。法の数値はマニフェストに埋め込まず、設定値だけを検査する。人材派遣での使い方と、契約層にまだ無いものは `docs/staffing.md` に書いた。
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
@@ -100,7 +110,9 @@ open build/expense/demo.html
 
 `approval` のマニフェストは `states` と `transitions` を持つ。`draft` から `pending`、`approved`、`returned`、`rejected` への遷移がデータとして定義され、`validate()` は遷移元・遷移先が `states` に含まれることを検査する。
 
-`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。`notify` には任意の `recipient` スロットがあり、承認後の通知先をロールで指定できる。
+`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。この検査は `on_approved` だけでなく、`checkout.success` など `type: hook` のスロットすべてに適用される。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。
+
+`approval` のフックは `notify` を想定しており、`channel` と `recipient` を引数として要求する。`notify` の `channel` が `email` / `slack` 以外なら `E-HOOK-ARG`、`recipient` が `auth.roles` に含まれなければ `E-HOOK-ARG` になる。`notify` を適用していない場合や、複数回適用して参照先が曖昧な場合も `E-HOOK` で止まる。
 
 ## なぜ「最も自由度が高い」と言えるのか
 
@@ -114,7 +126,7 @@ open build/expense/demo.html
 - パターンに当てはまらないプロダクトは、`open` モードでも遅くなる。長尾は消えない。
 - パターンの組み合わせ爆発は、テストの組み合わせ爆発になる。合成の検証が必要。
 - 生成物の品質はパターンライブラリの品質に依存する。ライブラリは言語の一部である。
-- `on_approved` は参照先（custom か適用済みパターン）までしか検査しない。`notify` の `recipient` や `channel` など、フック引数の整合はまだ検証できない。
+- `on_approved` が custom ブロックを指す場合、その引数スキーマまではまだ検証できない。標準パターンを指すフックの引数は検証できる。
 
 ## PROUTとの関係
 

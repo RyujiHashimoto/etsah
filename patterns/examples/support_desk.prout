@@ -1,0 +1,52 @@
+# 顧客サポートの受付から完了後の評価まで
+app support_desk
+  stack nextjs, postgres
+  freedom guided
+
+  entity Ticket
+    id: Id
+    subject: String
+    owner_id: Id
+    priority: Int
+    due_at: DateTime
+    archived_at: DateTime
+
+  pattern assignment Ticket
+    entity: Ticket
+    assignee: owner_id
+
+  pattern work_queue Ticket
+    entity: Ticket
+    priority: priority
+
+  pattern due_date Ticket
+    entity: Ticket
+    deadline: due_at
+
+  pattern checklist Ticket
+    entity: Ticket
+    template: support_desk_checks
+
+  pattern comment_thread Ticket
+    entity: Ticket
+    author: user_id
+
+  pattern labels Ticket
+    entity: Ticket
+    vocabulary: support_desk_categories
+
+  pattern activity_log Ticket
+    entity: Ticket
+    events: [created, assigned, closed]
+
+  pattern csv_export Ticket
+    entity: Ticket
+    columns: [id, subject, priority]
+
+  pattern archive Ticket
+    entity: Ticket
+    timestamp: archived_at
+
+  pattern survey Ticket
+    entity: Ticket
+    scale: 5

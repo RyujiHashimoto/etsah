@@ -1,0 +1,54 @@
+{
+  "name": "assignment",
+  "version": "0.1.0",
+  "intent": "案件の担当者を割り当て、変更履歴を残す",
+  "tags": [
+    "assignment",
+    "担当割当",
+    "assign",
+    "担当者"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "assignee": {
+      "type": "string",
+      "required": true,
+      "desc": "担当者の識別子を保持する項目"
+    }
+  },
+  "effects": [
+    "write(entity)",
+    "emit(audit)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/assignment.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の担当者の再割当"
+    },
+    {
+      "path": "tests/{plural}/assignment.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "担当変更前後の履歴"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

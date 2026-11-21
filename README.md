@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在110件で、意図的な未実装2件は `expectedFailure` として記録しています。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在120件で、意図的な未実装2件は `expectedFailure` として記録しています。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -69,6 +69,24 @@ open build/expense/demo.html
 同じ `approval` から、備品購入申請のデモも生成できます。
 
 ![備品購入申請の承認デモ](docs/demo-equipment.png)
+
+## フックの引数まで検査する
+
+`approval` の `on_approved` は、適用済みの `notify` を指せます。このとき `notify` の `channel` と `recipient` がフックの引数として検査されます。
+
+```prout
+pattern notify
+  channel: email
+  recipient: accounting
+  template: travel_approved
+
+pattern approval TravelRequest
+  entity: TravelRequest
+  approver: manager
+  on_approved: notify
+```
+
+`recipient` が `auth.roles` に含まれない場合や、`channel` が `email` / `slack` 以外の場合は `E-HOOK-ARG` で止まります。`notify` を適用していなければ `E-HOOK`、同じ `notify` を複数回適用して参照先が曖昧な場合も `E-HOOK` です。custom ブロックを指すフックは従来どおり使えます。
 
 ## パターンで書く
 
@@ -107,11 +125,11 @@ PC貸出は、承認パターンを二つのアプリから抽出するために
 |---|---:|---:|---:|---:|---:|
 | 経費精算（approval追加前） | 24 | 180 | 204 | 981 | 4.8x |
 | 経費精算（approval追加後） | 28 | 30 | **58** | 1,264 | **21.8x** |
-| 出張申請（approval再利用） | 36 | 40 | **76** | 1,426 | **18.8x** |
-| 備品購入申請（approval再利用） | 37 | 40 | **77** | 1,434 | **18.6x** |
+| 出張申請（approval再利用） | 33 | 0 | **33** | 1,386 | **42.0x** |
+| 備品購入申請（approval再利用） | 34 | 0 | **34** | 1,394 | **41.0x** |
 | PC貸出（approval再利用） | 28 | 35 | **63** | 1,269 | **20.1x** |
 
-同じ「申請→承認→差し戻し」を二度目に書くとき、AIの記述量は204行から58行へ **72%減**、再利用倍率は4.8倍から21.8倍へ改善しました。パターンが言語に追加されたことで、次の開発が短くなったことを示す最初の測定です。
+同じ「申請→承認→差し戻し」を二度目に書くとき、AIの記述量は204行から58行へ **72%減**、再利用倍率は4.8倍から21.8倍へ改善しました。パターンが言語に追加されたことで、次の開発が短くなったことを示す最初の測定です。出張申請と備品購入申請は、承認後の通知を `custom` から標準の `notify` パターンに移したため、custom 0行・42.0倍/41.0倍になっています。
 
 ## 二回の追試：会話を知らないAIに渡す
 
@@ -122,11 +140,11 @@ PC貸出は、承認パターンを二つのアプリから抽出するために
 | 1 | 出張申請を作って。上長が承認したら経理に通知して | 8分13秒 | 3回 | 0 | GUIがなく、フックも未検証 |
 | 2 | 備品購入申請を作って。上長が承認したら総務に通知して | **5分48秒** | 2回 | 0 | 標準の `demo.html` で承認前後を確認 |
 
-一回目、AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
+一回目、AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。当時の仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
 
-この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。二回目は、出張申請の例をそのままコピーできない「備品購入申請」に変えて試しています。結果は **5分48秒**、納品ビルド2回で失敗0。AIは `demo.html` を標準機能で生成し、Playwrightで承認前・承認後・差し戻し・却下まで確認しました。一回目より **29%短く**、修正も1回減っています。
+この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。二回目は、出張申請の例をそのままコピーできない「備品購入申請」に変えて試しています。結果は **5分48秒**、納品ビルド2回で失敗0。AIは `demo.html` を標準機能で生成し、Playwrightで承認前・承認後・差し戻し・却下まで確認しました。一回目より **29%短く**、修正も1回減っています。現在の出張申請の例は、当時の custom 40行を標準の `notify` パターンに置き換え、33行・42.0倍に整理しています。
 
-残る穴は、`approval` の `on_approved` が `notify` の `recipient` や `channel` を機械的に検証しないことです。次はフックに引数スキーマを持たせ、`recipient` が `auth.roles` に含まれるかまで検査します。
+`on_approved` が標準の `notify` を指す場合は、`channel` の許可値と `recipient` が `auth.roles` に含まれるかを `E-HOOK-ARG` で検査します。残る穴は、custom ブロックを指すフックの引数まで検証しないことです。次は custom 側にも引数宣言を持たせます。
 
 ## 言語が育つループ
 
@@ -167,13 +185,33 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              13個のパターンマニフェストと index.json
-  examples/              ショップ、経費精算、出張申請、備品購入、人材派遣の仕様
+  registry/              24個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
-  build/                 生成物（report.html、承認デモの demo.html）
+  build/                 生成物（report.html、demo.html、story.html）
   growth_report.py       成長ループのHTMLレポート
 .github/workflows/ci.yml 単体テスト、契約検査、索引整合、ビルド、ベンチ、回帰ガード
 CONTRIBUTING.md          パターン提案とレビューの基準
+```
+
+## ゲームブック・分岐教材を作る
+
+`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
+
+```sh
+cd patterns
+python3 proutc.py build examples/moon_garden.prout --out build/garden
+python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```
+
+## 修理受付・顧客サポートをパターンで組む
+
+`repair_desk` と `support_desk` の2例から、担当割当、作業キュー、期限、チェックリスト、コメント、ラベル、操作履歴、CSV出力、アーカイブ、評価の10パターンを抽出しました。どちらの仕様も52行で、業務固有の記述をパターンの適用に置き換えています。
+
+```sh
+cd patterns
+python3 proutc.py build examples/repair_desk.prout --out build/repair
+python3 proutc.py build examples/support_desk.prout --out build/support
 ```
 
 ## 参加する

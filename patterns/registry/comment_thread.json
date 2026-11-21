@@ -1,0 +1,54 @@
+{
+  "name": "comment_thread",
+  "version": "0.1.0",
+  "intent": "案件ごとの時系列に沿ってコメントを追加・閲覧する",
+  "tags": [
+    "comment_thread",
+    "コメント",
+    "discussion",
+    "申し送り"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "author": {
+      "type": "string",
+      "required": true,
+      "desc": "投稿者を識別する方法"
+    }
+  },
+  "effects": [
+    "read(comments)",
+    "write(comments)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/comment_thread.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の案件別のコメント追加"
+    },
+    {
+      "path": "tests/{plural}/comment_thread.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "異なる案件のコメントの分離"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

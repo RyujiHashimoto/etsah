@@ -1,0 +1,54 @@
+{
+  "name": "checklist",
+  "version": "0.1.0",
+  "intent": "案件ごとの確認項目と完了状態を記録する",
+  "tags": [
+    "checklist",
+    "チェックリスト",
+    "checklist",
+    "点検項目"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "対象の案件"
+    },
+    "template": {
+      "type": "string",
+      "required": true,
+      "desc": "使用する点検項目セット"
+    }
+  },
+  "effects": [
+    "read(checks)",
+    "write(checks)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/{plural}/checklist.ts",
+      "kind": "TS",
+      "lines": 35,
+      "desc": "{Entity}の確認項目の完了記録"
+    },
+    {
+      "path": "tests/{plural}/checklist.test.ts",
+      "kind": "TEST",
+      "lines": 25,
+      "desc": "一部完了時の集計"
+    }
+  ],
+  "examples": [
+    "examples/repair_desk.prout",
+    "examples/support_desk.prout"
+  ],
+  "provenance": {
+    "author": "OpenAI Codex",
+    "date": "2026-11-22",
+    "extracted_from": [
+      "repair_desk",
+      "support_desk"
+    ],
+    "note": "修理受付とサポート窓口の合成仕様例から共通化。行数は概算。"
+  }
+}

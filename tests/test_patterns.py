@@ -149,6 +149,17 @@ class TestSlots(unittest.TestCase):
             "notify": {"channel"},
             "upload": {"entity", "field"},
             "approval": {"entity", "approver"},
+            "scene": {"title", "body"},
+            "activity_log": {"entity", "events"},
+            "archive": {"entity", "timestamp"},
+            "assignment": {"entity", "assignee"},
+            "checklist": {"entity", "template"},
+            "comment_thread": {"entity", "author"},
+            "csv_export": {"entity", "columns"},
+            "due_date": {"entity", "deadline"},
+            "labels": {"entity", "vocabulary"},
+            "survey": {"entity", "scale"},
+            "work_queue": {"entity", "priority"},
             "timesheet": {"entity", "approver"},
             "dispatch_contract": {"entity", "staff", "client", "start_date", "end_date", "conflict_date"},
             "staffing_billing": {"entity", "timesheet", "bill_rate", "pay_rate"},
@@ -555,6 +566,120 @@ class TestIndex(unittest.TestCase):
             self.assertIn("widget", loaded)
             index = json.loads((registry / "index.json").read_text(encoding="utf-8"))
             self.assertEqual([item["name"] for item in index["patterns"]], ["widget"])
+
+
+class TestHooks(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.registry = load_registry(DEFAULT_REGISTRY)
+
+    def _app(
+        self,
+        *,
+        roles: str = "employee, manager, accounting",
+        channel: str = "email",
+        recipient: str | None = "accounting",
+        hook: str = "notify",
+        notify_count: int = 1,
+        custom: str = "",
+    ):
+        lines = [
+            "app demo",
+            "  stack nextjs",
+            "  entity Request",
+            "    id: Id",
+            "    status: String",
+            "  pattern auth",
+            "    provider: clerk",
+            f"    roles: {roles}",
+            "  pattern approval",
+            "    entity: Request",
+            "    approver: manager",
+            f"    on_approved: {hook}",
+        ]
+        for _ in range(notify_count):
+            lines += ["  pattern notify", f"    channel: {channel}"]
+            if recipient is not None:
+                lines.append(f"    recipient: {recipient}")
+            lines.append("    template: approved")
+        if custom:
+            lines += custom.splitlines()
+        return parse_app("\n".join(lines) + "\n")
+
+    def test_notify_hook_accepts_roles_and_channel(self) -> None:
+        self.assertEqual(validate(self._app(), self.registry), [])
+
+    def test_notify_hook_rejects_unknown_role(self) -> None:
+        diags = validate(self._app(roles="employee, manager"), self.registry)
+        self.assertIn("E-HOOK-ARG", _codes(diags))
+        self.assertTrue(any("accounting" in d.message for d in diags))
+
+    def test_notify_hook_rejects_unknown_channel(self) -> None:
+        diags = validate(self._app(channel="sms"), self.registry)
+        self.assertIn("E-HOOK-ARG", _codes(diags))
+
+    def test_notify_hook_requires_applied_pattern(self) -> None:
+        diags = validate(self._app(notify_count=0), self.registry)
+        self.assertIn("E-HOOK", _codes(diags))
+
+    def test_notify_hook_requires_channel_and_recipient(self) -> None:
+        diags = validate(self._app(recipient=None), self.registry)
+        self.assertIn("E-HOOK-ARG", _codes(diags))
+
+    def test_notify_hook_rejects_ambiguous_instances(self) -> None:
+        diags = validate(self._app(notify_count=2), self.registry)
+        self.assertIn("E-HOOK", _codes(diags))
+        self.assertTrue(any("ambiguous" in d.message for d in diags))
+
+    def test_custom_hook_is_still_allowed(self) -> None:
+        custom = '  custom ship\n    why "send it"\n    lines 4'
+        app = self._app(hook="ship", notify_count=0, custom=custom)
+        self.assertEqual(validate(app, self.registry), [])
+
+    def test_hook_must_reference_the_declared_pattern(self) -> None:
+        app = self._app(hook="auth", notify_count=0)
+        diags = validate(app, self.registry)
+        self.assertIn("E-HOOK", _codes(diags))
+
+    def test_all_hook_slots_are_checked(self) -> None:
+        valid = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity Order
+                    id: Id
+                    total: Money
+                  pattern checkout
+                    entity: Order
+                    payment: stripe
+                    success: fulfill
+                  custom fulfill
+                    why "after payment"
+                    lines 4
+                """
+            )
+        )
+        self.assertEqual(validate(valid, self.registry), [])
+
+        invalid = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity Order
+                    id: Id
+                    total: Money
+                  pattern checkout
+                    entity: Order
+                    payment: stripe
+                    success: notify
+                """
+            )
+        )
+        diags = validate(invalid, self.registry)
+        self.assertIn("E-HOOK", _codes(diags))
+        self.assertTrue(any("checkout.success" in d.message for d in diags))
 
 
 class TestBuild(unittest.TestCase):

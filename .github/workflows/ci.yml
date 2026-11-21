@@ -60,6 +60,12 @@ jobs:
           grep -q "approver" /tmp/staffing-pattern.txt
           grep -q "bill rate is below pay rate" /tmp/staffing-pattern.txt
 
+      - name: Build service desk examples
+        working-directory: patterns
+        run: |
+          python3 proutc.py build examples/repair_desk.prout
+          python3 proutc.py build examples/support_desk.prout
+
       - name: Benchmark
         working-directory: patterns
         run: |
