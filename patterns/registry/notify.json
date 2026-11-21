@@ -1,19 +1,62 @@
 {
   "name": "notify",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
-  "tags": ["notify", "email", "slack", "notification", "通知", "メール"],
-  "slots": {
-    "channel": {"type": "string", "required": true, "desc": "email または slack"},
-    "recipient": {"type": "role", "required": false, "desc": "通知先のロール（例: accounting）"},
-    "template": {"type": "string", "required": false, "desc": "テンプレート名"}
-  },
-  "effects": ["net(channel)", "read(templates)"],
-  "artifacts": [
-    {"path": "lib/notify.ts", "kind": "TS", "lines": 50, "desc": "通知ディスパッチャ"},
-    {"path": "emails/notification.tsx", "kind": "UI", "lines": 40, "desc": "メールテンプレート"},
-    {"path": "tests/notify.test.ts", "kind": "TEST", "lines": 30, "desc": "通知テスト"}
+  "tags": [
+    "notify",
+    "email",
+    "slack",
+    "notification",
+    "通知",
+    "メール"
   ],
-  "examples": ["examples/travel_request.prout"],
-  "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
+  "slots": {
+    "channel": {
+      "type": "string",
+      "required": true,
+      "desc": "email または slack"
+    },
+    "recipient": {
+      "type": "role",
+      "required": false,
+      "desc": "通知先のロール（例: accounting）"
+    },
+    "template": {
+      "type": "string",
+      "required": false,
+      "desc": "テンプレート名"
+    }
+  },
+  "effects": [
+    "net(channel)",
+    "read(templates)"
+  ],
+  "artifacts": [
+    {
+      "path": "lib/notify.ts",
+      "kind": "TS",
+      "lines": 50,
+      "desc": "通知ディスパッチャ"
+    },
+    {
+      "path": "emails/notification.tsx",
+      "kind": "UI",
+      "lines": 40,
+      "desc": "メールテンプレート"
+    },
+    {
+      "path": "tests/notify.test.ts",
+      "kind": "TEST",
+      "lines": 30,
+      "desc": "通知テスト"
+    }
+  ],
+  "examples": [
+    "examples/travel_request.prout",
+    "examples/equipment_purchase.prout"
+  ],
+  "provenance": {
+    "author": "橋元 龍二",
+    "date": "2026-11-22"
+  }
 }

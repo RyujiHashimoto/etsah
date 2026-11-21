@@ -3,7 +3,7 @@
   "patterns": [
     {
       "name": "approval",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "intent": "申請を承認者に回し、承認・差し戻し・却下の状態遷移を管理する。承認後の処理は on_approved フックで接続する",
       "tags": [
         "approval",
@@ -45,6 +45,7 @@
       "examples": [
         "examples/expense.prout",
         "examples/travel_request.prout",
+        "examples/equipment_purchase.prout",
         "bench/pc_lending.prout"
       ],
       "path": "registry/approval.json"
@@ -203,7 +204,7 @@
     },
     {
       "name": "notify",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
       "tags": [
         "notify",
@@ -233,7 +234,8 @@
         "read(templates)"
       ],
       "examples": [
-        "examples/travel_request.prout"
+        "examples/travel_request.prout",
+        "examples/equipment_purchase.prout"
       ],
       "path": "registry/notify.json"
     },

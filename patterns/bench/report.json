@@ -42,6 +42,21 @@
     "errors": 0
   },
   {
+    "case": "equipment_purchase",
+    "spec_lines": 37,
+    "custom_lines": 40,
+    "ai_authored_lines": 77,
+    "generated_lines": 1434,
+    "reuse_ratio": 18.6,
+    "patterns": [
+      "auth",
+      "crud",
+      "approval",
+      "notify"
+    ],
+    "errors": 0
+  },
+  {
     "case": "pc_lending",
     "spec_lines": 28,
     "custom_lines": 35,

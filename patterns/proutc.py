@@ -767,6 +767,12 @@ def sample_value(name: str, typ: str) -> str:
         return "2026-12-08"
     if "amount" in n or "price" in n or "total" in n or t == "money":
         return "48000"
+    if "quantity" in n or "count" in n:
+        return "3"
+    if "department" in n:
+        return "営業部"
+    if "item" in n:
+        return "ノートPC"
     if "applicant" in n:
         return "山田 太郎"
     if "destination" in n:
@@ -1099,6 +1105,7 @@ def bench_rows(registry: dict[str, PatternManifest]) -> list[dict]:
         ("expense_before", ROOT / "bench" / "expense_before.prout"),
         ("expense_after", ROOT / "bench" / "expense_after.prout"),
         ("travel_request", ROOT / "examples" / "travel_request.prout"),
+        ("equipment_purchase", ROOT / "examples" / "equipment_purchase.prout"),
         ("pc_lending", ROOT / "bench" / "pc_lending.prout"),
     ]
     rows = []
@@ -1158,7 +1165,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     out.mkdir(parents=True, exist_ok=True)
     report = render_report(app, diags, arts)
     (out / "report.html").write_text(report, encoding="utf-8")
-    demo = render_demo(app, arts)
+    has_errors = any(d.severity == "error" for d in diags)
+    demo = "" if has_errors else render_demo(app, arts)
     if demo:
         (out / "demo.html").write_text(demo, encoding="utf-8")
 
@@ -1179,6 +1187,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     print(f"wrote {out / 'report.html'}")
     if demo:
         print(f"wrote {out / 'demo.html'}")
+    elif has_errors:
+        print("demo.html skipped because the spec has errors")
     print(f"wrote {out / 'manifest.json'}")
     return 1 if any(d.severity == "error" for d in diags) else 0
 

@@ -1,0 +1,45 @@
+# 備品購入申請：申請 → 上長承認 → 総務へ通知
+app equipment_purchase
+  stack nextjs, postgres
+  freedom guided
+
+  entity Employee
+    id: Id
+    name: String
+    email: Email
+
+  entity PurchaseRequest
+    id: Id
+    applicant: Employee
+    department: String
+    item: String
+    quantity: Int
+    unit_price: Money
+    total_amount: Money
+    desired_date: Date
+    status: ApprovalStatus
+    note: String
+
+  pattern auth
+    provider: clerk
+    roles: employee, manager, general_affairs
+
+  pattern crud PurchaseRequests
+    entity: PurchaseRequest
+    access: employee
+    search: [id, status, applicant.email, item]
+    paginate: 20
+
+  pattern approval PurchaseRequest
+    entity: PurchaseRequest
+    approver: manager
+    on_approved: notify_general_affairs
+
+  pattern notify
+    channel: email
+    recipient: general_affairs
+    template: equipment_purchase_approved
+
+  custom notify_general_affairs
+    why "上長の承認後に、備品購入申請の品名・数量・金額・希望納期を総務ロールへメールで通知し、監査ログに記録する"
+    lines 40
