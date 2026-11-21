@@ -74,6 +74,9 @@ python3 proutc.py find "申請 承認"
 # 経費精算を、承認デモ付きで組む
 python3 proutc.py build examples/expense.prout --out build/expense
 
+# 出張申請を、承認→経理通知のデモ付きで組む
+python3 proutc.py build examples/travel_request.prout --out build/travel
+
 # PC貸出は、承認パターンを二つのアプリから抽出するための利用例
 python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
 
@@ -91,9 +94,18 @@ PC貸出は、承認パターンを二つのアプリから抽出するために
 |---|---:|---:|---:|---:|---:|
 | 経費精算（approval追加前） | 24 | 180 | 204 | 981 | 4.8x |
 | 経費精算（approval追加後） | 28 | 30 | **58** | 1,264 | **21.8x** |
+| 出張申請（approval再利用） | 36 | 40 | **76** | 1,426 | **18.8x** |
 | PC貸出（approval再利用） | 28 | 35 | **63** | 1,269 | **20.1x** |
 
 同じ「申請→承認→差し戻し」を二度目に書くとき、AIの記述量は204行から58行へ **72%減**、再利用倍率は4.8倍から21.8倍へ改善しました。パターンが言語に追加されたことで、次の開発が短くなったことを示す最初の測定です。
+
+## 最初の追試：会話を知らないAIに渡す
+
+2026年11月22日、このリポジトリのURLと「出張申請を作って。上長が承認したら経理に通知して」という依頼だけを、開発経緯を知らないAIに渡しました。`approval` という名前は教えていません。
+
+結果は **8分13秒**、ビルド試行11回（うち納品仕様は3回で失敗0回）。AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12 で自力発見しました。仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。
+
+一方で、標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。
 
 ## 言語が育つループ
 
@@ -110,6 +122,12 @@ PROUTの成長は、コードの行数ではなく、**次のAIが少ない手�
 ![言語が育つループ](docs/growth.png)
 
 `patterns/growth_report.py` は、この一周をHTMLレポートにします。ベンチ結果とレジストリから自動生成されるので、パターンを追加するたびに数値が更新されます。
+
+## 現在の範囲
+
+`build` が生成するのは、成果物の一覧と行数見積もりを含む `report.html`、操作できる `demo.html`、`manifest.json` です。APIやDBの実ソースはまだ書き出していません。生成行数はパターン定義からの見積もりで、実際にコンパイルされたコードの行数ではありません。
+
+次の課題は、`approval` の7成果物を実際のファイルとして書き出し、テストを通すことです。現時点のPROUTは、パターンの発見・適用・検証・人間向け表示までを試作した段階です。
 
 ## これは「全言語の上位互換」ではない
 
@@ -128,7 +146,7 @@ patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
   registry/              9個のパターンマニフェストと index.json
-  examples/              ショップ、経費精算の仕様
+  examples/              ショップ、経費精算、出張申請の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、承認デモの demo.html）
   growth_report.py       成長ループのHTMLレポート

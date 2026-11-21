@@ -8,6 +8,15 @@
     "approver": {"type": "role", "required": true, "desc": "承認ロール"},
     "on_approved": {"type": "hook", "required": false, "desc": "承認後に呼ぶ処理（custom または別パターン）"}
   },
+  "states": ["draft", "pending", "approved", "returned", "rejected"],
+  "transitions": [
+    {"from": "draft", "on": "submit", "to": "pending", "effect": "notify(approver)"},
+    {"from": "pending", "on": "approve", "to": "approved", "effect": "emit(audit)"},
+    {"from": "pending", "on": "return", "to": "returned", "effect": "notify(applicant)"},
+    {"from": "pending", "on": "reject", "to": "rejected", "effect": "notify(applicant)"},
+    {"from": "returned", "on": "resubmit", "to": "pending"}
+  ],
+  "hooks": {"on_approved": {"kind": "custom_or_pattern", "required": false}},
   "requires_fields": {"status": "String"},
   "effects": ["write(approvals)", "notify(approver)", "emit(audit)"],
   "artifacts": [
@@ -19,7 +28,7 @@
     {"path": "lib/workflows/approval.ts", "kind": "TS", "lines": 60, "desc": "状態遷移と on_approved フック"},
     {"path": "tests/approval.test.ts", "kind": "TEST", "lines": 75, "desc": "承認フローの契約テスト"}
   ],
-  "examples": ["examples/expense.prout", "bench/pc_lending.prout"],
+  "examples": ["examples/expense.prout", "examples/travel_request.prout", "bench/pc_lending.prout"],
   "provenance": {
     "author": "橋元 龍二",
     "date": "2026-11-22",

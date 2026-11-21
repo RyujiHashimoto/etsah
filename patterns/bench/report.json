@@ -27,6 +27,21 @@
     "errors": 0
   },
   {
+    "case": "travel_request",
+    "spec_lines": 36,
+    "custom_lines": 40,
+    "ai_authored_lines": 76,
+    "generated_lines": 1426,
+    "reuse_ratio": 18.8,
+    "patterns": [
+      "auth",
+      "crud",
+      "approval",
+      "notify"
+    ],
+    "errors": 0
+  },
+  {
     "case": "pc_lending",
     "spec_lines": 28,
     "custom_lines": 35,

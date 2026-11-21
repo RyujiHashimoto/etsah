@@ -90,6 +90,12 @@ open build/expense/demo.html
 
 デモは仕様の `entity`、`approver`、`on_approved` から決定論的に生成される。人間はパターン名とスロットを確認し、ボタンを押して状態遷移を見る。コードを読む必要はない。
 
+## 状態遷移をデータで持つ
+
+`approval` のマニフェストは `states` と `transitions` を持つ。`draft` から `pending`、`approved`、`returned`、`rejected` への遷移がデータとして定義され、`validate()` は遷移元・遷移先が `states` に含まれることを検査する。
+
+`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。`notify` には任意の `recipient` スロットがあり、承認後の通知先をロールで指定できる。
+
 ## なぜ「最も自由度が高い」と言えるのか
 
 - パターンは追加できる。ユーザーもAIも、新しいパターンをライブラリに足せる。

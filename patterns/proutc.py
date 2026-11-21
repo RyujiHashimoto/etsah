@@ -235,6 +235,9 @@ class PatternManifest:
     intent: str
     tags: list[str] = field(default_factory=list)
     slots: dict[str, dict] = field(default_factory=dict)
+    states: list[str] = field(default_factory=list)
+    transitions: list[dict] = field(default_factory=list)
+    hooks: dict = field(default_factory=dict)
     effects: list[str] = field(default_factory=list)
     artifacts: list[dict] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
@@ -251,6 +254,7 @@ class PatternManifest:
                 k: {"required": bool(v.get("required")), "desc": v.get("desc", "")}
                 for k, v in self.slots.items()
             },
+            "states": self.states,
             "effects": self.effects,
             "examples": self.examples,
             "path": f"registry/{self.name}.json",
@@ -264,6 +268,9 @@ def manifest_from_dict(data: dict) -> PatternManifest:
         intent=data.get("intent", ""),
         tags=data.get("tags", []),
         slots=data.get("slots", {}),
+        states=data.get("states", []),
+        transitions=data.get("transitions", []),
+        hooks=data.get("hooks", {}),
         effects=data.get("effects", []),
         artifacts=data.get("artifacts", []),
         examples=data.get("examples", []),
@@ -288,6 +295,15 @@ def validate_manifest(m: PatternManifest) -> list[str]:
             errors.append("artifact is missing a path")
         if "lines" not in a:
             errors.append(f"artifact {a.get('path', '?')} is missing a line estimate")
+    if m.states:
+        known = set(m.states)
+        for t in m.transitions:
+            if t.get("from") not in known:
+                errors.append(f"transition from unknown state {t.get('from')!r}")
+            if t.get("to") not in known:
+                errors.append(f"transition to unknown state {t.get('to')!r}")
+            if not t.get("on"):
+                errors.append("transition is missing an event name")
     return errors
 
 
@@ -341,6 +357,7 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             err("E-ENTITY", f"entity {e.name!r} has no fields", e.line)
 
     seen_patterns: set[tuple[str, str]] = set()
+    custom_names = {c.name for c in app.customs}
     auth_count = 0
     for p in app.patterns:
         m = registry.get(p.name)
@@ -350,6 +367,16 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         for slot_name, spec in m.slots.items():
             if spec.get("required") and slot_name not in p.slots:
                 err("E-SLOT", f"pattern {p.name} requires slot {slot_name!r}", p.line)
+        for slot_name in p.slots:
+            if slot_name not in m.slots:
+                diags.append(
+                    Diagnostic(
+                        "W-SLOT",
+                        f"pattern {p.name} has no slot {slot_name!r}; it will be ignored",
+                        p.line,
+                        "warning",
+                    )
+                )
         target = p.slots.get("entity", p.target)
         if "entity" in m.slots:
             if not target:
@@ -361,6 +388,21 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             for fname in m.requires_fields:
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
+        hook_spec = m.hooks.get("on_approved")
+        hook = p.slots.get("on_approved")
+        if hook_spec and hook:
+            if hook not in custom_names and hook not in registry:
+                err(
+                    "E-HOOK",
+                    f"on_approved {hook!r} is not a custom block or registered pattern",
+                    p.line,
+                )
+            elif hook in registry and not any(other.name == hook for other in app.patterns):
+                err(
+                    "E-HOOK",
+                    f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
+                    p.line,
+                )
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:
@@ -820,6 +862,7 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
     .pill.pending { background: var(--amber-soft); color: var(--amber); }
     .pill.approved { background: var(--green-soft); color: var(--green); }
     .pill.returned { background: var(--red-soft); color: var(--red); }
+    .pill.rejected { background: var(--red-soft); color: var(--red); }
     .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; color: #4b5563; margin-bottom: 14px; }
     .flow span { background: #f8f5ee; border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
     .flow i { color: #9aa0a8; font-style: normal; }
@@ -860,6 +903,7 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
     const submitEl = document.getElementById("submit");
     const approveEl = document.getElementById("approve");
     const returnEl = document.getElementById("return");
+    const rejectEl = document.getElementById("reject");
     const resetEl = document.getElementById("reset");
     const actionStateEl = document.getElementById("action-state");
     const logEl = document.getElementById("log");
@@ -884,6 +928,7 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
       submitEl.disabled = state.status !== "draft";
       approveEl.disabled = state.status !== "pending";
       returnEl.disabled = state.status !== "pending";
+      rejectEl.disabled = state.status !== "pending";
       actionStateEl.textContent = state.fired ? "実行済み" : "未実行";
       actionStateEl.className = "state" + (state.fired ? " done" : "");
       beforeCol.classList.toggle("active", state.status !== "approved");
@@ -919,6 +964,11 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
     returnEl.addEventListener("click", function () {
       state.status = "returned";
       addLog("承認者が申請を差し戻しました", "warn");
+    });
+
+    rejectEl.addEventListener("click", function () {
+      state.status = "rejected";
+      addLog("承認者が申請を却下しました", "warn");
     });
 
     resetEl.addEventListener("click", function () {
@@ -957,6 +1007,7 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
         <button id="submit">申請する</button>
         <button id="approve" disabled>承認する</button>
         <button id="return" class="ghost" disabled>差し戻す</button>
+        <button id="reject" class="ghost" disabled>却下する</button>
         <button id="reset" class="ghost">リセット</button>
       </div>
     </section>
@@ -1047,6 +1098,7 @@ def bench_rows(registry: dict[str, PatternManifest]) -> list[dict]:
     cases = [
         ("expense_before", ROOT / "bench" / "expense_before.prout"),
         ("expense_after", ROOT / "bench" / "expense_after.prout"),
+        ("travel_request", ROOT / "examples" / "travel_request.prout"),
         ("pc_lending", ROOT / "bench" / "pc_lending.prout"),
     ]
     rows = []

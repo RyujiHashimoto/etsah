@@ -1,0 +1,44 @@
+# 出張申請：申請 → 上長承認 → 経理へ通知
+app travel_request
+  stack nextjs, postgres
+  freedom guided
+
+  entity Employee
+    id: Id
+    name: String
+    email: Email
+
+  entity TravelRequest
+    id: Id
+    applicant: Employee
+    destination: String
+    purpose: String
+    start_date: Date
+    end_date: Date
+    estimated_cost: Money
+    status: ApprovalStatus
+    note: String
+
+  pattern auth
+    provider: clerk
+    roles: employee, manager, accounting
+
+  pattern crud TravelRequests
+    entity: TravelRequest
+    access: employee
+    search: [id, status, applicant.email, destination]
+    paginate: 20
+
+  pattern approval TravelRequest
+    entity: TravelRequest
+    approver: manager
+    on_approved: notify_accounting
+
+  pattern notify
+    channel: email
+    recipient: accounting
+    template: travel_approved
+
+  custom notify_accounting
+    why "上長の承認後に、出張申請の内容と概算費用を経理ロールへメールで通知し、監査ログに記録する"
+    lines 40

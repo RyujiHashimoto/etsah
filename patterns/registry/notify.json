@@ -5,6 +5,7 @@
   "tags": ["notify", "email", "slack", "notification", "通知", "メール"],
   "slots": {
     "channel": {"type": "string", "required": true, "desc": "email または slack"},
+    "recipient": {"type": "role", "required": false, "desc": "通知先のロール（例: accounting）"},
     "template": {"type": "string", "required": false, "desc": "テンプレート名"}
   },
   "effects": ["net(channel)", "read(templates)"],
@@ -13,6 +14,6 @@
     {"path": "emails/notification.tsx", "kind": "UI", "lines": 40, "desc": "メールテンプレート"},
     {"path": "tests/notify.test.ts", "kind": "TEST", "lines": 30, "desc": "通知テスト"}
   ],
-  "examples": [],
+  "examples": ["examples/travel_request.prout"],
   "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
 }

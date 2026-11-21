@@ -30,6 +30,13 @@
           "desc": "承認後に呼ぶ処理（custom または別パターン）"
         }
       },
+      "states": [
+        "draft",
+        "pending",
+        "approved",
+        "returned",
+        "rejected"
+      ],
       "effects": [
         "write(approvals)",
         "notify(approver)",
@@ -37,6 +44,7 @@
       ],
       "examples": [
         "examples/expense.prout",
+        "examples/travel_request.prout",
         "bench/pc_lending.prout"
       ],
       "path": "registry/approval.json"
@@ -64,6 +72,7 @@
           "desc": "アプリで使うロール"
         }
       },
+      "states": [],
       "effects": [
         "read(users)",
         "write(sessions)"
@@ -104,6 +113,7 @@
           "desc": "キャンセル時の戻り先"
         }
       },
+      "states": [],
       "effects": [
         "write(orders)",
         "net(payment)"
@@ -145,6 +155,7 @@
           "desc": "1ページの件数"
         }
       },
+      "states": [],
       "effects": [
         "read(entity)",
         "write(entity)"
@@ -181,6 +192,7 @@
           "desc": "集計期間"
         }
       },
+      "states": [],
       "effects": [
         "read(entity)"
       ],
@@ -206,16 +218,23 @@
           "required": true,
           "desc": "email または slack"
         },
+        "recipient": {
+          "required": false,
+          "desc": "通知先のロール（例: accounting）"
+        },
         "template": {
           "required": false,
           "desc": "テンプレート名"
         }
       },
+      "states": [],
       "effects": [
         "net(channel)",
         "read(templates)"
       ],
-      "examples": [],
+      "examples": [
+        "examples/travel_request.prout"
+      ],
       "path": "registry/notify.json"
     },
     {
@@ -248,6 +267,7 @@
           "desc": "返金上限の式"
         }
       },
+      "states": [],
       "effects": [
         "write(payments)",
         "net(payment)",
@@ -279,6 +299,7 @@
           "desc": "検索対象のフィールド"
         }
       },
+      "states": [],
       "effects": [
         "read(entity)"
       ],
@@ -307,6 +328,7 @@
           "desc": "ファイルURLを保持するフィールド"
         }
       },
+      "states": [],
       "effects": [
         "write(storage)",
         "net(storage)"
