@@ -164,7 +164,7 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              9個のパターンマニフェストと index.json
+  registry/              パターンマニフェストと index.json
   examples/              ショップ、経費精算、出張申請、備品購入の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、承認デモの demo.html）
@@ -182,3 +182,13 @@ CONTRIBUTING.md          パターン提案とレビューの基準
 ## ライセンス
 
 MIT。Copyright (c) 2026 橋元 龍二（Ryuji Hashimoto）。
+
+### ゲームブック・分岐教材を作る
+
+`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
+
+```sh
+cd patterns
+python3 proutc.py build examples/moon_garden.prout --out build/garden
+python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```

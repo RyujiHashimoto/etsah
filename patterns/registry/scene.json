@@ -1,0 +1,15 @@
+{
+  "name": "scene",
+  "version": "0.1.0",
+  "intent": "選択肢で場面を移動するゲームブックや分岐教材をHTMLで体験する",
+  "tags": ["scene", "story", "quiz", "ゲームブック", "物語", "教材", "クイズ", "分岐"],
+  "slots": {
+    "title": {"type": "string", "required": true, "desc": "見出し（プレーンテキスト）"},
+    "body": {"type": "string", "required": true, "desc": "場面の本文"},
+    "choices": {"type": "list", "required": false, "desc": "JSON配列。各項目は [表示名, 移動先の場面ID]"}
+  },
+  "effects": [],
+  "artifacts": [{"path": "story.html#scene-{Entity}", "kind": "HTML", "lines": 8, "desc": "選択できる場面"}],
+  "examples": ["examples/moon_garden.prout", "examples/fraction_quiz.prout"],
+  "provenance": {"author": "OpenAI Codex", "date": "2026-11-22", "extracted_from": ["moon_garden", "fraction_quiz"]}
+}

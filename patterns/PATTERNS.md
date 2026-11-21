@@ -59,6 +59,7 @@ app shop
 | `notify` | メール/Slack通知、テンプレート | channel |
 | `upload` | 署名付きURL、アップロードUI、ウイルススキャン | entity, field |
 | `approval` | 承認テーブル、申請/承認API、承認画面、状態遷移、テスト | entity, approver |
+| `scene` | 選択肢で移動するHTMLの場面 | title, body |
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 
