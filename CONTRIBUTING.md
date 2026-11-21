@@ -12,6 +12,9 @@ cd prout-lang
 python3 prout.py check examples/refund_fixed.prout
 python3 render.py
 
+# 単体テスト（標準ライブラリの unittest。追加の依存はない）
+python3 -m unittest discover -s tests -v
+
 # パターン層の検証
 cd patterns
 python3 proutc.py index
@@ -62,7 +65,7 @@ python3 proutc.py build examples/your_app.prout
 4. 生成物が決定論的で、同じ入力から同じ出力になる。
 5. 二つ以上の利用例（実アプリ一つと、合成した仕様一つでよい）がある。
 6. `python3 proutc.py bench` の数値が悪化していない。
-7. 状態遷移を持つパターンは `states` と `transitions` を定義し、`on_approved` の参照先が custom か適用済みパターンになっている。
+7. 状態遷移を持つパターンは `states` と `transitions` を定義し、`on_approved` の参照先が custom か適用済みパターンになっている。パターンを指すフックは、引数が参照先のスロットと `auth.roles` に合っている。
 
 ### バージョンの上げ方
 

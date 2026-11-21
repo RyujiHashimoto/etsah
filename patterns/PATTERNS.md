@@ -59,6 +59,7 @@ app shop
 | `notify` | メール/Slack通知、テンプレート | channel |
 | `upload` | 署名付きURL、アップロードUI、ウイルススキャン | entity, field |
 | `approval` | 承認テーブル、申請/承認API、承認画面、状態遷移、テスト | entity, approver |
+| `scene` | 選択肢で移動するHTMLの場面 | title, body |
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 
@@ -94,7 +95,9 @@ open build/expense/demo.html
 
 `approval` のマニフェストは `states` と `transitions` を持つ。`draft` から `pending`、`approved`、`returned`、`rejected` への遷移がデータとして定義され、`validate()` は遷移元・遷移先が `states` に含まれることを検査する。
 
-`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。`notify` には任意の `recipient` スロットがあり、承認後の通知先をロールで指定できる。
+`on_approved` は custom ブロックか、適用済みの別パターンを参照しなければならない。存在しない名前を書くと `E-HOOK` で止まる。この検査は `on_approved` だけでなく、`checkout.success` など `type: hook` のスロットすべてに適用される。パターンが持たないスロットを書いた場合は `W-SLOT` 警告を出し、黙って無視しない。
+
+`approval` のフックは `notify` を想定しており、`channel` と `recipient` を引数として要求する。`notify` の `channel` が `email` / `slack` 以外なら `E-HOOK-ARG`、`recipient` が `auth.roles` に含まれなければ `E-HOOK-ARG` になる。`notify` を適用していない場合や、複数回適用して参照先が曖昧な場合も `E-HOOK` で止まる。
 
 ## なぜ「最も自由度が高い」と言えるのか
 
@@ -108,7 +111,7 @@ open build/expense/demo.html
 - パターンに当てはまらないプロダクトは、`open` モードでも遅くなる。長尾は消えない。
 - パターンの組み合わせ爆発は、テストの組み合わせ爆発になる。合成の検証が必要。
 - 生成物の品質はパターンライブラリの品質に依存する。ライブラリは言語の一部である。
-- `on_approved` は参照先（custom か適用済みパターン）までしか検査しない。`notify` の `recipient` や `channel` など、フック引数の整合はまだ検証できない。
+- `on_approved` が custom ブロックを指す場合、その引数スキーマまではまだ検証できない。標準パターンを指すフックの引数は検証できる。
 
 ## PROUTとの関係
 

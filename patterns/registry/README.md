@@ -32,7 +32,7 @@ python3 proutc.py build examples/expense.prout
 | `slots` | 埋めるべき値。`required: true` は必須 |
 | `requires_fields` | 対象エンティティが持つべきフィールド |
 | `states` / `transitions` | 承認などの状態遷移。遷移元・遷移先は `states` に含める |
-| `hooks` | `on_approved` など、承認後に呼ぶ処理の参照規則 |
+| `hooks` | `on_approved` など、承認後に呼ぶ処理の参照先と引数（`notify` の `channel` / `recipient`） |
 | `effects` | このパターンが起こす副作用。契約検査に渡す |
 | `artifacts` | 生成されるファイルと行数。実装の形を予測する |
 | `examples` | 実際にビルドが通る使用例 |

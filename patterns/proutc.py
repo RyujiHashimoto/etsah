@@ -136,6 +136,22 @@ def parse_string(s: str, line: int) -> str:
     return json.loads(s)
 
 
+def slot_value(raw: str) -> str:
+    """Return a slot value without its optional JSON string quotes."""
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] == '"':
+        try:
+            return parse_string(raw, 0)
+        except ValueError:
+            return raw[1:-1]
+    return raw
+
+
+def role_names(raw: str) -> set[str]:
+    """Parse the comma-separated `roles` slot of an auth pattern."""
+    return {part.strip().strip('"') for part in slot_value(raw).split(",") if part.strip()}
+
+
 def parse_app(text: str) -> App:
     lines = preprocess(text)
     if not lines:
@@ -336,6 +352,17 @@ def write_index(registry_dir: Path) -> Path:
 # Validation
 # ---------------------------------------------------------------------------
 
+def scene_choices(scene: PatternUse) -> list:
+    choices = json.loads(scene.slots.get("choices", "[]"))
+    if not isinstance(choices, list) or not all(
+        isinstance(pair, list) and len(pair) == 2
+        and all(isinstance(value, str) and value.strip() for value in pair)
+        for pair in choices
+    ):
+        raise ValueError("choices must be an array of [label, scene ID] pairs")
+    return choices
+
+
 def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]:
     diags: list[Diagnostic] = []
 
@@ -358,7 +385,12 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
 
     seen_patterns: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
+    applied_patterns = {p.name for p in app.patterns}
     auth_count = 0
+    auth_roles: set[str] = set()
+    for p in app.patterns:
+        if p.name == "auth" and "roles" in p.slots:
+            auth_roles |= role_names(p.slots["roles"])
     for p in app.patterns:
         m = registry.get(p.name)
         if not m:
@@ -367,6 +399,22 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         for slot_name, spec in m.slots.items():
             if spec.get("required") and slot_name not in p.slots:
                 err("E-SLOT", f"pattern {p.name} requires slot {slot_name!r}", p.line)
+            hook_raw = p.slots.get(slot_name)
+            if spec.get("type") == "hook" and hook_raw:
+                hook = slot_value(hook_raw)
+                if hook not in custom_names:
+                    if hook not in registry:
+                        err(
+                            "E-HOOK",
+                            f"{p.name}.{slot_name}: {hook!r} is not a custom block or registered pattern",
+                            p.line,
+                        )
+                    elif hook not in applied_patterns:
+                        err(
+                            "E-HOOK",
+                            f"{p.name}.{slot_name}: add `pattern {hook}` to use this hook",
+                            p.line,
+                        )
         for slot_name in p.slots:
             if slot_name not in m.slots:
                 diags.append(
@@ -389,20 +437,55 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
         hook_spec = m.hooks.get("on_approved")
-        hook = p.slots.get("on_approved")
-        if hook_spec and hook:
-            if hook not in custom_names and hook not in registry:
+        hook_raw = p.slots.get("on_approved")
+        if hook_spec and hook_raw:
+            hook = slot_value(hook_raw)
+            uses = [other for other in app.patterns if other.name == hook]
+            if hook in custom_names or hook not in registry or not uses:
+                # The generic hook-slot check above already reported these.
+                pass
+            elif len(uses) > 1:
                 err(
                     "E-HOOK",
-                    f"on_approved {hook!r} is not a custom block or registered pattern",
+                    f"on_approved pattern {hook!r} is applied {len(uses)} times; the hook target is ambiguous",
                     p.line,
                 )
-            elif hook in registry and not any(other.name == hook for other in app.patterns):
-                err(
-                    "E-HOOK",
-                    f"on_approved pattern {hook!r} is not applied; add `pattern {hook}`",
-                    p.line,
-                )
+            else:
+                expected = hook_spec.get("pattern")
+                if expected and hook != expected:
+                    err(
+                        "E-HOOK",
+                        f"on_approved must reference the {expected!r} pattern, got {hook!r}",
+                        p.line,
+                    )
+                else:
+                    use = uses[0]
+                    for arg in hook_spec.get("args", []):
+                        if arg not in use.slots:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook!r} requires argument {arg!r}",
+                                p.line,
+                            )
+                    target = registry[hook]
+                    for arg, raw in use.slots.items():
+                        spec = target.slots.get(arg)
+                        if not spec:
+                            continue
+                        value = slot_value(raw)
+                        allowed = spec.get("enum")
+                        if allowed and value not in allowed:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook}.{arg} must be one of {', '.join(allowed)}; got {value!r}",
+                                use.line,
+                            )
+                        if spec.get("type") == "role" and auth_roles and value not in auth_roles:
+                            err(
+                                "E-HOOK-ARG",
+                                f"on_approved {hook}.{arg} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
+                                use.line,
+                            )
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:
@@ -424,6 +507,22 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             err("E-FREEDOM", "strict mode does not allow custom blocks", c.line)
         if app.freedom == "guided" and not c.why:
             err("E-CUSTOM", f"custom {c.name} needs a `why` in guided mode", c.line)
+
+    scenes = [p for p in app.patterns if p.name == "scene"]
+    scene_ids = {p.target for p in scenes}
+    seen_scenes = set()
+    for scene in scenes:
+        if not scene.target or scene.target in seen_scenes:
+            err("E-SCENE", "each scene requires a unique scene ID", scene.line)
+        seen_scenes.add(scene.target)
+        try:
+            choices = scene_choices(scene)
+        except ValueError as ex:
+            err("E-SCENE", str(ex), scene.line)
+            continue
+        for label, destination in choices:
+            if destination not in scene_ids:
+                err("E-SCENE", f"{label!r} links to unknown scene {destination!r}", scene.line)
 
     return diags
 
@@ -483,12 +582,17 @@ def expand(app: App, registry: dict[str, PatternManifest]) -> list[Artifact]:
     arts.append(Artifact("shared", "lib/types.ts", "TS", type_lines, "共有型とブランド型"))
     arts.append(Artifact("shared", "README.md", "MD", 30, "セットアップと環境変数の手順"))
 
+    if not app.entities and app.patterns and all(p.name == "scene" for p in app.patterns):
+        arts.clear()
+
     for p in app.patterns:
         m = registry.get(p.name)
         if not m:
             continue
         entity = entity_for(app, p)
         ctx = template_context(entity)
+        if p.name == "scene":
+            ctx["Entity"] = p.target
         for t in m.artifacts:
             path = substitute(t.get("path", ""), ctx)
             desc = substitute(t.get("desc", ""), ctx)
@@ -610,6 +714,10 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         )
     else:
         human_panel = '<p style="font-size:12.5px;color:var(--muted);">エンティティが定義されていない。</p>'
+
+    if any(p.name == "scene" for p in app.patterns) and not errors:
+        link = '<p><a class="demo-link" href="story.html">作品を開く →</a></p>'
+        human_panel = human_panel + link if approval or preview_entity else link
 
     freedom_text = {
         "strict": "パターンのみ。最速・最も検証しやすい。",
@@ -788,6 +896,37 @@ def sample_value(name: str, typ: str) -> str:
     return "サンプル"
 
 
+def render_story(scenes: list[PatternUse]) -> str:
+    start = scenes[0]
+    sections = []
+    # Keep the default scene last so a targeted sibling can hide it without JS.
+    for scene in [*scenes[1:], start]:
+        choices = scene_choices(scene) or [("最初から", start.target)]
+        links = "".join(
+            f'<a href="#scene-{esc(target)}">{esc(label)}</a>'
+            for label, target in choices
+        )
+        sections.append(
+            f'<section id="scene-{esc(scene.target)}" tabindex="-1">'
+            f'<h1>{esc(scene.slots["title"])}</h1><p>{esc(scene.slots["body"])}</p>'
+            f'<nav aria-label="選択肢">{links}</nav></section>'
+        )
+    css = """
+    body{margin:0;background:#f6f2e9;color:#243b38;font:1.15rem/1.8 system-ui,sans-serif}
+    main{max-width:36rem;margin:10vh auto;padding:1.5rem}
+    h1{line-height:1.3}section{display:none}section:last-child,section:target{display:block}
+    section:target~section:last-child{display:none}
+    nav{display:grid;gap:.7rem;margin-top:2rem}
+    a{display:block;padding:.6rem 1rem;background:#234e48;color:white;border-radius:.4rem}
+    """
+    return (
+        '<!doctype html><html lang="ja"><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f'<title>{esc(start.slots["title"])}</title><style>{css}</style>'
+        f'<main>{"".join(sections)}</main></html>'
+    )
+
+
 def render_demo(app: App, arts: list[Artifact]) -> str:
     """Generate a dependency-free, interactive approval demo for humans."""
     approval = next((p for p in app.patterns if p.name == "approval"), None)
@@ -797,10 +936,18 @@ def render_demo(app: App, arts: list[Artifact]) -> str:
     entity_name = approval.slots.get("entity") or approval.target
     entity = next((e for e in app.entities if e.name == entity_name), None)
     approver = approval.slots.get("approver", "approver")
-    on_approved = approval.slots.get("on_approved", "")
+    on_approved = slot_value(approval.slots.get("on_approved", ""))
     custom = next((c for c in app.customs if c.name == on_approved), None)
+    hook_use = next((p for p in app.patterns if p.name == on_approved), None)
     if custom and custom.why:
         action = custom.why
+    elif hook_use and on_approved == "notify":
+        channel = slot_value(hook_use.slots.get("channel", "email"))
+        recipient = slot_value(hook_use.slots.get("recipient", "approver"))
+        template = slot_value(hook_use.slots.get("template", ""))
+        action = f"{channel} で {recipient} ロールに承認結果を通知する"
+        if template:
+            action += f"（テンプレート: {template}）"
     elif on_approved:
         action = f"{on_approved} を実行する"
     else:
@@ -1084,6 +1231,7 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
         intent = m.intent.lower()
         tags = [t.lower() for t in m.tags]
         slots = [s.lower() for s in m.slots]
+        descriptions = [str(v.get("desc", "")).lower() for v in m.slots.values()]
         for token in tokens:
             if token in name:
                 score += 5
@@ -1094,6 +1242,9 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
                     score += 3
             for slot in slots:
                 if token in slot:
+                    score += 1
+            for description in descriptions:
+                if token in description:
                     score += 1
         if score:
             results.append((score, m))
@@ -1170,6 +1321,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     if demo:
         (out / "demo.html").write_text(demo, encoding="utf-8")
 
+    scenes = [p for p in app.patterns if p.name == "scene"]
+    story = out / "story.html"
+    if scenes and not has_errors:
+        story.write_text(render_story(scenes), encoding="utf-8")
+        print(f"wrote {story}")
+    else:
+        story.unlink(missing_ok=True)
+
     manifest = {
         "app": app.name,
         "stack": app.stack,
@@ -1199,8 +1358,9 @@ def cmd_find(args: argparse.Namespace) -> int:
     if not results:
         print(f"no patterns matched {args.query!r}")
         return 1
-    print(f"query: {args.query!r}  ({len(results)} match(es))")
-    for score, m in results:
+    shown = results[:3]
+    print(f"query: {args.query!r}  ({len(results)} match(es), showing {len(shown)})")
+    for score, m in shown:
         required = [k for k, v in m.slots.items() if v.get("required")]
         optional = [k for k, v in m.slots.items() if not v.get("required")]
         print()
@@ -1208,6 +1368,7 @@ def cmd_find(args: argparse.Namespace) -> int:
         print(f"    intent: {m.intent}")
         print(f"    required: {', '.join(required) or '-'}")
         print(f"    optional: {', '.join(optional) or '-'}")
+        print(f"    effects: {', '.join(m.effects) or '-'}")
         print(f"    tags: {', '.join(m.tags)}")
         if m.examples:
             print(f"    examples: {', '.join(m.examples)}")

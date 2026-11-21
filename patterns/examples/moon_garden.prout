@@ -1,0 +1,15 @@
+app moon_garden
+  stack html
+  pattern scene gate
+    title: 月の庭の入口
+    body: 夜の庭で、鍵の代わりに音を集める門番に出会った。どちらの小道を歩こう？
+    choices: [["池へ行く", "pond"], ["竹林へ行く", "bamboo"]]
+
+  pattern scene pond
+    title: 水面の鈴
+    body: カエルが銀色の鈴を鳴らした。その音で門が開き、月の庭が姿を現す。
+
+  pattern scene bamboo
+    title: 風の笛
+    body: 竹を渡る風の音が聞こえる。門番にこの音を届けようか。
+    choices: [["入口に戻る", "gate"], ["池の音も聴く", "pond"]]

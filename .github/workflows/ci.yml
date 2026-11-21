@@ -15,6 +15,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+
       - name: Contract language
         run: |
           python3 prout.py check examples/refund_fixed.prout
@@ -36,7 +39,7 @@ jobs:
           python3 proutc.py find "申請 承認" | grep -q approval
           python3 proutc.py build examples/shop.prout
           python3 proutc.py build examples/expense.prout
-          python3 proutc.py build examples/pc_lending.prout
+          python3 proutc.py build bench/pc_lending.prout
 
       - name: Build service desk examples
         working-directory: patterns

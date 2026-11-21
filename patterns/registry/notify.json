@@ -1,6 +1,6 @@
 {
   "name": "notify",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
   "tags": [
     "notify",
@@ -14,7 +14,8 @@
     "channel": {
       "type": "string",
       "required": true,
-      "desc": "email または slack"
+      "desc": "email または slack",
+      "enum": ["email", "slack"]
     },
     "recipient": {
       "type": "role",

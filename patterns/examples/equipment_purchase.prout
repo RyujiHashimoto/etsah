@@ -30,16 +30,12 @@ app equipment_purchase
     search: [id, status, applicant.email, item]
     paginate: 20
 
-  pattern approval PurchaseRequest
-    entity: PurchaseRequest
-    approver: manager
-    on_approved: notify_general_affairs
-
   pattern notify
     channel: email
     recipient: general_affairs
     template: equipment_purchase_approved
 
-  custom notify_general_affairs
-    why "上長の承認後に、備品購入申請の品名・数量・金額・希望納期を総務ロールへメールで通知し、監査ログに記録する"
-    lines 40
+  pattern approval PurchaseRequest
+    entity: PurchaseRequest
+    approver: manager
+    on_approved: notify

@@ -34,7 +34,7 @@
     },
     {
       "name": "approval",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "intent": "申請を承認者に回し、承認・差し戻し・却下の状態遷移を管理する。承認後の処理は on_approved フックで接続する",
       "tags": [
         "approval",
@@ -58,7 +58,7 @@
         },
         "on_approved": {
           "required": false,
-          "desc": "承認後に呼ぶ処理（custom または別パターン）"
+          "desc": "承認後に呼ぶ処理（custom、または channel と recipient を渡す notify）"
         }
       },
       "states": [
@@ -450,7 +450,7 @@
     },
     {
       "name": "notify",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
       "tags": [
         "notify",
@@ -525,6 +525,42 @@
         "examples/shop.prout"
       ],
       "path": "registry/refund.json"
+    },
+    {
+      "name": "scene",
+      "version": "0.1.0",
+      "intent": "選択肢で場面を移動するゲームブックや分岐教材をHTMLで体験する",
+      "tags": [
+        "scene",
+        "story",
+        "quiz",
+        "ゲームブック",
+        "物語",
+        "教材",
+        "クイズ",
+        "分岐"
+      ],
+      "slots": {
+        "title": {
+          "required": true,
+          "desc": "見出し（プレーンテキスト）"
+        },
+        "body": {
+          "required": true,
+          "desc": "場面の本文"
+        },
+        "choices": {
+          "required": false,
+          "desc": "JSON配列。各項目は [表示名, 移動先の場面ID]"
+        }
+      },
+      "states": [],
+      "effects": [],
+      "examples": [
+        "examples/moon_garden.prout",
+        "examples/fraction_quiz.prout"
+      ],
+      "path": "registry/scene.json"
     },
     {
       "name": "search",
