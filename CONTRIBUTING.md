@@ -17,7 +17,7 @@ cd patterns
 python3 proutc.py index
 python3 proutc.py build examples/shop.prout
 python3 proutc.py build examples/expense.prout
-python3 proutc.py build examples/pc_lending.prout
+python3 proutc.py build bench/pc_lending.prout
 python3 proutc.py bench
 python3 growth_report.py
 ```

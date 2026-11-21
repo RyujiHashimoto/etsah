@@ -79,6 +79,17 @@ tests/orders.test.ts
 
 合計は約430行。仕様は7行。これが「高速に開発できる」の中身である。
 
+## 人間向けデモ
+
+`build` は `report.html` に加えて `demo.html` を生成する。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できる。サーバも外部依存も不要で、生成されたHTMLを開くだけでよい。
+
+```bash
+python3 proutc.py build examples/expense.prout --out build/expense
+open build/expense/demo.html
+```
+
+デモは仕様の `entity`、`approver`、`on_approved` から決定論的に生成される。人間はパターン名とスロットを確認し、ボタンを押して状態遷移を見る。コードを読む必要はない。
+
 ## なぜ「最も自由度が高い」と言えるのか
 
 - パターンは追加できる。ユーザーもAIも、新しいパターンをライブラリに足せる。

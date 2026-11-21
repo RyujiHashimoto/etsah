@@ -534,57 +534,40 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         spec_rows.append(f'<div class="src-line"><span class="ln">{no}</span><span>{esc(line)}</span></div>')
     spec_html = "".join(spec_rows)
 
-    orders = [
-        ("#1042", "山田 太郎", "¥12,800", "paid", "返金"),
-        ("#1041", "佐藤 花子", "¥3,400", "paid", "返金"),
-        ("#1040", "鈴木 一郎", "¥28,000", "pending", "—"),
-        ("#1039", "高橋 美咲", "¥8,900", "refunded", "済"),
-        ("#1038", "田中 健", "¥15,600", "paid", "返金"),
-    ]
-    order_rows = "".join(
-        f"""
-        <tr>
-          <td class="mono">{esc(oid)}</td>
-          <td>{esc(name)}</td>
-          <td class="num">{esc(amount)}</td>
-          <td><span class="pill {esc(status)}">{esc(status)}</span></td>
-          <td class="action">{esc(action)}</td>
-        </tr>
-        """
-        for oid, name, amount, status, action in orders
-    )
+    preview_entity = app.entities[0] if app.entities else None
+    preview_fields = [
+        name
+        for name in (preview_entity.fields if preview_entity else {})
+        if name not in ("id", "status")
+    ][:4]
+    preview_rows = ""
+    if preview_entity:
+        for index, person in enumerate(("山田 太郎", "佐藤 花子", "鈴木 一郎"), 1):
+            cells = "".join(
+                f"<td>{esc(person if name in ('applicant', 'name') else sample_value(name, preview_entity.fields[name]))}</td>"
+                for name in preview_fields
+            )
+            preview_rows += (
+                f'<tr><td class="mono">#{1043 - index}</td>{cells}'
+                f'<td><span class="pill approved">active</span></td></tr>'
+            )
 
-    example = '''import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { orderSchema } from "@/lib/validation/order";
-import { requireRole } from "@/lib/auth";
-
-export async function GET(req: NextRequest) {
-  await requireRole("admin");
-  const { searchParams } = new URL(req.url);
-  const page = Number(searchParams.get("page") ?? "1");
-  const status = searchParams.get("status");
-  const where = status ? { status } : {};
-
-  const [rows, total] = await Promise.all([
-    db.order.findMany({
-      where,
-      skip: (page - 1) * 20,
-      take: 20,
-      orderBy: { created_at: "desc" },
-    }),
-    db.order.count({ where }),
-  ]);
-
-  return NextResponse.json({ rows, total, page, pageSize: 20 });
-}
-
-export async function POST(req: NextRequest) {
-  await requireRole("admin");
-  const body = orderSchema.parse(await req.json());
-  const row = await db.order.create({ data: body });
-  return NextResponse.json(row, { status: 201 });
-}'''
+    approval = next((p for p in app.patterns if p.name == "approval"), None)
+    if approval:
+        human_panel = (
+            '<p style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">'
+            '承認前と承認後を、ボタンで確かめられるデモを生成した。'
+            '申請・承認・差し戻しのたびに、状態と承認後の処理が変わる。</p>'
+            '<p><a class="demo-link" href="demo.html">承認デモを開く →</a></p>'
+        )
+    elif preview_entity:
+        headers = "".join(f"<th>{esc(field)}</th>" for field in preview_fields)
+        human_panel = (
+            f'<table><thead><tr><th>ID</th>{headers}<th>状態</th></tr></thead>'
+            f'<tbody>{preview_rows}</tbody></table>'
+        )
+    else:
+        human_panel = '<p style="font-size:12.5px;color:var(--muted);">エンティティが定義されていない。</p>'
 
     freedom_text = {
         "strict": "パターンのみ。最速・最も検証しやすい。",
@@ -652,6 +635,7 @@ export async function POST(req: NextRequest) {
     .mono { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #4b5563; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .action { text-align: right; color: var(--green); font-size: 11px; font-weight: 650; }
+    .demo-link { display: inline-block; background: var(--green); color: #fff; text-decoration: none; padding: 9px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 650; }
     .pill { font-size: 10px; font-weight: 650; padding: 3px 8px; border-radius: 999px; }
     .pill.paid { background: var(--green-soft); color: var(--green); }
     .pill.pending { background: var(--amber-soft); color: var(--amber); }
@@ -706,18 +690,8 @@ export async function POST(req: NextRequest) {
   </div>
 
   <div class="panel">
-    <h2>生成例：api/orders/route.ts</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin-bottom:0;"><code>crud Orders</code> のスロット（access: admin, paginate: 20, search: [id, status]）が、そのままルートハンドラになる。</p>
-    <div class="codeblock"><pre>{esc(example)}</pre></div>
-  </div>
-
-  <div class="panel">
     <h2>人間が見るもの</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">同じ仕様から生成された管理画面。人間はパターン名とスロットだけを確認すればよい。</p>
-    <table>
-      <thead><tr><th>注文</th><th>顧客</th><th style="text-align:right">金額</th><th>状態</th><th></th></tr></thead>
-      <tbody>{order_rows}</tbody>
-    </table>
+    {human_panel}
   </div>
 
   <div class="panel">
@@ -735,6 +709,306 @@ export async function POST(req: NextRequest) {
     <span>AST <span class="hash">{esc(app.name)}-{spec}-{total_lines}</span></span>
   </div>
 </div>
+</body>
+</html>
+"""
+
+
+def sample_value(name: str, typ: str) -> str:
+    n = name.lower()
+    t = typ.lower()
+    if "email" in n or t == "email":
+        return "taro@example.com"
+    if "end" in n and ("date" in n or t == "date"):
+        return "2026-12-09"
+    if "date" in n or t == "date":
+        return "2026-12-08"
+    if "amount" in n or "price" in n or "total" in n or t == "money":
+        return "48000"
+    if "applicant" in n:
+        return "山田 太郎"
+    if "destination" in n:
+        return "大阪"
+    if "purpose" in n or "reason" in n:
+        return "顧客訪問"
+    if "note" in n or "memo" in n:
+        return "新規取引先との打ち合わせ"
+    if "model" in n:
+        return "ThinkPad X1"
+    if "name" in n:
+        return "山田 太郎"
+    return "サンプル"
+
+
+def render_demo(app: App, arts: list[Artifact]) -> str:
+    """Generate a dependency-free, interactive approval demo for humans."""
+    approval = next((p for p in app.patterns if p.name == "approval"), None)
+    if approval is None:
+        return ""
+
+    entity_name = approval.slots.get("entity") or approval.target
+    entity = next((e for e in app.entities if e.name == entity_name), None)
+    approver = approval.slots.get("approver", "approver")
+    on_approved = approval.slots.get("on_approved", "")
+    custom = next((c for c in app.customs if c.name == on_approved), None)
+    if custom and custom.why:
+        action = custom.why
+    elif on_approved:
+        action = f"{on_approved} を実行する"
+    else:
+        action = "承認後の処理は未定義"
+
+    fields = []
+    if entity:
+        for name, typ in entity.fields.items():
+            if name in ("id", "status"):
+                continue
+            fields.append({"name": name, "type": typ, "value": sample_value(name, typ)})
+
+    fields_html = "".join(
+        f'<label class="field"><span>{esc(f["name"])} <em>{esc(f["type"])}</em></span>'
+        f'<input value="{esc(f["value"])}" data-field="{esc(f["name"])}"></label>'
+        for f in fields
+    )
+
+    data = {
+        "app": app.name,
+        "entity": entity_name,
+        "approver": approver,
+        "onApproved": on_approved,
+        "action": action,
+    }
+    data_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+
+    demo_css = """
+    :root {
+      --bg: #f4f1e9; --card: #fffdf8; --ink: #1e2328; --muted: #6d7280;
+      --line: #e3ddd0; --green: #2f6f4e; --green-soft: #e7f2ea;
+      --amber: #a85a08; --amber-soft: #fbf1e0; --red: #b3261e; --red-soft: #fbe9e7;
+      --blue: #2454b8; --blue-soft: #e8eefb;
+      --shadow: 0 1px 2px rgba(30,35,40,.04), 0 8px 24px rgba(30,35,40,.05);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); line-height: 1.7;
+      background: radial-gradient(1200px 500px at 50% -200px, #fbf8f1 0%, rgba(251,248,241,0) 70%), var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 30px 20px 64px; }
+    .kicker { font-family: ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: .16em; color: var(--green); margin-bottom: 10px; }
+    h1 { font-size: 32px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -.02em; }
+    .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+    .sub code { background: #eae5d9; padding: 2px 6px; border-radius: 5px; font-size: .88em; }
+    .grid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 16px; align-items: start; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .card-head strong { font-size: 15px; }
+    .card-head code { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; background: #f2eee4; padding: 3px 7px; border-radius: 5px; color: #4b5563; }
+    .field { display: block; margin-bottom: 10px; }
+    .field span { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .field em { font-style: normal; font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: #8a8f98; }
+    .field input { width: 100%; border: 1px solid var(--line); background: #fffefa; border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); }
+    .field input:focus { outline: 2px solid #bcd9c6; outline-offset: 1px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    button { border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; background: var(--green); color: #fff; transition: transform .08s ease, opacity .15s ease; }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .32; cursor: not-allowed; }
+    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+    .pill { font-family: ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 999px; letter-spacing: .04em; }
+    .pill.draft { background: #efede7; color: #6d7280; }
+    .pill.pending { background: var(--amber-soft); color: var(--amber); }
+    .pill.approved { background: var(--green-soft); color: var(--green); }
+    .pill.returned { background: var(--red-soft); color: var(--red); }
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; color: #4b5563; margin-bottom: 14px; }
+    .flow span { background: #f8f5ee; border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
+    .flow i { color: #9aa0a8; font-style: normal; }
+    .action-box { background: var(--green-soft); border: 1px solid #cfe3d6; border-radius: 12px; padding: 14px; }
+    .action-box .label { font-size: 10px; letter-spacing: .1em; color: var(--green); font-weight: 700; margin-bottom: 4px; }
+    .action-text { font-size: 13px; font-weight: 650; }
+    .state { display: inline-block; margin-top: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 10px; padding: 3px 8px; border-radius: 999px; background: #fffefa; color: var(--muted); border: 1px solid var(--line); }
+    .state.done { background: var(--green); color: #fff; border-color: var(--green); }
+    .log { list-style: none; margin: 0; padding: 0; }
+    .log li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #ece6d9; font-size: 12px; }
+    .log li:last-child { border-bottom: 0; }
+    .log .time { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: #8a8f98; min-width: 42px; }
+    .log .n { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: #b0b4ba; }
+    .log li.ok span:nth-child(2) { color: var(--green); font-weight: 650; }
+    .log li.warn span:nth-child(2) { color: var(--amber); }
+    .log li.empty { color: var(--muted); font-size: 11.5px; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .compare-col { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fffefa; opacity: .55; transition: opacity .2s ease, border-color .2s ease, background .2s ease; }
+    .compare-col.active { opacity: 1; border-color: #bcd9c6; background: var(--green-soft); }
+    .compare-label { font-size: 10px; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+    .compare-col ul { margin: 0; padding-left: 16px; font-size: 11.5px; color: #4b5563; }
+    .compare-col li { margin: 4px 0; }
+    .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+    .stat { background: #fffefa; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 10.5px; color: var(--muted); }
+    .stat b { color: var(--ink); font-weight: 700; }
+    .footer { margin-top: 8px; font-size: 11px; color: var(--muted); }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+      .wrap { padding: 24px 15px 56px; }
+      .card { padding: 16px; }
+      .compare { grid-template-columns: 1fr; }
+    }
+    """
+
+    demo_js = """
+    const statusEl = document.getElementById("status");
+    const submitEl = document.getElementById("submit");
+    const approveEl = document.getElementById("approve");
+    const returnEl = document.getElementById("return");
+    const resetEl = document.getElementById("reset");
+    const actionStateEl = document.getElementById("action-state");
+    const logEl = document.getElementById("log");
+    const beforeCol = document.getElementById("before-col");
+    const afterCol = document.getElementById("after-col");
+    const auditCountEl = document.getElementById("audit-count");
+
+    let state = { status: "draft", fired: false, log: [] };
+
+    function addLog(text, tone) {
+      state.log.push({
+        text: text,
+        tone: tone || "",
+        time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+      });
+      render();
+    }
+
+    function render() {
+      statusEl.textContent = state.status;
+      statusEl.className = "pill " + state.status;
+      submitEl.disabled = state.status !== "draft";
+      approveEl.disabled = state.status !== "pending";
+      returnEl.disabled = state.status !== "pending";
+      actionStateEl.textContent = state.fired ? "実行済み" : "未実行";
+      actionStateEl.className = "state" + (state.fired ? " done" : "");
+      beforeCol.classList.toggle("active", state.status !== "approved");
+      afterCol.classList.toggle("active", state.status === "approved");
+      auditCountEl.textContent = String(state.log.length);
+      document.querySelectorAll("input[data-field]").forEach(function (el) {
+        el.disabled = state.status !== "draft";
+      });
+      if (state.log.length === 0) {
+        logEl.innerHTML = '<li class="empty">まだ操作はありません。「申請する」を押してください。</li>';
+        return;
+      }
+      logEl.innerHTML = state.log.map(function (entry, index) {
+        return '<li class="' + entry.tone + '"><span class="time">' + entry.time +
+          '</span><span>' + entry.text + '</span><span class="n">' +
+          String(index + 1).padStart(2, "0") + '</span></li>';
+      }).join("");
+    }
+
+    submitEl.addEventListener("click", function () {
+      state.status = "pending";
+      addLog("申請者が申請を送信しました", "info");
+      addLog("承認者（" + DATA.approver + "）に承認依頼を送りました", "info");
+    });
+
+    approveEl.addEventListener("click", function () {
+      state.status = "approved";
+      addLog("承認者が申請を承認しました", "ok");
+      state.fired = true;
+      addLog("承認後の処理を実行: " + DATA.action, "ok");
+    });
+
+    returnEl.addEventListener("click", function () {
+      state.status = "returned";
+      addLog("承認者が申請を差し戻しました", "warn");
+    });
+
+    resetEl.addEventListener("click", function () {
+      state = { status: "draft", fired: false, log: [] };
+      render();
+    });
+
+    render();
+    """
+
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROUT Patterns — {esc(app.name)} / approval demo</title>
+<style>{demo_css}</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">PROUT PATTERNS / HUMAN VIEW</div>
+  <h1>{esc(app.name)}</h1>
+  <p class="sub">承認前と承認後を、ボタンで確かめる。仕様の <code>approval</code> と <code>{esc(on_approved) or "on_approved"}</code> が、この画面の動きに対応している。</p>
+
+  <div class="stats">
+    <span class="stat">対象 <b>{esc(entity_name)}</b></span>
+    <span class="stat">承認者 <b>{esc(approver)}</b></span>
+    <span class="stat">監査ログ <b id="audit-count">0</b> 件</span>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-head"><strong>申請</strong><span id="status" class="pill draft">draft</span></div>
+      {fields_html}
+      <div class="actions">
+        <button id="submit">申請する</button>
+        <button id="approve" disabled>承認する</button>
+        <button id="return" class="ghost" disabled>差し戻す</button>
+        <button id="reset" class="ghost">リセット</button>
+      </div>
+    </section>
+
+    <div>
+      <section class="card">
+        <div class="card-head"><strong>承認フロー</strong><code>{esc(approver)}</code></div>
+        <div class="flow">
+          <span>申請</span><i>→</i><span>{esc(approver)} が承認</span><i>→</i><span>{esc(action)}</span>
+        </div>
+        <div class="action-box">
+          <div class="label">ON_APPROVED</div>
+          <div class="action-text">{esc(action)}</div>
+          <div id="action-state" class="state">未実行</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><strong>履歴</strong><span style="font-size:11px;color:var(--muted)">操作するたびに増える</span></div>
+        <ol id="log" class="log"><li class="empty">まだ操作はありません。「申請する」を押してください。</li></ol>
+      </section>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card-head"><strong>承認前後の差分</strong><span style="font-size:11px;color:var(--muted)">状態に応じて強調される</span></div>
+    <div class="compare">
+      <div class="compare-col active" id="before-col">
+        <div class="compare-label">承認前 / BEFORE</div>
+        <ul>
+          <li>申請は下書き、または承認待ち</li>
+          <li>承認後の処理はまだ動かない</li>
+          <li>監査ログは申請と承認依頼だけ</li>
+        </ul>
+      </div>
+      <div class="compare-col" id="after-col">
+        <div class="compare-label">承認後 / AFTER</div>
+        <ul>
+          <li>状態は <code>approved</code></li>
+          <li>{esc(action)}</li>
+          <li>監査ログに承認と処理を記録</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">PROUT Patterns / generated from the spec. No server, no external dependencies.</div>
+</div>
+<script>
+const DATA = {data_json};
+{demo_js}
+</script>
 </body>
 </html>
 """
@@ -832,6 +1106,9 @@ def cmd_build(args: argparse.Namespace) -> int:
     out.mkdir(parents=True, exist_ok=True)
     report = render_report(app, diags, arts)
     (out / "report.html").write_text(report, encoding="utf-8")
+    demo = render_demo(app, arts)
+    if demo:
+        (out / "demo.html").write_text(demo, encoding="utf-8")
 
     manifest = {
         "app": app.name,
@@ -848,6 +1125,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     }
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote {out / 'report.html'}")
+    if demo:
+        print(f"wrote {out / 'demo.html'}")
     print(f"wrote {out / 'manifest.json'}")
     return 1 if any(d.severity == "error" for d in diags) else 0
 

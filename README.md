@@ -48,6 +48,18 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
+## 承認前後をGUIで確かめる
+
+`proutc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
+
+```bash
+cd patterns
+python3 proutc.py build examples/expense.prout --out build/expense
+open build/expense/demo.html
+```
+
+![承認デモ](docs/demo.png)
+
 ## パターンで書く
 
 ```bash
@@ -59,13 +71,17 @@ python3 proutc.py build examples/shop.prout
 # 日本語でパターンを検索する
 python3 proutc.py find "申請 承認"
 
-# 経費精算とPC貸出を、同じ approval パターンで組む
-python3 proutc.py build examples/expense.prout
-python3 proutc.py build examples/pc_lending.prout
+# 経費精算を、承認デモ付きで組む
+python3 proutc.py build examples/expense.prout --out build/expense
+
+# PC貸出は、承認パターンを二つのアプリから抽出するための利用例
+python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
 
 # パターン追加前後を比較する
 python3 proutc.py bench
 ```
+
+PC貸出は、承認パターンを二つのアプリから抽出するために使った二つ目の利用例です。製品デモとして育てる予定はなく、再利用が効いた証拠としてベンチに残しています。
 
 `find "申請 承認"` は `approval` を score 12 で返します。元の会話を知らないAIでも、この索引とマニフェストだけで「申請→承認→差し戻し」を再利用できます。
 
@@ -112,8 +128,9 @@ patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
   registry/              9個のパターンマニフェストと index.json
-  examples/              ショップ、経費精算、PC貸出の仕様
-  bench/                 パターン追加前後の比較
+  examples/              ショップ、経費精算の仕様
+  bench/                 パターン追加前後の比較（PC貸出を含む）
+  build/                 生成物（report.html、承認デモの demo.html）
   growth_report.py       成長ループのHTMLレポート
 .github/workflows/ci.yml 契約検査、索引整合、ビルド、ベンチ、回帰ガード
 CONTRIBUTING.md          パターン提案とレビューの基準

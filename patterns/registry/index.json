@@ -37,7 +37,7 @@
       ],
       "examples": [
         "examples/expense.prout",
-        "examples/pc_lending.prout"
+        "bench/pc_lending.prout"
       ],
       "path": "registry/approval.json"
     },

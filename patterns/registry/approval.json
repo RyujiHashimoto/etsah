@@ -19,7 +19,7 @@
     {"path": "lib/workflows/approval.ts", "kind": "TS", "lines": 60, "desc": "状態遷移と on_approved フック"},
     {"path": "tests/approval.test.ts", "kind": "TEST", "lines": 75, "desc": "承認フローの契約テスト"}
   ],
-  "examples": ["examples/expense.prout", "examples/pc_lending.prout"],
+  "examples": ["examples/expense.prout", "bench/pc_lending.prout"],
   "provenance": {
     "author": "橋元 龍二",
     "date": "2026-11-22",
