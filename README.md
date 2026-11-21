@@ -92,11 +92,14 @@ python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
 
 # パターン追加前後を比較する
 python3 proutc.py bench
+
+# 人材派遣の基幹（勤怠承認、抵触日、請求単価）。設計は docs/staffing.md
+python3 proutc.py build examples/staffing.prout --out build/staffing
 ```
 
 PC貸出は、承認パターンを二つのアプリから抽出するために使った二つ目の利用例です。製品デモとして育てる予定はなく、再利用が効いた証拠としてベンチに残しています。
 
-`find "申請 承認"` は `approval` を score 15 で返します。元の会話を知らないAIでも、この索引とマニフェストだけで「申請→承認→差し戻し」を再利用できます。
+`find "申請 承認"` は `approval` を score 15 で返します。元の会話を知らないAIでも、この索引とマニフェストだけで「申請→承認→差し戻し」を再利用できます。人材派遣の基幹に足した `timesheet`、`dispatch_contract`、`staffing_billing`、`matching` は `docs/staffing.md` にまとめています。
 
 ### パターン追加前後
 
@@ -164,8 +167,8 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              9個のパターンマニフェストと index.json
-  examples/              ショップ、経費精算、出張申請、備品購入の仕様
+  registry/              13個のパターンマニフェストと index.json
+  examples/              ショップ、経費精算、出張申請、備品購入、人材派遣の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、承認デモの demo.html）
   growth_report.py       成長ループのHTMLレポート

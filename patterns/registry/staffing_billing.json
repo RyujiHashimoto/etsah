@@ -1,0 +1,78 @@
+{
+  "name": "staffing_billing",
+  "version": "0.1.0",
+  "intent": "承認済みの勤怠から派遣先請求とスタッフ給与を起こし、請求単価が支払単価を下回らないことを検査する",
+  "tags": [
+    "invoice",
+    "payroll",
+    "billing",
+    "margin",
+    "請求",
+    "給与",
+    "粗利",
+    "マージン",
+    "単価"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "請求エンティティ"
+    },
+    "timesheet": {
+      "type": "entity",
+      "required": true,
+      "desc": "集計元の勤怠エンティティ"
+    },
+    "bill_rate": {
+      "type": "rate",
+      "required": true,
+      "desc": "派遣先への請求時間単価（円）。小数可"
+    },
+    "pay_rate": {
+      "type": "rate",
+      "required": true,
+      "desc": "スタッフへの支払時間単価（円）。小数可"
+    }
+  },
+  "field_types": {
+    "bill_rate": "Rate",
+    "pay_rate": "Rate",
+    "hours": "Duration"
+  },
+  "constraints": [
+    {
+      "id": "bill_gte_pay",
+      "left": "bill_rate",
+      "op": ">=",
+      "right": "pay_rate",
+      "kind": "rate",
+      "message": "bill rate is below pay rate",
+      "note": "同一労働同一賃金の検査ではない。請求単価が支払単価を下回ることだけを拒否する。社会保険と割増は含まないので、差が非負でも赤字になり得る。"
+    }
+  ],
+  "requires_patterns": ["timesheet"],
+  "requires_reason": "client approval of attendance is missing",
+  "effects": ["read(timesheets)", "write(invoices)", "write(payroll)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#invoices", "kind": "SQL", "lines": 16, "desc": "派遣先への請求"},
+    {"path": "db/schema.sql#payroll", "kind": "SQL", "lines": 16, "desc": "スタッフへの給与"},
+    {"path": "api/billing/close/route.ts", "kind": "API", "lines": 80, "desc": "承認済み勤怠から請求と給与を起こす"},
+    {"path": "app/(admin)/billing/page.tsx", "kind": "UI", "lines": 70, "desc": "単価、時間、粗利の確認画面"},
+    {"path": "lib/billing/rates.ts", "kind": "TS", "lines": 45, "desc": "請求単価と支払単価の比較"},
+    {"path": "tests/billing.test.ts", "kind": "TEST", "lines": 55, "desc": "単価の逆転を拒否するテスト"}
+  ],
+  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "notes": [
+    "timesheet パターンが同じ仕様に無いとエラーにする。承認スロットの無い勤怠は timesheet 側が拒否する。",
+    "Rate は非負の十進数。契約層の Money は整数で、金額リテラルを持たない。",
+    "粗利ゼロは通す。マイナスだけを止める。",
+    "同一労働同一賃金の検査ではない。比べているのは請求単価と支払単価だけである。"
+  ],
+  "provenance": {
+    "author": "PROUT staffing prototype",
+    "date": "2026-11-21",
+    "extracted_from": ["staffing", "staffing_desk"],
+    "note": "請求と給与を一つのパターンにし、単価の逆転と勤怠承認の欠落を仕様時に止める。"
+  }
+}

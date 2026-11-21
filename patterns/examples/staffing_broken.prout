@@ -1,0 +1,67 @@
+# 意図的に壊した派遣仕様。proutc build は次の3件で失敗する。
+# 1. 請求単価 1500 が支払単価 1800.50 を下回る
+# 2. 契約終了 2029-04-02 が抵触日 2029-04-01 を超える
+# 3. 勤怠に approver が無く、派遣先承認が欠けている
+
+app staffing_broken
+  stack nextjs, postgres
+  freedom guided
+
+  entity Staff
+    id: Id
+    name: String
+    skills: String
+
+  entity Client
+    id: Id
+    name: String
+
+  entity Opening
+    id: Id
+    client: Client
+    required_skills: String
+
+  entity DispatchContract
+    id: Id
+    staff: Staff
+    client: Client
+    duties: String
+    workplace: String
+    start_date: Date
+    end_date: Date
+    conflict_date: Date
+    status: String
+
+  entity Timesheet
+    id: Id
+    contract: DispatchContract
+    work_date: Date
+    hours: Duration
+    status: String
+
+  entity Invoice
+    id: Id
+    client: Client
+    bill_rate: Rate
+    pay_rate: Rate
+    hours: Duration
+    amount: Money
+    status: String
+
+  pattern dispatch_contract
+    entity: DispatchContract
+    staff: Staff
+    client: Client
+    start_date: 2026-04-01
+    end_date: 2029-04-02
+    conflict_date: 2029-04-01
+
+  pattern timesheet
+    entity: Timesheet
+    period: monthly
+
+  pattern staffing_billing
+    entity: Invoice
+    timesheet: Timesheet
+    bill_rate: 1500
+    pay_rate: 1800.50

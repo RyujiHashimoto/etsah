@@ -1,0 +1,91 @@
+{
+  "name": "timesheet",
+  "version": "0.1.0",
+  "intent": "スタッフの勤怠を提出し、派遣先の承認を経てから請求と給与に回す",
+  "tags": [
+    "timesheet",
+    "attendance",
+    "勤怠",
+    "タイムシート",
+    "勤怠承認",
+    "派遣先",
+    "残業",
+    "36協定"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "勤怠エンティティ"
+    },
+    "approver": {
+      "type": "role",
+      "required": true,
+      "desc": "派遣先の承認ロール。無い勤怠は請求に回せない"
+    },
+    "on_approved": {
+      "type": "hook",
+      "required": false,
+      "desc": "派遣先の承認後に呼ぶ処理（請求起票など）"
+    },
+    "period": {
+      "type": "enum",
+      "values": ["daily", "monthly"],
+      "required": false,
+      "desc": "daily または monthly。既定は monthly"
+    },
+    "overtime_cap_hours": {
+      "type": "duration",
+      "required": false,
+      "desc": "36協定で定めた時間外の上限（時間）。法定の数値は入れない"
+    }
+  },
+  "states": ["draft", "submitted", "client_approved", "returned"],
+  "transitions": [
+    {"from": "draft", "on": "submit", "to": "submitted", "effect": "notify(approver)"},
+    {"from": "submitted", "on": "approve", "to": "client_approved", "effect": "emit(audit)"},
+    {"from": "submitted", "on": "return", "to": "returned", "effect": "notify(staff)"},
+    {"from": "returned", "on": "resubmit", "to": "submitted"}
+  ],
+  "hooks": {
+    "on_approved": {"kind": "custom_or_pattern", "required": false}
+  },
+  "requires_fields": {"status": "String"},
+  "field_types": {
+    "work_date": "Date",
+    "hours": "Duration"
+  },
+  "constraints": [
+    {
+      "id": "overtime_cap_non_negative",
+      "left": "overtime_cap_hours",
+      "op": ">=",
+      "right": "0",
+      "kind": "duration",
+      "message": "overtime cap must be zero or a positive number of hours",
+      "note": "上限は会社の36協定の設定値。45時間や360時間は含意しない。実労働時間との比較は契約層に Duration が来るまで実行時。"
+    }
+  ],
+  "effects": ["read(timesheets)", "write(timesheets)", "notify(approver)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#timesheets", "kind": "SQL", "lines": 22, "desc": "勤怠、日次明細、承認ステップ"},
+    {"path": "api/timesheets/route.ts", "kind": "API", "lines": 70, "desc": "勤怠の提出と一覧"},
+    {"path": "api/timesheets/[id]/route.ts", "kind": "API", "lines": 60, "desc": "派遣先の承認と差し戻し"},
+    {"path": "app/(client)/timesheets/page.tsx", "kind": "UI", "lines": 80, "desc": "派遣先の承認画面"},
+    {"path": "app/(staff)/timesheets/page.tsx", "kind": "UI", "lines": 75, "desc": "スタッフの入力画面"},
+    {"path": "lib/workflows/timesheet.ts", "kind": "TS", "lines": 65, "desc": "状態遷移、時間外上限、承認後フック"},
+    {"path": "tests/timesheets.test.ts", "kind": "TEST", "lines": 70, "desc": "提出、承認、上限のテスト"}
+  ],
+  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "notes": [
+    "派遣先承認は approver スロットを必須にすることで、承認のない勤怠パターンをコンパイルエラーにする。",
+    "時間外の法定上限は埋め込まない。overtime_cap_hours は協定書の値。",
+    "承認そのものの画面遷移は approval パターンと同じ形だが、対象が勤怠で承認者が派遣先である点が違う。"
+  ],
+  "provenance": {
+    "author": "PROUT staffing prototype",
+    "date": "2026-11-21",
+    "extracted_from": ["staffing", "staffing_desk"],
+    "note": "人材派遣の勤怠提出と派遣先承認。法定時間は設定値として受け取る。"
+  }
+}

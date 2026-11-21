@@ -1,0 +1,127 @@
+# 人材派遣会社の基幹。スタッフ、案件、個別契約、勤怠の派遣先承認、請求と給与。
+# 抵触日・時間単価・36協定の上限は設定値。法令の数値は埋め込まない。
+# 根拠と未実装は docs/staffing.md。
+
+app staffing
+  stack nextjs, postgres
+  freedom guided
+
+  entity Staff
+    id: Id
+    name: String
+    email: Email
+    skills: String
+    insured: String
+    resume: String
+
+  entity Client
+    id: Id
+    name: String
+    workplace: String
+
+  entity Opening
+    id: Id
+    client: Client
+    title: String
+    required_skills: String
+    workplace: String
+
+  entity DispatchContract
+    id: Id
+    staff: Staff
+    client: Client
+    opening: Opening
+    duties: String
+    workplace: String
+    start_date: Date
+    end_date: Date
+    conflict_date: Date
+    status: String
+
+  entity Timesheet
+    id: Id
+    contract: DispatchContract
+    staff: Staff
+    work_date: Date
+    hours: Duration
+    overtime_hours: Duration
+    status: String
+
+  entity Invoice
+    id: Id
+    client: Client
+    contract: DispatchContract
+    bill_rate: Rate
+    pay_rate: Rate
+    hours: Duration
+    amount: Money
+    status: String
+
+  pattern auth
+    provider: clerk
+    roles: coordinator, client_approver, payroll, staff
+
+  pattern crud Staff
+    entity: Staff
+    access: coordinator
+    search: [name, skills]
+    paginate: 20
+
+  pattern crud Openings
+    entity: Opening
+    access: coordinator
+    search: [title, required_skills]
+    paginate: 20
+
+  pattern search
+    entity: Staff
+    fields: [name, skills]
+
+  pattern matching
+    staff: Staff
+    opening: Opening
+    skills: skills
+    required_skills: required_skills
+
+  pattern upload
+    entity: Staff
+    field: resume
+
+  pattern dispatch_contract
+    entity: DispatchContract
+    staff: Staff
+    client: Client
+    start_date: 2026-04-01
+    end_date: 2027-03-31
+    conflict_date: 2029-04-01
+
+  pattern timesheet
+    entity: Timesheet
+    approver: client_approver
+    on_approved: bill_approved_hours
+    period: monthly
+    overtime_cap_hours: 45
+
+  pattern staffing_billing
+    entity: Invoice
+    timesheet: Timesheet
+    bill_rate: 2800
+    pay_rate: 1800
+
+  pattern dashboard
+    entity: Invoice
+    metrics: [billed, payroll, margin]
+    range: 30d
+
+  pattern notify
+    channel: email
+    recipient: client_approver
+    template: timesheet_submitted
+
+  custom bill_approved_hours
+    why "派遣先が承認した時間だけを請求と給与に回す。社会保険、雇用保険、割増、交通費は料率が年度と協定で変わるため、このcustomに残す"
+    lines 80
+
+  custom record_conflict_notice
+    why "抵触日は派遣先からの通知を記録する。開始日に3年を足さない。クーリングと例外の判定は人が確認する"
+    lines 25

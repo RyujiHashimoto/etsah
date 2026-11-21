@@ -203,6 +203,119 @@
       "path": "registry/dashboard.json"
     },
     {
+      "name": "dispatch_contract",
+      "version": "0.1.0",
+      "intent": "派遣の個別契約と就業条件の明示を、開始日・終了日・抵触日つきで管理する",
+      "tags": [
+        "dispatch",
+        "contract",
+        "派遣契約",
+        "個別契約",
+        "就業条件明示",
+        "抵触日",
+        "期間制限"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "個別契約のエンティティ"
+        },
+        "staff": {
+          "required": true,
+          "desc": "派遣スタッフのエンティティ"
+        },
+        "client": {
+          "required": true,
+          "desc": "派遣先企業のエンティティ"
+        },
+        "start_date": {
+          "required": true,
+          "desc": "契約開始日。YYYY-MM-DD"
+        },
+        "end_date": {
+          "required": true,
+          "desc": "契約終了日。YYYY-MM-DD"
+        },
+        "conflict_date": {
+          "required": true,
+          "desc": "抵触日。YYYY-MM-DD。派遣先が通知した日を設定する"
+        },
+        "exempt": {
+          "required": false,
+          "desc": "期間制限の例外。none、無期雇用の indefinite、60歳以上の age60。例外でも法令判断はしない"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(contracts)",
+        "write(contracts)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/staffing.prout",
+        "examples/staffing_desk.prout"
+      ],
+      "path": "registry/dispatch_contract.json",
+      "field_types": {
+        "start_date": "Date",
+        "end_date": "Date",
+        "conflict_date": "Date"
+      },
+      "constraints": [
+        {
+          "id": "start_on_or_before_end",
+          "message": "contract start_date must be on or before end_date"
+        },
+        {
+          "id": "end_on_or_before_conflict",
+          "message": "contract end_date is after the 抵触日"
+        }
+      ]
+    },
+    {
+      "name": "matching",
+      "version": "0.1.0",
+      "intent": "スタッフのスキル欄と案件の必須スキル欄を結び、候補一覧の器を作る",
+      "tags": [
+        "matching",
+        "staffing",
+        "assignment",
+        "マッチング",
+        "スキル",
+        "案件",
+        "アサイン"
+      ],
+      "slots": {
+        "staff": {
+          "required": true,
+          "desc": "スタッフのエンティティ"
+        },
+        "opening": {
+          "required": true,
+          "desc": "案件のエンティティ"
+        },
+        "skills": {
+          "required": true,
+          "desc": "スタッフ側のスキルフィールド名"
+        },
+        "required_skills": {
+          "required": false,
+          "desc": "案件側の必須スキルフィールド名。省略時は required_skills"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(staff)",
+        "read(openings)",
+        "write(matches)"
+      ],
+      "examples": [
+        "examples/staffing.prout",
+        "examples/staffing_desk.prout"
+      ],
+      "path": "registry/matching.json"
+    },
+    {
       "name": "notify",
       "version": "0.2.0",
       "intent": "メールやSlackで通知を送り、テンプレートと再送を管理する",
@@ -307,6 +420,130 @@
       ],
       "examples": [],
       "path": "registry/search.json"
+    },
+    {
+      "name": "staffing_billing",
+      "version": "0.1.0",
+      "intent": "承認済みの勤怠から派遣先請求とスタッフ給与を起こし、請求単価が支払単価を下回らないことを検査する",
+      "tags": [
+        "invoice",
+        "payroll",
+        "billing",
+        "margin",
+        "請求",
+        "給与",
+        "粗利",
+        "マージン",
+        "単価"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "請求エンティティ"
+        },
+        "timesheet": {
+          "required": true,
+          "desc": "集計元の勤怠エンティティ"
+        },
+        "bill_rate": {
+          "required": true,
+          "desc": "派遣先への請求時間単価（円）。小数可"
+        },
+        "pay_rate": {
+          "required": true,
+          "desc": "スタッフへの支払時間単価（円）。小数可"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(timesheets)",
+        "write(invoices)",
+        "write(payroll)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/staffing.prout",
+        "examples/staffing_desk.prout"
+      ],
+      "path": "registry/staffing_billing.json",
+      "field_types": {
+        "bill_rate": "Rate",
+        "pay_rate": "Rate",
+        "hours": "Duration"
+      },
+      "constraints": [
+        {
+          "id": "bill_gte_pay",
+          "message": "bill rate is below pay rate"
+        }
+      ],
+      "requires_patterns": [
+        "timesheet"
+      ]
+    },
+    {
+      "name": "timesheet",
+      "version": "0.1.0",
+      "intent": "スタッフの勤怠を提出し、派遣先の承認を経てから請求と給与に回す",
+      "tags": [
+        "timesheet",
+        "attendance",
+        "勤怠",
+        "タイムシート",
+        "勤怠承認",
+        "派遣先",
+        "残業",
+        "36協定"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "勤怠エンティティ"
+        },
+        "approver": {
+          "required": true,
+          "desc": "派遣先の承認ロール。無い勤怠は請求に回せない"
+        },
+        "on_approved": {
+          "required": false,
+          "desc": "派遣先の承認後に呼ぶ処理（請求起票など）"
+        },
+        "period": {
+          "required": false,
+          "desc": "daily または monthly。既定は monthly"
+        },
+        "overtime_cap_hours": {
+          "required": false,
+          "desc": "36協定で定めた時間外の上限（時間）。法定の数値は入れない"
+        }
+      },
+      "states": [
+        "draft",
+        "submitted",
+        "client_approved",
+        "returned"
+      ],
+      "effects": [
+        "read(timesheets)",
+        "write(timesheets)",
+        "notify(approver)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/staffing.prout",
+        "examples/staffing_desk.prout"
+      ],
+      "path": "registry/timesheet.json",
+      "field_types": {
+        "work_date": "Date",
+        "hours": "Duration"
+      },
+      "constraints": [
+        {
+          "id": "overtime_cap_non_negative",
+          "message": "overtime cap must be zero or a positive number of hours"
+        }
+      ]
     },
     {
       "name": "upload",

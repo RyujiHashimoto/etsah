@@ -149,6 +149,10 @@ class TestSlots(unittest.TestCase):
             "notify": {"channel"},
             "upload": {"entity", "field"},
             "approval": {"entity", "approver"},
+            "timesheet": {"entity", "approver"},
+            "dispatch_contract": {"entity", "staff", "client", "start_date", "end_date", "conflict_date"},
+            "staffing_billing": {"entity", "timesheet", "bill_rate", "pay_rate"},
+            "matching": {"staff", "opening", "skills"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():
