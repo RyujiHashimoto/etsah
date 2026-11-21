@@ -48,6 +48,12 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
 ## 承認前後をGUIで確かめる
 
 `proutc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
@@ -124,6 +130,7 @@ prout.py                 契約言語のパーサー・検証器・CLI
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
 examples/                壊れた初稿と修正版
+tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
@@ -132,7 +139,7 @@ patterns/
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、承認デモの demo.html）
   growth_report.py       成長ループのHTMLレポート
-.github/workflows/ci.yml 契約検査、索引整合、ビルド、ベンチ、回帰ガード
+.github/workflows/ci.yml 単体テスト、契約検査、索引整合、ビルド、ベンチ、回帰ガード
 CONTRIBUTING.md          パターン提案とレビューの基準
 ```
 

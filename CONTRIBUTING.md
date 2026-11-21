@@ -12,6 +12,9 @@ cd prout-lang
 python3 prout.py check examples/refund_fixed.prout
 python3 render.py
 
+# 単体テスト（標準ライブラリの unittest。追加の依存はない）
+python3 -m unittest discover -s tests -v
+
 # パターン層の検証
 cd patterns
 python3 proutc.py index
