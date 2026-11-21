@@ -42,6 +42,8 @@ def first_call(e):
         return e
     if e.kind == "bin":
         return first_call(e.left) or first_call(e.right)
+    if e.kind == "unary":
+        return first_call(e.left)
     if e.kind == "field":
         return first_call(e.base)
     return None
