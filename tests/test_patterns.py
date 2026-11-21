@@ -150,6 +150,16 @@ class TestSlots(unittest.TestCase):
             "upload": {"entity", "field"},
             "approval": {"entity", "approver"},
             "scene": {"title", "body"},
+            "activity_log": {"entity", "events"},
+            "archive": {"entity", "timestamp"},
+            "assignment": {"entity", "assignee"},
+            "checklist": {"entity", "template"},
+            "comment_thread": {"entity", "author"},
+            "csv_export": {"entity", "columns"},
+            "due_date": {"entity", "deadline"},
+            "labels": {"entity", "vocabulary"},
+            "survey": {"entity", "scale"},
+            "work_queue": {"entity", "priority"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():
