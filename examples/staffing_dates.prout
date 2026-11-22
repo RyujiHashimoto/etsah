@@ -1,0 +1,76 @@
+# 契約層の Date と Decimal。
+# 日付リテラルは空白なしの YYYY-MM-DD。2026 - 04 - 01 のように空白を入れると整数の減算になる。
+# 小数は十進数。1800.50 と 1800.5 は等しい。1 / 2 は折りたたまない。
+# 抵触日は通知された日であり、開始日に3年を足した値ではない。
+# 請求単価 >= 支払単価は同一労働同一賃金の判定ではない。
+
+type Id
+type Status
+
+type Invoice {
+  id: Id
+  amount: Decimal
+  status: Status
+}
+
+type DispatchContract {
+  id: Id
+  bill_rate: Decimal
+  pay_rate: Decimal
+  start_date: Date
+  end_date: Date
+  conflict_date: Date
+  client_approved: Bool
+}
+
+op accept_rates(bill_rate: Decimal, pay_rate: Decimal) -> Bool
+  doc "請求単価は支払単価以上。小数円を許す。同一労働同一賃金は見ない"
+  pre bill_rate >= pay_rate
+  impl native
+
+op accept_term(end_date: Date, conflict_date: Date) -> Bool
+  doc "終了日は抵触日以前。暦日であり、通算日の手計算ではない"
+  pre end_date <= conflict_date
+  impl native
+
+op span_days(start_date: Date, end_date: Date) -> Int
+  doc "終了日と開始日の差。日数は整数。時刻は扱わない"
+  pre end_date - start_date >= 0
+  impl end_date - start_date
+
+op accept_approval(client_approved: Bool) -> Bool
+  doc "派遣先承認が真であること。承認の手続き自体は検査しない"
+  pre client_approved == true
+  impl native
+
+op contracts.get(id: Id) -> DispatchContract
+  doc "個別契約を取得する"
+  eff read(contracts)
+  impl native
+
+op billing.issue(amount: Decimal) -> Invoice
+  doc "請求と給与を起票する"
+  eff write(invoices), write(payroll), emit(audit)
+  post result.status == "issued"
+  impl native
+
+flow close_quoted() -> Bool
+  doc "妥当な定数は静的に通る。1800 は整数のまま Decimal に渡せる"
+  let rates_ok = accept_rates(2800.50, 1800)
+  let term_ok = accept_term(2027-03-31, 2029-04-01)
+  let span_ok = span_days(2026-04-01, 2027-03-31)
+  let approved_ok = accept_approval(true)
+  return rates_ok && term_ok && span_ok >= 0 && approved_ok
+
+flow close_month(contract_id: Id) -> Invoice
+  doc "保存済みの契約は実行時ガード。定数での証明は close_quoted"
+  summary "契約を読み、小数単価と抵触日と派遣先承認を確認してから請求する。"
+  eff read(contracts), write(invoices), write(payroll), emit(audit)
+  let contract = contracts.get(contract_id)
+  let rates_ok = accept_rates(contract.bill_rate, contract.pay_rate)
+  let term_ok = accept_term(contract.end_date, contract.conflict_date)
+  let span_ok = span_days(contract.start_date, contract.end_date)
+  let approved_ok = accept_approval(contract.client_approved)
+  let amount = contract.bill_rate * 160
+  let invoice = billing.issue(amount)
+  return invoice

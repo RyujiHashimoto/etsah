@@ -1,0 +1,35 @@
+# 意図的に壊した契約。Date と Decimal の事前条件が静的に偽になる。
+# 1. 請求 1500.5 円 < 支払 1800.50 円
+# 2. 終了日 2029-04-02 が抵触日 2029-04-01 の後
+# 3. 派遣先承認が false
+
+type Id
+type Status
+
+type Invoice {
+  id: Id
+  amount: Decimal
+  status: Status
+}
+
+op accept_rates(bill_rate: Decimal, pay_rate: Decimal) -> Bool
+  doc "請求単価は支払単価以上"
+  pre bill_rate >= pay_rate
+  impl native
+
+op accept_term(end_date: Date, conflict_date: Date) -> Bool
+  doc "終了日は抵触日以前"
+  pre end_date <= conflict_date
+  impl native
+
+op accept_approval(client_approved: Bool) -> Bool
+  doc "派遣先承認が真であること"
+  pre client_approved == true
+  impl native
+
+flow close_broken() -> Bool
+  doc "小数単価の逆転、抵触日超過、承認なしを一度に踏む"
+  let rates_ok = accept_rates(1500.5, 1800.50)
+  let term_ok = accept_term(2029-04-02, 2029-04-01)
+  let approved_ok = accept_approval(false)
+  return rates_ok && term_ok && approved_ok
