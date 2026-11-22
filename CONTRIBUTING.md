@@ -23,6 +23,8 @@ python3 proutc.py build examples/expense.prout
 python3 proutc.py build bench/pc_lending.prout
 python3 proutc.py build examples/staffing.prout
 python3 proutc.py build examples/staffing_desk.prout
+python3 proutc.py build examples/ai_automation.prout
+python3 proutc.py build examples/ai_desk.prout
 python3 proutc.py bench
 python3 growth_report.py
 ```

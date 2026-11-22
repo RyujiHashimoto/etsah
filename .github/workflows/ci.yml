@@ -59,6 +59,17 @@ jobs:
           grep -q "抵触日" /tmp/staffing-pattern.txt
           grep -q "approver" /tmp/staffing-pattern.txt
           grep -q "bill rate is below pay rate" /tmp/staffing-pattern.txt
+          python3 proutc.py build examples/ai_automation.prout
+          python3 proutc.py build examples/ai_desk.prout
+          python3 proutc.py find "自動化" | grep -q ai_task
+          python3 proutc.py find "承認ゲート" | grep -q approval_gate
+          if python3 proutc.py build examples/ai_automation_broken.prout > /tmp/ai-automation.txt 2>&1; then
+            echo "broken ai automation spec unexpectedly passed"
+            exit 1
+          fi
+          grep -q "emit to an external party has no approval gate" /tmp/ai-automation.txt
+          grep -q "5000 <= 1000" /tmp/ai-automation.txt
+          grep -q "a contract change has no approval gate" /tmp/ai-automation.txt
 
       - name: Build service desk examples
         working-directory: patterns

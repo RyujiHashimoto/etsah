@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在133件で、意図的な未実装2件は `expectedFailure` として記録しています。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在148件で、意図的な未実装2件は `expectedFailure` として記録しています。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -185,8 +185,8 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              24個のパターンマニフェストと index.json
-  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
+  registry/              26個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣、AIタスクの仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、demo.html、story.html）
   growth_report.py       成長ループのHTMLレポート
@@ -225,6 +225,19 @@ cd patterns
 python3 proutc.py build examples/staffing.prout --out build/staffing
 python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
 python3 proutc.py find "勤怠"
+```
+
+## AIに任せる作業の境界を仕様で止める
+
+`ai_task` は、定期実行・新しい行・webhook のどれで起動するかを宣言し、AIが使ってよい効果、`spend` の1回と期間の上限、`net` と `emit` の時間あたり回数、再試行とエスカレーション、冪等キー、監査（`audit: ast_hash`）をスロットに持つ。`approval_gate` は、社外への `emit` と `net`、支払いの `spend`、契約の変更を、人が承認するまで止める。ゲートの無い社外への `emit` は `E-POLICY` になる。
+
+契約層の `agent` / `task` 構文は提案である。`prout.py` は変更していない。設計、未実装、オーナーの判断が要る箇所は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
+
+```sh
+cd patterns
+python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
+python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
+python3 proutc.py find "自動化"
 ```
 
 ## 参加する

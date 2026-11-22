@@ -1,0 +1,198 @@
+{
+  "name": "ai_task",
+  "version": "0.1.0",
+  "intent": "AIが決めた手順でエンティティを処理する。外部への送信、支払い、契約変更は人の承認が無いと仕様を通さない",
+  "tags": [
+    "ai",
+    "agent",
+    "task",
+    "automation",
+    "schedule",
+    "webhook",
+    "budget",
+    "自動化",
+    "タスク",
+    "エージェント",
+    "定期実行",
+    "予算",
+    "監査"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "タスクが読むエンティティ"
+    },
+    "trigger": {
+      "type": "enum",
+      "values": ["schedule", "record", "webhook"],
+      "required": true,
+      "desc": "schedule（cron）、record（新しい行）、webhook（外部からの呼び出し）"
+    },
+    "schedule": {
+      "type": "cron",
+      "required": false,
+      "desc": "5欄の数値cron。trigger が schedule のときだけ書く"
+    },
+    "on_record": {
+      "type": "entity",
+      "required": false,
+      "desc": "行が増えたときに起動するエンティティ。trigger が record のときだけ書く"
+    },
+    "webhook": {
+      "type": "name",
+      "required": false,
+      "desc": "受け口の名前。trigger が webhook のときだけ書く"
+    },
+    "steps": {
+      "type": "names",
+      "required": true,
+      "desc": "手順。custom か、同じ仕様に適用済みのパターン名"
+    },
+    "effects": {
+      "type": "effects",
+      "required": true,
+      "desc": "AIが使ってよい効果。read, write, net, spend, emit"
+    },
+    "audience": {
+      "type": "enum",
+      "values": ["internal", "external"],
+      "required": true,
+      "desc": "作用の相手。external は社外"
+    },
+    "approval": {
+      "type": "names",
+      "required": false,
+      "desc": "approval_gate に付けた名前。外部への emit と net、spend、契約変更では必須"
+    },
+    "changes": {
+      "type": "enum",
+      "values": ["none", "contract"],
+      "required": false,
+      "desc": "contract は契約の変更。承認ゲートが要る。省略は none"
+    },
+    "spend_per_run": {
+      "type": "count",
+      "required": true,
+      "desc": "1回の実行で使ってよい spend の上限。円の整数。spend を使わないタスクは 0"
+    },
+    "spend_per_period": {
+      "type": "count",
+      "required": true,
+      "desc": "period のあいだの spend 上限。1回の上限を下回ってはいけない"
+    },
+    "period": {
+      "type": "enum",
+      "values": ["daily", "weekly", "monthly"],
+      "required": true,
+      "desc": "spend 上限の期間"
+    },
+    "net_per_hour": {
+      "type": "count",
+      "required": true,
+      "desc": "1時間あたりの net 回数。net を使わないタスクは 0"
+    },
+    "emit_per_hour": {
+      "type": "count",
+      "required": true,
+      "desc": "1時間あたりの emit 回数。emit を使わないタスクは 0"
+    },
+    "retries": {
+      "type": "count",
+      "required": true,
+      "desc": "失敗後の再試行回数。0以上5以下"
+    },
+    "escalate_to": {
+      "type": "role",
+      "required": true,
+      "desc": "再試行が尽きたときに呼ぶ人のロール"
+    },
+    "idempotency_key": {
+      "type": "field",
+      "of": "entity",
+      "required": true,
+      "desc": "同じキーの再実行を1回に畳むためのフィールド名"
+    },
+    "audit": {
+      "type": "enum",
+      "values": ["ast_hash"],
+      "required": true,
+      "desc": "監査行に契約ASTのSHA-256を付ける。ast_hash だけを受け付ける"
+    }
+  },
+  "automation": {
+    "effects_slot": "effects",
+    "audience_slot": "audience",
+    "steps_slot": "steps",
+    "trigger_slot": "trigger",
+    "entity_slot": "entity",
+    "trigger_slots": {
+      "schedule": "schedule",
+      "record": "on_record",
+      "webhook": "webhook"
+    },
+    "gate_slot": "approval",
+    "gate_pattern": "approval_gate",
+    "gate_action_slot": "action",
+    "gate_audience_slot": "audience",
+    "gate_entity_slot": "entity",
+    "gates": [
+      {
+        "kind": "emit",
+        "audiences": ["external"],
+        "action": "emit",
+        "match_audience": true,
+        "message": "emit to an external party has no approval gate"
+      },
+      {
+        "kind": "net",
+        "audiences": ["external"],
+        "action": "net",
+        "match_audience": true,
+        "message": "net to an external party has no approval gate"
+      },
+      {
+        "kind": "spend",
+        "audiences": ["internal", "external"],
+        "action": "spend",
+        "match_audience": true,
+        "message": "spend has no approval gate"
+      }
+    ],
+    "change_slot": "changes",
+    "change_value": "contract",
+    "change_action": "contract",
+    "change_message": "a contract change has no approval gate",
+    "spend_run_slot": "spend_per_run",
+    "spend_period_slot": "spend_per_period",
+    "net_limit_slot": "net_per_hour",
+    "emit_limit_slot": "emit_per_hour",
+    "retries_slot": "retries",
+    "retries_max": 5,
+    "escalate_slot": "escalate_to",
+    "idempotency_slot": "idempotency_key",
+    "audit_slot": "audit",
+    "audit_value": "ast_hash"
+  },
+  "bound_roles": ["escalate_to"],
+  "effects": ["read(entity)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#ai_task_{target_lower}", "kind": "SQL", "lines": 16, "desc": "{Entity}の実行、冪等キー、予算カウンタ"},
+    {"path": "lib/automation/{target_lower}.ts", "kind": "TS", "lines": 80, "desc": "{Entity}の起動、予算、再試行、ASTハッシュの監査行"},
+    {"path": "tests/automation/{target_lower}.test.ts", "kind": "TEST", "lines": 45, "desc": "ゲートと予算の契約テスト"}
+  ],
+  "examples": ["examples/ai_automation.prout", "examples/ai_desk.prout"],
+  "notes": [
+    "パターン層はスロットを検査する。契約層の task 構文は提案であり、prout.py は変更していない。",
+    "audit が ast_hash であることは必須にする。ハッシュの計算は契約層の ast_hash の仕事で、このコンパイラは呼ばない。",
+    "steps は op の呼び出しではない。custom か適用済みパターンの名前である。",
+    "予算と回数の数値は宣言である。実行時のカウンタはまだ無い。",
+    "承認ゲートの on_approved が、その外部効果の唯一の実行箇所であることまでは見ていない。"
+  ],
+  "provenance": {
+    "author": "PROUT automation proposal",
+    "date": "2026-11-22",
+    "extracted_from": ["staffing", "pc_rental", "inquiry_triage"],
+    "note": "人材派遣、PCレンタル、問い合わせ仕分けに共通する自動タスクの器。外部効果は承認ゲートに結ぶ。"
+  }
+}

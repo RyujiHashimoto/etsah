@@ -74,7 +74,11 @@ app shop
 | `dispatch_contract` | 個別契約、就業条件、抵触日との比較 | entity, staff, client, start_date, end_date, conflict_date |
 | `staffing_billing` | 請求と給与、請求単価 >= 支払単価、勤怠承認の必須 | entity, timesheet, bill_rate, pay_rate |
 | `matching` | スタッフと案件をスキル欄で結ぶ候補一覧 | staff, opening, skills |
+| `ai_task` | AIの定期実行・行追加・webhook。効果、予算、回数、再試行、冪等キー、監査 | entity, trigger, steps, effects, audience, spend_per_run, spend_per_period, period, net_per_hour, emit_per_hour, retries, escalate_to, idempotency_key, audit |
+| `approval_gate` | 社外への送信、支払い、契約変更の前の人の承認 | entity, approver, action, audience |
 `Date`（`YYYY-MM-DD`）、`Duration`（`7.5` または `7h30m`）、`Rate`（非負の十進数、円の時間単価）はパターン層のフィールド型とスロット型である。マニフェストの `constraints` がスロットの値を比較し、`field_types` がエンティティの型を見る。`requires_patterns` は、請求のように他のパターン（勤怠承認）が同じ仕様に無いとエラーにする。法の数値はマニフェストに埋め込まず、設定値だけを検査する。人材派遣での使い方と、契約層にまだ無いものは `docs/staffing.md` に書いた。
+
+`ai_task` の `automation` は、トリガーに対応するスロット、効果と予算の一致、社外への `emit` / `net` と `spend` と契約変更に `approval_gate` が要ることを仕様時に検査する。`count` は非負整数、`cron` は5欄の数値 cron である。使い方と、契約層へまだ移していない構文は `docs/ai_automation.md` に書いた。
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 
