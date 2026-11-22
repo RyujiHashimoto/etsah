@@ -1,8 +1,7 @@
-"""Behavior the specs describe and the current code does not implement.
+"""Regression tests for SPEC claims that were previously known gaps.
 
-These tests are ``expectedFailure`` on purpose. They should start passing when
-the implementation catches up; until then they document the gap without
-failing CI. Do not "fix" them by weakening the assertion.
+These tests used to be ``expectedFailure`` while the implementation caught up.
+They now run as normal tests, so weakening them would hide a regression.
 """
 from __future__ import annotations
 
@@ -16,17 +15,15 @@ from proutc import DEFAULT_REGISTRY, find_patterns, load_registry
 from support import PATTERNS, check, codes, parse
 
 
-class TestSpecGaps(unittest.TestCase):
-    @unittest.expectedFailure
-    def test_precondition_order_does_not_change_the_hash(self) -> None:
-        """SPEC.md: 正規形が一意 — 同じ意味のプログラムは同じAST・同じハッシュになる。
+class TestSpecContracts(unittest.TestCase):
+    def test_pre_and_post_order_do_not_change_the_hash(self) -> None:
+        """SPEC.md: 正規形が一意 — 条件の並び順はハッシュに影響しない。
 
-        Preconditions are a conjunction, so source order is not meaningful.
-        ``program_to_dict`` keeps ``pre`` and ``post`` in source order, and
-        these two programs hash differently. Effects, fields, and declarations
-        are sorted; the contract lists are not.
+        Preconditions and postconditions are conjunctions, so source order is
+        not meaningful. ``program_to_dict`` sorts both lists by their canonical
+        expression JSON before hashing.
         """
-        first = parse(
+        pre_first = parse(
             """
             op f(x: Int) -> Int
               pre x > 0
@@ -34,7 +31,7 @@ class TestSpecGaps(unittest.TestCase):
               impl native
             """
         )
-        second = parse(
+        pre_second = parse(
             """
             op f(x: Int) -> Int
               pre x < 10
@@ -42,16 +39,32 @@ class TestSpecGaps(unittest.TestCase):
               impl native
             """
         )
-        self.assertEqual(ast_hash(first), ast_hash(second))
+        self.assertEqual(ast_hash(pre_first), ast_hash(pre_second))
 
-    @unittest.expectedFailure
+        post_first = parse(
+            """
+            op g(x: Int) -> Int
+              post result >= 0
+              post result <= 10
+              impl native
+            """
+        )
+        post_second = parse(
+            """
+            op g(x: Int) -> Int
+              post result <= 10
+              post result >= 0
+              impl native
+            """
+        )
+        self.assertEqual(ast_hash(post_first), ast_hash(post_second))
+
     def test_declared_effects_must_match_an_effect_free_impl(self) -> None:
         """SPEC.md: 宣言と実際の効果が一致しなければエラー。
 
-        ``check_op`` only compares effects when the impl infers at least one
-        (``if inferred and declared != inferred``). An impl that performs
-        nothing therefore does not report the extra declared effect. Flows do
-        compare both directions, including the empty set.
+        An expression impl that performs no effects must still report an extra
+        declared effect. ``impl native`` remains trusted because its body is
+        not available for inference.
         """
         diags = check(
             """
@@ -61,6 +74,8 @@ class TestSpecGaps(unittest.TestCase):
             """
         )
         self.assertIn("E-EFF", codes(diags, "error"))
+        eff = next(d for d in diags if d.code == "E-EFF")
+        self.assertIn("unused read(orders)", eff.message)
 
     def test_find_scores_slot_descriptions(self) -> None:
         """patterns/registry/README.md: find は intent、tags、name、スロット説明の一致を点数化する。

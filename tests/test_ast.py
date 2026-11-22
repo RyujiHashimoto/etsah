@@ -1,8 +1,8 @@
 """Canonical AST and hash stability.
 
-SPEC: the same meaning has one AST and one hash. Whitespace, comments, and
-declaration order are not meaning. `pre` / `post` order is covered separately
-as a known gap.
+SPEC: structurally equivalent programs have one AST and one hash. Whitespace,
+comments, declaration order, and pre/post conjunct order are not meaning.
+Logical equivalence beyond that structural normalization is not attempted.
 """
 from __future__ import annotations
 
