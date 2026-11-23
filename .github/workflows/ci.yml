@@ -22,6 +22,7 @@ jobs:
         run: |
           python3 prout.py check examples/refund_fixed.prout
           python3 prout.py check examples/staffing.prout
+          python3 prout.py check examples/staffing_dates.prout
           python3 render.py
           test -s human-view.html
           git diff --exit-code -- human-view.html
@@ -39,6 +40,13 @@ jobs:
           grep -q "1500 >= 1800" /tmp/staffing-contract.txt
           grep -q "21641 <= 21640" /tmp/staffing-contract.txt
           grep -q "false == true" /tmp/staffing-contract.txt
+          if python3 prout.py check examples/staffing_dates_broken.prout > /tmp/staffing-dates.txt 2>&1; then
+            echo "broken staffing date contract unexpectedly passed"
+            exit 1
+          fi
+          grep -q "1500.5 >= 1800.50" /tmp/staffing-dates.txt
+          grep -q "2029-04-02 <= 2029-04-01" /tmp/staffing-dates.txt
+          grep -q "false == true" /tmp/staffing-dates.txt
 
       - name: Pattern registry
         working-directory: patterns
