@@ -298,6 +298,8 @@ declassify(customer.email, pii, "領収書の宛先に使う")
 - `pre` / `post` の中の `declassify` は `E-DECLASS`。契約は public でなければならない。
 - ネストは許可する。各 `declassify` がそれぞれポリシーを持つ必要がある。
 
+`declassify` は値を作り変えない。ラベルを下げるだけである。実際のマスキング・匿名化・暗号化は別の操作で行い、その結果に対して `declassify` する。`declassify` は「この値はもう安全だと主張する」監査可能な宣言であり、変換ではない。生のメールアドレスに `declassify(..., "マスクする")` と書いても、値は生のままである。
+
 許可は `policy` に書く。
 
 ```prout
@@ -593,6 +595,10 @@ v0.1 の `&&` / `||` は短絡評価をせず、両辺のラベルの和集合�
 
 ## 8. 例と期待診断
 
+![PII漏洩を止める検査経路](pii-flow.png)
+
+顧客のメールアドレスは `pii` のまま `send_receipt` を通り、`net(email)` で許可される。`track_event` にそのまま渡すと引数の契約で止まり、引数を `@pii` に変えても `net(analytics)` のポリシーで止まる。どうしても必要なときだけ、ポリシー・スコープ・ロール・理由付きの `declassify` で外す。
+
 ### 8.1 安全な例
 
 ```prout
@@ -691,13 +697,17 @@ op find_customer(email: String @pii) -> Customer
 ### 8.5 declassify を使う例
 
 ```prout
+op mask_email(email: String @pii) -> String @pii
+  impl native
+
 policy
   declassify pii in masked_email require role support
 
 flow masked_email(customer_id: Id) -> Bool
   eff read(customers), net(analytics)
   let customer = customers.get(customer_id)
-  let masked = declassify(customer.email, pii, "分析用にマスクする")
+  let masked_value = mask_email(customer.email)
+  let masked = declassify(masked_value, pii, "分析用にマスクする")
   return track_event(masked)
 ```
 
@@ -708,7 +718,7 @@ flow masked_email(customer_id: Id) -> Bool
     fix: review the declassification policy for role support
 ```
 
-`masked` は public になり、`track_event` と `net(analytics)` を通る。`require role support` はパターン層の `auth.roles` と照合する。
+`mask_email` は値をマスクするが、ラベルは `pii` のまま返す。`declassify` がその結果を public に下げ、`track_event` と `net(analytics)` を通る。`require role support` はパターン層の `auth.roles` と照合する。`declassify` 自体は値を変換しないため、マスク処理を別の op に分けるのが正しい使い方である。
 
 ### 8.6 違反例: レコードの declassify
 
