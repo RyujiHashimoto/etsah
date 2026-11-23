@@ -246,6 +246,27 @@ python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
 python3 proutc.py find "自動化"
 ```
 
+## 情報フローラベルでPIIの流出を止める
+
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出する設計を [docs/information-flow.md](docs/information-flow.md) にまとめました。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装はこれからで、現在の `prout.py` はまだラベルを解析しません。
+
+```prout
+type Customer {
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+  sink net(*) rejects secret
+
+op send_receipt(to: String @pii) -> Receipt
+  eff net(email)
+  sends to -> net(email)
+  impl native
+```
+
+設計には、EBNF、式のラベル推論規則、sink の解決アルゴリズム、診断コード、AST ハッシュへの影響、パターン層の `data_policy`、実装計画とテストマトリクスを含めています。
+
 ## 参加する
 
 新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
