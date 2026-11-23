@@ -97,7 +97,7 @@
 
 ローカルで次を確認した。数値は実行結果である。
 
-- `python3 -m unittest discover -s tests -v` が通る。`tests/test_spec_gaps.py` の `expectedFailure` はそのままである。
+- `python3 -m unittest discover -s tests -v` が通る。`tests/test_spec_contracts.py` を含め、148件すべて成功する。
 - `python3 prout.py check examples/staffing.prout` はエラー 0、警告 3（保存値に対する実行時ガード）。
 - `python3 prout.py check examples/staffing_broken.prout` は `E-PRE` が 3。
 - `patterns/examples/staffing.prout` はエラー 0。仕様 104 行、生成見積もり 3,383 行、展開 32.5 倍。

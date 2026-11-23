@@ -897,13 +897,13 @@ class Checker:
             t = self.type_of(p, env2)
             if t not in ("Bool", "Unknown"):
                 self.error("E-TYPE", f"postcondition must be Bool, got {t}", p.line)
-        if op.impl:
+        if op.impl is not None:
             it = self.type_of(op.impl, env)
             if it != "Unknown" and not self.compatible(op.ret, it):
                 self.error("E-TYPE", f"impl returns {it}, expected {op.ret}", op.impl.line)
             inferred = self.effects_of_expr(op.impl)
             declared = set(op.effects)
-            if inferred and declared != inferred:
+            if declared != inferred:
                 missing = inferred - declared
                 extra = declared - inferred
                 bits = []
@@ -1029,6 +1029,16 @@ def expr_to_dict(e: Optional[Expr]) -> Optional[dict]:
     return d
 
 
+def _canonical_expr_list(exprs: list[Expr]) -> list[Expr]:
+    """Sort conjuncts by canonical JSON; their source order is not meaning."""
+    return sorted(
+        exprs,
+        key=lambda e: json.dumps(
+            expr_to_dict(e), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
+    )
+
+
 def program_to_dict(p: Program) -> dict:
     return {
         "types": [
@@ -1041,8 +1051,8 @@ def program_to_dict(p: Program) -> dict:
                 "params": o.params,
                 "ret": o.ret,
                 "effects": sorted(o.effects),
-                "pre": [expr_to_dict(x) for x in o.pres],
-                "post": [expr_to_dict(x) for x in o.posts],
+                "pre": [expr_to_dict(x) for x in _canonical_expr_list(o.pres)],
+                "post": [expr_to_dict(x) for x in _canonical_expr_list(o.posts)],
                 "impl": expr_to_dict(o.impl),
                 "native": o.native,
                 "doc": o.doc,

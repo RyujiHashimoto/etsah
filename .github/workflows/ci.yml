@@ -24,6 +24,7 @@ jobs:
           python3 prout.py check examples/staffing.prout
           python3 render.py
           test -s human-view.html
+          git diff --exit-code -- human-view.html
 
       - name: Broken example must fail
         run: |

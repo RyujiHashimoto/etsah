@@ -284,7 +284,7 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 
 ローカルで次を確認した。数値は実行結果である。
 
-- `python3 -m unittest discover -s tests -v` は 148 件が通り、`expectedFailure` は従来の 2 件のままである。
+- `python3 -m unittest discover -s tests -v` は 148 件がすべて成功する。以前 `expectedFailure` だった契約の穴は `tests/test_spec_contracts.py` で通常のテストになっている。
 - `patterns/examples/ai_automation.prout` はエラー 0。仕様 163 行、生成見積もり 2,081 行、展開 12.8 倍。
 - `patterns/examples/ai_desk.prout` はエラー 0。仕様 85 行、生成見積もり 1,100 行、展開 12.9 倍。
 - 壊した仕様は上の 3 件の `E-POLICY` だけで失敗する。
