@@ -24,6 +24,12 @@ jobs:
           python3 prout.py check examples/staffing.prout
           python3 prout.py check examples/staffing_dates.prout
           python3 prout.py check examples/ai_tasks.prout
+          python3 prout.py check examples/agents/support_reply.prout
+          python3 prout.py check examples/agents/invoice.prout
+          python3 prout.py check examples/agents/subscription_cancel.prout
+          python3 prout.py check examples/agents/github_triage.prout --allow-net github
+          python3 prout.py import mcp examples/agents/tools/mcp_tools.json | diff -u examples/agents/tools/mcp_tools.prout -
+          python3 prout.py import openai examples/agents/tools/openai_tools.json | diff -u examples/agents/tools/openai_tools.prout -
           python3 render.py
           test -s human-view.html
           git diff --exit-code -- human-view.html
@@ -59,6 +65,27 @@ jobs:
           grep -q "5000 <= 1000" /tmp/ai-tasks.txt
           grep -q "retries must be from 0 through 5" /tmp/ai-tasks.txt
           grep -q "escalation path produces external effects" /tmp/ai-tasks.txt
+          if python3 prout.py check examples/agents/support_reply_broken.prout > /tmp/support-reply.txt 2>&1; then
+            echo "broken support reply unexpectedly passed"
+            exit 1
+          fi
+          grep -q "emit to an external party has no approval gate" /tmp/support-reply.txt
+          if python3 prout.py check examples/agents/invoice_broken.prout > /tmp/invoice.txt 2>&1; then
+            echo "broken invoice unexpectedly passed"
+            exit 1
+          fi
+          grep -q "spend has no approval gate" /tmp/invoice.txt
+          if python3 prout.py check examples/agents/subscription_cancel_broken.prout > /tmp/subscription.txt 2>&1; then
+            echo "broken subscription cancellation unexpectedly passed"
+            exit 1
+          fi
+          grep -q "a contract change has no approval gate" /tmp/subscription.txt
+          if python3 prout.py check examples/agents/github_triage_broken.prout --allow-net github > /tmp/github-triage.txt 2>&1; then
+            echo "broken github triage unexpectedly passed"
+            exit 1
+          fi
+          grep -q "network target 'gist' is not allowed by policy" /tmp/github-triage.txt
+          grep -q "net effect needs a positive hourly rate limit" /tmp/github-triage.txt
 
       - name: Pattern registry
         working-directory: patterns

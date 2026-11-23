@@ -1,0 +1,42 @@
+# Same triage as github_triage.prout, plus two policy failures:
+# the hourly cap is 0, and a note is published to gist, which is not allowlisted.
+# Expected, even with --allow-net github: E-POLICY for the gist host and for the cap.
+#   python3 prout.py check examples/agents/github_triage_broken.prout --allow-net github
+
+type Id
+type Issue
+
+op github.list_issues(repo: Id) -> Issue
+  doc "Read one open issue from the allowlisted GitHub host"
+  eff read(issues), net(github)
+  impl native
+
+op github.add_label(issue: Issue) -> Bool
+  doc "Write the needs-review label through the allowlisted GitHub host"
+  eff write(issues), net(github)
+  impl native
+
+op github.publish_gist(issue: Issue) -> Bool
+  doc "Publish a triage note on a host that is not on the allowlist"
+  eff net(gist)
+  impl native
+
+agent issue_triage
+  doc "Labels issues, with no hourly cap and a second host"
+  allow read(issues), write(issues), net(github), net(gist)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+task triage_open_issues(repo: Id) -> Bool
+  agent issue_triage
+  doc "Label an issue and copy it to a host outside the allowlist"
+  trigger schedule "15 9 * * 1-5"
+  eff read(issues), write(issues), net(github), net(gist)
+  key repo
+  retry 2 escalate maintainer
+  let issue = github.list_issues(repo)
+  let labeled = github.add_label(issue)
+  let spilled = github.publish_gist(issue)
+  return labeled

@@ -1,0 +1,47 @@
+# Invoice generation for fictional Example Goods, account A-19.
+# Drafting the invoice is a write. Charging the card is spend and needs
+# the payment gate. Amounts are integer yen. Nothing here moves money.
+#   python3 prout.py check examples/agents/invoice.prout
+
+type Id
+type Invoice
+
+op ledger.draft(account_id: Id) -> Invoice
+  doc "Write a draft invoice for account A-19"
+  eff read(accounts), write(invoices)
+  impl native
+
+op payments.charge(invoice: Invoice) -> Bool
+  doc "Collect the invoice amount after a person approves"
+  eff spend(payments)
+  impl native
+
+policy
+  payment spend(payments)
+
+agent invoice_clerk
+  doc "Drafts invoices and charges only inside the payment gate"
+  allow read(accounts), write(invoices), spend(payments)
+  budget run 5000 period 20000
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+gate approve_charge
+  doc "A billing lead approves a charge of at most 5000 yen"
+  approver billing_lead
+  before spend(payments)
+  on_approved payments.charge
+
+task issue_invoice(account_id: Id) -> Invoice
+  agent invoice_clerk
+  doc "Draft an invoice and charge it after approval"
+  trigger schedule "0 6 1 * *"
+  eff read(accounts), write(invoices), spend(payments)
+  gate approve_charge
+  budget run 5000 period 20000
+  key account_id
+  retry 1 escalate billing_lead
+  let draft = ledger.draft(account_id)
+  let charged = payments.charge(draft)
+  return draft
