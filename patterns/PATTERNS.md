@@ -71,10 +71,11 @@ app shop
 | `survey` | 対応後の評価記録、集計 | entity, scale |
 | `work_queue` | 優先度順の作業一覧 | entity, priority |
 | `timesheet` | 勤怠の提出、派遣先承認、時間外上限のスロット | entity, approver |
-| `dispatch_contract` | 個別契約、就業条件、抵触日との比較 | entity, staff, client, start_date, end_date, conflict_date |
+| `overtime_agreement` | 36協定の上限、警告（notify）と硬停止（reject）。一般則を既定かつ天井にする | entity, timesheet, warn_at_hours, on_warning, on_limit |
+| `dispatch_contract` | 個別契約、就業条件、通知された抵触日と、開始日から計算した抵触日 | entity, staff, client, start_date, end_date, conflict_date |
 | `staffing_billing` | 請求と給与、請求単価 >= 支払単価、勤怠承認の必須 | entity, timesheet, bill_rate, pay_rate |
 | `matching` | スタッフと案件をスキル欄で結ぶ候補一覧 | staff, opening, skills |
-`Date`（`YYYY-MM-DD`）、`Duration`（`7.5` または `7h30m`）、`Rate`（非負の十進数、円の時間単価）はパターン層のフィールド型とスロット型である。マニフェストの `constraints` がスロットの値を比較し、`field_types` がエンティティの型を見る。`requires_patterns` は、請求のように他のパターン（勤怠承認）が同じ仕様に無いとエラーにする。法の数値はマニフェストに埋め込まず、設定値だけを検査する。人材派遣での使い方と、契約層にまだ無いものは `docs/staffing.md` に書いた。
+`Date`（`YYYY-MM-DD`）、`Duration`（`7.5` または `7h30m`）、`Rate`（非負の十進数、円の時間単価）はパターン層のフィールド型とスロット型である。マニフェストの `constraints` がスロットの値を比較し、`field_types` がエンティティの型を見る。`requires_patterns` は、請求のように他のパターン（勤怠承認）が同じ仕様に無いとエラーにする。36協定の上限はスロットで、一般則の天井を超える値だけをエラーにする。抵触日は通知日に加え、仕様の派遣期間から計算する。どちらも実績データは見ない。人材派遣での使い方と、社労士の確認が要る箇所は `docs/staffing.md` に書いた。
 
 パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 

@@ -1,0 +1,94 @@
+# 意図的に壊した上限と抵触日。
+# 月50時間、特別条項の年721時間、時間外+休日100時間、月45時間超が年7回は一般則の天井を超える。
+# もう一つの勤怠は時間外があるのに36協定が無い。
+# 2024-04-01 から通算した事業所の抵触日は 2027-04-01。終了 2027-04-02 はそれを超え、
+# 通知した 2029-04-01 は計算値と違う。2024-02-29 開始の終了 2027-03-02 は抵触日 2027-03-01 の後。
+
+app staffing_limits_broken
+  stack nextjs, postgres
+  freedom guided
+
+  entity Staff
+    id: Id
+    name: String
+
+  entity Client
+    id: Id
+    name: String
+
+  entity DispatchContract
+    id: Id
+    staff: Staff
+    client: Client
+    duties: String
+    workplace: String
+    start_date: Date
+    end_date: Date
+    conflict_date: Date
+    status: String
+
+  entity Timesheet
+    id: Id
+    work_date: Date
+    hours: Duration
+    overtime_hours: Duration
+    holiday_hours: Duration
+    status: String
+
+  entity TimesheetOpen
+    id: Id
+    work_date: Date
+    hours: Duration
+    overtime_hours: Duration
+    status: String
+
+  entity OvertimeAgreement
+    id: Id
+    status: String
+
+  pattern overtime_agreement
+    entity: OvertimeAgreement
+    timesheet: Timesheet
+    monthly_overtime_hours: 50
+    yearly_overtime_hours: 360
+    special_clause: enabled
+    special_yearly_overtime_hours: 721
+    month_with_holiday_hours: 100
+    average_hours: 80
+    months_over_limit: 7
+    warn_at_hours: 40
+    on_warning: notify
+    on_limit: reject
+
+  pattern timesheet
+    entity: Timesheet
+    approver: client_approver
+    period: monthly
+
+  pattern timesheet
+    entity: TimesheetOpen
+    approver: client_approver
+    period: monthly
+
+  pattern dispatch_contract
+    entity: DispatchContract
+    staff: Staff
+    client: Client
+    start_date: 2026-04-01
+    end_date: 2027-04-02
+    conflict_date: 2029-04-01
+    office: tokyo-hq
+    org_unit: general
+    person: staff-a
+    office_history: 2024-04-01/2026-03-31
+
+  pattern dispatch_contract
+    entity: DispatchContract
+    staff: Staff
+    client: Client
+    start_date: 2024-02-29
+    end_date: 2027-03-02
+    conflict_date: 2027-03-01
+    office: osaka-leap
+    org_unit: accounting
+    person: leap-person

@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在133件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在149件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -185,7 +185,7 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              24個のパターンマニフェストと index.json
+  registry/              25個のパターンマニフェストと index.json
   examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、demo.html、story.html）
@@ -216,9 +216,9 @@ python3 proutc.py build examples/support_desk.prout --out build/support
 
 ## 人材派遣の勤怠・契約・単価を検査する
 
-`timesheet`（勤怠と派遣先承認）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
+`timesheet`（勤怠と派遣先承認）、`overtime_agreement`（36協定の上限、警告と硬停止）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
 
-法令の数値は言語に埋め込まず、設定された値の整合だけを見ます。抵触日の3年計算、36協定の上限、社会保険料率、同一労働同一賃金の判断は対象外です。設計と限界は [docs/staffing.md](docs/staffing.md) にまとめています。
+36協定の上限はスロットで、一般則を既定かつ天井にします。抵触日は、通知された日に加え、同じ事業所・同じ人と組織単位の開始日から3年後を計算します。どちらも仕様の定数だけを見て、実績の時間や保存済みの契約は実行時の検査として生成します。社会保険料率と同一労働同一賃金は対象外です。設計と、社労士の確認が要る箇所は [docs/staffing.md](docs/staffing.md) にまとめています。
 
 ```sh
 cd patterns

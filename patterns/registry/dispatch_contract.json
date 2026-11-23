@@ -1,6 +1,6 @@
 {
   "name": "dispatch_contract",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "intent": "派遣の個別契約と就業条件の明示を、開始日・終了日・抵触日つきで管理する",
   "tags": [
     "dispatch",
@@ -40,13 +40,43 @@
     "conflict_date": {
       "type": "date",
       "required": true,
-      "desc": "抵触日。YYYY-MM-DD。派遣先が通知した日を設定する"
+      "desc": "派遣先が通知した抵触日。YYYY-MM-DD。計算値と違えば警告し、通知値は残す"
+    },
+    "office": {
+      "type": "text",
+      "required": false,
+      "desc": "派遣先事業所の識別子。同じ値の契約を事業所単位で通算する。省略時はこの契約だけを見る"
+    },
+    "org_unit": {
+      "type": "text",
+      "required": false,
+      "desc": "組織単位の識別子。person と組で個人単位を通算する"
+    },
+    "person": {
+      "type": "text",
+      "required": false,
+      "desc": "派遣労働者の識別子。org_unit と組で個人単位を通算する"
+    },
+    "office_history": {
+      "type": "spans",
+      "required": false,
+      "desc": "同じ事業所の過去の派遣。YYYY-MM-DD/YYYY-MM-DD をカンマ区切り"
+    },
+    "person_history": {
+      "type": "spans",
+      "required": false,
+      "desc": "同じ人と組織単位の過去の派遣。YYYY-MM-DD/YYYY-MM-DD をカンマ区切り"
+    },
+    "person_conflict_date": {
+      "type": "date",
+      "required": false,
+      "desc": "通知された個人単位の抵触日。計算値と違えば警告する"
     },
     "exempt": {
       "type": "enum",
-      "values": ["none", "indefinite", "age60"],
+      "values": ["none", "indefinite", "age60", "day_limited", "leave_substitute"],
       "required": false,
-      "desc": "期間制限の例外。none、無期雇用の indefinite、60歳以上の age60。例外でも法令判断はしない"
+      "desc": "期間制限の例外。none、無期雇用 indefinite、60歳以上 age60。day_limited と leave_substitute は文書上の任意フラグで、日数や休業の事実は検査しない"
     }
   },
   "requires_fields": {
@@ -75,9 +105,9 @@
       "right": "conflict_date",
       "kind": "date",
       "message": "contract end_date is after the 抵触日",
-      "note": "設定された日付の比較だけを行う。開始日に3年を足す計算、クーリング、法定の例外列挙はしない。",
+      "note": "通知された抵触日との比較。同じ日付の自動計算は staffing_rules が行い、違えば警告する。抵触日当日を終了日に含めるかは社労士の確認事項。",
       "exempt_slot": "exempt",
-      "exempt_values": ["indefinite", "age60"]
+      "exempt_values": ["indefinite", "age60", "day_limited", "leave_substitute"]
     }
   ],
   "effects": ["read(contracts)", "write(contracts)", "emit(audit)"],
@@ -89,16 +119,17 @@
     {"path": "lib/dispatch/term.ts", "kind": "TS", "lines": 40, "desc": "開始日、終了日、抵触日の比較"},
     {"path": "tests/dispatch-contracts.test.ts", "kind": "TEST", "lines": 60, "desc": "抵触日と例外スロットのテスト"}
   ],
-  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout", "examples/staffing_limits.prout"],
   "notes": [
-    "抵触日は派遣先からの通知をスロットに書く。言語は end_date <= conflict_date だけを見る。開始日に3年を足す計算はしない。",
+    "抵触日は、同じ派遣先事業所（office）または同じ人と組織単位（person + org_unit）の最も早い開始日に3年を足した日（その期間の翌日）として計算する。2月29日で応当日が無い年は3月1日。過去の span との空白が3か月を超える（3か月+1日）と起算をリセットする。",
+    "conflict_date は派遣先が通知した日のまま必須。計算値と違えば W-POLICY で、通知値は上書きしない。終了日が計算値より後で、かつ通知値より前なら E-POLICY。計算値と通知値が同じときは、従来の end_date <= conflict_date だけが終了日を見る。",
     "就業条件明示の全文（指揮命令者、就業日、責任の程度など）はフィールドの一部だけを必須にしている。残りはエンティティに足す。",
-    "exempt が indefinite または age60 のとき、抵触日超過はエラーではなく警告になる。警告は法令意見ではない。"
+    "exempt が indefinite、age60、day_limited、leave_substitute のとき、抵触日超過はエラーではなく警告になる。警告は法令意見ではない。day_limited と leave_substitute は日数や休業を確認しない。有期プロジェクトはフラグにしていない。"
   ],
   "provenance": {
     "author": "PROUT staffing prototype",
-    "date": "2026-11-21",
-    "extracted_from": ["staffing", "staffing_desk"],
-    "note": "個別契約と就業条件。期間制限は通知された抵触日との比較に限る。"
+    "date": "2026-11-23",
+    "extracted_from": ["staffing", "staffing_desk", "staffing_limits"],
+    "note": "個別契約と就業条件。通知された抵触日に加え、仕様に書かれた span から3年後の抵触日を計算する。"
   }
 }

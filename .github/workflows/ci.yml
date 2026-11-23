@@ -87,3 +87,15 @@ jobs:
           assert after["reuse_ratio"] > before["reuse_ratio"], "reuse ratio did not improve"
           print(f'{before["ai_authored_lines"]} -> {after["ai_authored_lines"]} lines, {before["reuse_ratio"]}x -> {after["reuse_ratio"]}x')
           PY
+
+      - name: Staffing limits
+        working-directory: patterns
+        run: |
+          python3 proutc.py build examples/staffing_limits.prout
+          python3 proutc.py find "36協定" | grep -q overtime_agreement
+          if python3 proutc.py build examples/staffing_limits_broken.prout > /tmp/staffing-limits.txt 2>&1; then
+            echo "broken staffing limits spec unexpectedly passed"
+            exit 1
+          fi
+          grep -q "overtime" /tmp/staffing-limits.txt
+          grep -q "抵触日" /tmp/staffing-limits.txt

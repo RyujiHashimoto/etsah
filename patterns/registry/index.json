@@ -389,7 +389,7 @@
     },
     {
       "name": "dispatch_contract",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "intent": "派遣の個別契約と就業条件の明示を、開始日・終了日・抵触日つきで管理する",
       "tags": [
         "dispatch",
@@ -423,11 +423,35 @@
         },
         "conflict_date": {
           "required": true,
-          "desc": "抵触日。YYYY-MM-DD。派遣先が通知した日を設定する"
+          "desc": "派遣先が通知した抵触日。YYYY-MM-DD。計算値と違えば警告し、通知値は残す"
+        },
+        "office": {
+          "required": false,
+          "desc": "派遣先事業所の識別子。同じ値の契約を事業所単位で通算する。省略時はこの契約だけを見る"
+        },
+        "org_unit": {
+          "required": false,
+          "desc": "組織単位の識別子。person と組で個人単位を通算する"
+        },
+        "person": {
+          "required": false,
+          "desc": "派遣労働者の識別子。org_unit と組で個人単位を通算する"
+        },
+        "office_history": {
+          "required": false,
+          "desc": "同じ事業所の過去の派遣。YYYY-MM-DD/YYYY-MM-DD をカンマ区切り"
+        },
+        "person_history": {
+          "required": false,
+          "desc": "同じ人と組織単位の過去の派遣。YYYY-MM-DD/YYYY-MM-DD をカンマ区切り"
+        },
+        "person_conflict_date": {
+          "required": false,
+          "desc": "通知された個人単位の抵触日。計算値と違えば警告する"
         },
         "exempt": {
           "required": false,
-          "desc": "期間制限の例外。none、無期雇用の indefinite、60歳以上の age60。例外でも法令判断はしない"
+          "desc": "期間制限の例外。none、無期雇用 indefinite、60歳以上 age60。day_limited と leave_substitute は文書上の任意フラグで、日数や休業の事実は検査しない"
         }
       },
       "states": [],
@@ -438,7 +462,8 @@
       ],
       "examples": [
         "examples/staffing.prout",
-        "examples/staffing_desk.prout"
+        "examples/staffing_desk.prout",
+        "examples/staffing_limits.prout"
       ],
       "path": "registry/dispatch_contract.json",
       "field_types": {
@@ -597,6 +622,82 @@
         "examples/equipment_purchase.prout"
       ],
       "path": "registry/notify.json"
+    },
+    {
+      "name": "overtime_agreement",
+      "version": "0.1.0",
+      "intent": "36協定の上限、警告閾値、硬停止を設定値として宣言し、一般則の上限を超える値を仕様時に止める",
+      "tags": [
+        "36協定",
+        "overtime",
+        "agreement",
+        "時間外",
+        "特別条項",
+        "残業上限"
+      ],
+      "slots": {
+        "entity": {
+          "required": true,
+          "desc": "協定を記録するエンティティ"
+        },
+        "timesheet": {
+          "required": true,
+          "desc": "この協定が覆う勤怠エンティティ"
+        },
+        "monthly_overtime_hours": {
+          "required": false,
+          "desc": "原則の1か月の時間外上限（時間）。既定 45。45を超える値はエラー"
+        },
+        "yearly_overtime_hours": {
+          "required": false,
+          "desc": "原則の1年の時間外上限（時間）。既定 360。360を超える値はエラー"
+        },
+        "special_clause": {
+          "required": false,
+          "desc": "特別条項。既定 none。enabled のときだけ特別の上限を検査し、実行時チェックを生成する"
+        },
+        "special_yearly_overtime_hours": {
+          "required": false,
+          "desc": "特別条項の1年の時間外上限。既定 720。720を超える値はエラー。special_clause が none のときは書けない"
+        },
+        "month_with_holiday_hours": {
+          "required": false,
+          "desc": "時間外+休日の1か月上限。省略時の実行時検査は100時間未満。100以上はエラー"
+        },
+        "average_hours": {
+          "required": false,
+          "desc": "2〜6か月平均の時間外+休日。既定 80。80を超える値はエラー"
+        },
+        "months_over_limit": {
+          "required": false,
+          "desc": "原則の月上限を超えてよい月数。既定 6。6を超える値はエラー"
+        },
+        "warn_at_hours": {
+          "required": true,
+          "desc": "警告閾値（月の時間外）。硬停止の月上限より小さいこと。達したら on_warning"
+        },
+        "on_warning": {
+          "required": true,
+          "desc": "警告閾値に達したときの動作。notify は通知し、提出は止めない"
+        },
+        "on_limit": {
+          "required": true,
+          "desc": "上限を超えたときの動作。reject は提出を止める"
+        }
+      },
+      "states": [],
+      "effects": [
+        "read(agreements)",
+        "read(timesheets)",
+        "notify(approver)",
+        "emit(audit)"
+      ],
+      "examples": [
+        "examples/staffing.prout",
+        "examples/staffing_desk.prout",
+        "examples/staffing_limits.prout"
+      ],
+      "path": "registry/overtime_agreement.json"
     },
     {
       "name": "refund",
@@ -796,7 +897,7 @@
     },
     {
       "name": "timesheet",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "intent": "スタッフの勤怠を提出し、派遣先の承認を経てから請求と給与に回す",
       "tags": [
         "timesheet",
