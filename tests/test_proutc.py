@@ -1,1 +1,153 @@
-IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJSZWdyZXNzaW9uIHRlc3RzIGZvciB0aGUgUFJPVVQgUGF0dGVybnMgY29tcGlsZXIgKHBhdHRlcm5zL3Byb3V0Yy5weSkuCgpSdW4gZnJvbSB0aGUgcmVwb3NpdG9yeSByb290OgoKICAgIHB5dGhvbjMgLW0gdW5pdHRlc3QgZGlzY292ZXIgLXMgdGVzdHMgLXYKCkNvdmVycyBkdXBsaWNhdGUgcGF0dGVybiBhcHBsaWNhdGlvbiwgbmF0dXJhbC1sYW5ndWFnZSBwYXR0ZXJuCmRpc2NvdmVyeSwgYW5kIHRoZSBlbmZvcmNlZCBgZmllbGRfdHlwZXNgIG1hbmlmZXN0IGtleS4KIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBzeXMKaW1wb3J0IHVuaXR0ZXN0CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAoKUk9PVCA9IFBhdGgoX19maWxlX18pLnJlc29sdmUoKS5wYXJlbnQucGFyZW50CnN5cy5wYXRoLmluc2VydCgwLCBzdHIoUk9PVCAvICJwYXR0ZXJucyIpKQoKZnJvbSBwcm91dGMgaW1wb3J0ICggICMgbm9xYTogRTQwMgogICAgREVGQVVMVF9SRUdJU1RSWSwKICAgIGZpbmRfcGF0dGVybnMsCiAgICBsb2FkX3JlZ2lzdHJ5LAogICAgbWFuaWZlc3RfZnJvbV9kaWN0LAogICAgcGFyc2VfYXBwLAogICAgdmFsaWRhdGUsCikKClJFR0lTVFJZID0gbG9hZF9yZWdpc3RyeShERUZBVUxUX1JFR0lTVFJZKQoKCmRlZiBlcnJvcl9jb2RlcyhzcmM6IHN0ciwgcmVnaXN0cnk9Tm9uZSkgLT4gbGlzdFtzdHJdOgogICAgYXBwID0gcGFyc2VfYXBwKHNyYykKICAgIGRpYWdzID0gdmFsaWRhdGUoYXBwLCByZWdpc3RyeSBvciBSRUdJU1RSWSkKICAgIHJldHVybiBbZC5jb2RlIGZvciBkIGluIGRpYWdzIGlmIGQuc2V2ZXJpdHkgPT0gImVycm9yIl0KCgpjbGFzcyBEdXBsaWNhdGVBcHBsaWNhdGlvbih1bml0dGVzdC5UZXN0Q2FzZSk6CiAgICBkZWYgdGVzdF9zYW1lX3BhdHRlcm5fc2FtZV9lbnRpdHlfaXNfYV9jb25mbGljdChzZWxmKToKICAgICAgICBjb2RlcyA9IGVycm9yX2NvZGVzKAogICAgICAgICAgICAiIiIKYXBwIGR1cF90ZXN0CiAgc3RhY2sgbmV4dGpzCiAgZnJlZWRvbSBndWlkZWQKICBlbnRpdHkgSXRlbQogICAgaWQ6IElkCiAgICBuYW1lOiBTdHJpbmcKICBwYXR0ZXJuIGNydWQgSXRlbQogICAgZW50aXR5OiBJdGVtCiAgcGF0dGVybiBjcnVkIEl0ZW0KICAgIGVudGl0eTogSXRlbQoiIiIKICAgICAgICApCiAgICAgICAgc2VsZi5hc3NlcnRJbigiRS1DT05GTElDVCIsIGNvZGVzKQoKICAgIGRlZiB0ZXN0X3NhbWVfcGF0dGVybl9kaWZmZXJlbnRfZW50aXRpZXNfaXNfYWxsb3dlZChzZWxmKToKICAgICAgICBjb2RlcyA9IGVycm9yX2NvZGVzKAogICAgICAgICAgICAiIiIKYXBwIHR3b19lbnRpdGllcwogIHN0YWNrIG5leHRqcwogIGZyZWVkb20gZ3VpZGVkCiAgZW50aXR5IEl0ZW0KICAgIGlkOiBJZAogICAgbmFtZTogU3RyaW5nCiAgZW50aXR5IE9yZGVyCiAgICBpZDogSWQKICAgIG5hbWU6IFN0cmluZwogIHBhdHRlcm4gY3J1ZCBJdGVtCiAgICBlbnRpdHk6IEl0ZW0KICBwYXR0ZXJuIGNydWQgT3JkZXIKICAgIGVudGl0eTogT3JkZXIKIiIiCiAgICAgICAgKQogICAgICAgIHNlbGYuYXNzZXJ0Tm90SW4oIkUtQ09ORkxJQ1QiLCBjb2RlcykKCiAgICBkZWYgdGVzdF90YXJnZXRsZXNzX3BhdHRlcm5zX21heV9yZXBlYXQoc2VsZik6CiAgICAgICAgIyBub3RpZnkgaGFzIG5vIGVudGl0eSB0YXJnZXQ7IHR3byBub3RpZmljYXRpb25zIHdpdGggZGlmZmVyZW50CiAgICAgICAgIyByZWNpcGllbnRzIGFyZSBhIGxlZ2l0aW1hdGUgdXNlLCBub3QgYSBjb25mbGljdC4KICAgICAgICBjb2RlcyA9IGVycm9yX2NvZGVzKAogICAgICAgICAgICAiIiIKYXBwIHR3b19ub3RpZmllcwogIHN0YWNrIG5leHRqcwogIGZyZWVkb20gZ3VpZGVkCiAgZW50aXR5IEl0ZW0KICAgIGlkOiBJZAogICAgbmFtZTogU3RyaW5nCiAgcGF0dGVybiBub3RpZnkKICAgIGNoYW5uZWw6IGVtYWlsCiAgICByZWNpcGllbnQ6IHN0YWZmCiAgcGF0dGVybiBub3RpZnkKICAgIGNoYW5uZWw6IGVtYWlsCiAgICByZWNpcGllbnQ6IG1hbmFnZXIKIiIiCiAgICAgICAgKQogICAgICAgIHNlbGYuYXNzZXJ0Tm90SW4oIkUtQ09ORkxJQ1QiLCBjb2RlcykKCgpjbGFzcyBEaXNjb3ZlcnkodW5pdHRlc3QuVGVzdENhc2UpOgogICAgZGVmIHRvcChzZWxmLCBxdWVyeTogc3RyKSAtPiBzdHI6CiAgICAgICAgcmVzdWx0cyA9IGZpbmRfcGF0dGVybnMocXVlcnksIFJFR0lTVFJZKQogICAgICAgIHNlbGYuYXNzZXJ0VHJ1ZShyZXN1bHRzLCBmIm5vIHBhdHRlcm5zIG1hdGNoZWQge3F1ZXJ5IXJ9IikKICAgICAgICByZXR1cm4gcmVzdWx0c1swXVsxXS5uYW1lCgogICAgZGVmIHRlc3Rfa2V5d29yZF9xdWVyeV9zdGlsbF9maW5kc19hcHByb3ZhbChzZWxmKToKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKCJhcHByb3ZhbCIsIHNlbGYudG9wKCLnlLPoq4sg5om/6KqNIikpCgogICAgZGVmIHRlc3RfbmF0dXJhbF9qYXBhbmVzZV9zZW50ZW5jZV9maW5kc19hcHByb3ZhbChzZWxmKToKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKCJhcHByb3ZhbCIsIHNlbGYudG9wKCLnlLPoq4vjgpLmib/oqo3jgZfjgZ/jgYQiKSkKCiAgICBkZWYgdGVzdF9uYXR1cmFsX2phcGFuZXNlX3NlbnRlbmNlX2ZpbmRzX3JlZnVuZChzZWxmKToKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKCJyZWZ1bmQiLCBzZWxmLnRvcCgi6L+U6YeR44KS44GX44Gf44GEIikpCgogICAgZGVmIHRlc3RfZW5nbGlzaF9zdG9wd29yZHNfZG9fbm90X2Ryb3duX3RoZV9tYXRjaChzZWxmKToKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKCJyZWZ1bmQiLCBzZWxmLnRvcCgiSSB3YW50IGEgcmVmdW5kIGZsb3ciKSkKCgpjbGFzcyBGaWVsZFR5cGVzKHVuaXR0ZXN0LlRlc3RDYXNlKToKICAgIE1BTklGRVNUID0gewogICAgICAgICJuYW1lIjogInR5cGVkIiwKICAgICAgICAidmVyc2lvbiI6ICIwLjEuMCIsCiAgICAgICAgImludGVudCI6ICJ0ZXN0IHBhdHRlcm4gd2l0aCBhbiBlbmZvcmNlZCBmaWVsZCB0eXBlIiwKICAgICAgICAidGFncyI6IFsidHlwZWQiXSwKICAgICAgICAic2xvdHMiOiB7ImVudGl0eSI6IHsidHlwZSI6ICJlbnRpdHkiLCAicmVxdWlyZWQiOiBUcnVlLCAiZGVzYyI6ICJ0YXJnZXQifX0sCiAgICAgICAgImZpZWxkX3R5cGVzIjogeyJ3b3JrX2RhdGUiOiAiRGF0ZSJ9LAogICAgICAgICJhcnRpZmFjdHMiOiBbeyJwYXRoIjogImxpYi90eXBlZC50cyIsICJraW5kIjogIlRTIiwgImxpbmVzIjogMTAsICJkZXNjIjogIngifV0sCiAgICAgICAgImV4YW1wbGVzIjogW10sCiAgICB9CgogICAgZGVmIHJlZ2lzdHJ5KHNlbGYpOgogICAgICAgIG0gPSBtYW5pZmVzdF9mcm9tX2RpY3Qoc2VsZi5NQU5JRkVTVCkKICAgICAgICByZXR1cm4ge20ubmFtZTogbX0KCiAgICBkZWYgYXBwKHNlbGYsIGZpZWxkX3R5cGU6IHN0cikgLT4gc3RyOgogICAgICAgIHJldHVybiBmIiIiCmFwcCB0eXBlZF90ZXN0CiAgc3RhY2sgbmV4dGpzCiAgZnJlZWRvbSBndWlkZWQKICBlbnRpdHkgU2hpZnQKICAgIGlkOiBJZAogICAgd29ya19kYXRlOiB7ZmllbGRfdHlwZX0KICBwYXR0ZXJuIHR5cGVkIFNoaWZ0CiAgICBlbnRpdHk6IFNoaWZ0CiIiIgoKICAgIGRlZiB0ZXN0X2ZpZWxkX3R5cGVfbWlzbWF0Y2hfaXNfYW5fZXJyb3Ioc2VsZik6CiAgICAgICAgc2VsZi5hc3NlcnRJbigiRS1UWVBFIiwgZXJyb3JfY29kZXMoc2VsZi5hcHAoIlN0cmluZyIpLCBzZWxmLnJlZ2lzdHJ5KCkpKQoKICAgIGRlZiB0ZXN0X2ZpZWxkX3R5cGVfbWF0Y2hfaXNfY2xlYW4oc2VsZik6CiAgICAgICAgc2VsZi5hc3NlcnROb3RJbigiRS1UWVBFIiwgZXJyb3JfY29kZXMoc2VsZi5hcHAoIkRhdGUiKSwgc2VsZi5yZWdpc3RyeSgpKSkKCgppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOgogICAgdW5pdHRlc3QubWFpbigpCg==
+#!/usr/bin/env python3
+"""Regression tests for the PROUT Patterns compiler (patterns/proutc.py).
+
+Run from the repository root:
+
+    python3 -m unittest discover -s tests -v
+
+Covers duplicate pattern application, natural-language pattern
+discovery, and the enforced `field_types` manifest key.
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "patterns"))
+
+from proutc import (  # noqa: E402
+    DEFAULT_REGISTRY,
+    find_patterns,
+    load_registry,
+    manifest_from_dict,
+    parse_app,
+    validate,
+)
+
+REGISTRY = load_registry(DEFAULT_REGISTRY)
+
+
+def error_codes(src: str, registry=None) -> list[str]:
+    app = parse_app(src)
+    diags = validate(app, registry or REGISTRY)
+    return [d.code for d in diags if d.severity == "error"]
+
+
+class DuplicateApplication(unittest.TestCase):
+    def test_same_pattern_same_entity_is_a_conflict(self):
+        codes = error_codes(
+            """
+app dup_test
+  stack nextjs
+  freedom guided
+  entity Item
+    id: Id
+    name: String
+  pattern crud Item
+    entity: Item
+  pattern crud Item
+    entity: Item
+"""
+        )
+        self.assertIn("E-CONFLICT", codes)
+
+    def test_same_pattern_different_entities_is_allowed(self):
+        codes = error_codes(
+            """
+app two_entities
+  stack nextjs
+  freedom guided
+  entity Item
+    id: Id
+    name: String
+  entity Order
+    id: Id
+    name: String
+  pattern crud Item
+    entity: Item
+  pattern crud Order
+    entity: Order
+"""
+        )
+        self.assertNotIn("E-CONFLICT", codes)
+
+    def test_targetless_patterns_may_repeat(self):
+        # notify has no entity target; two notifications with different
+        # recipients are a legitimate use, not a conflict.
+        codes = error_codes(
+            """
+app two_notifies
+  stack nextjs
+  freedom guided
+  entity Item
+    id: Id
+    name: String
+  pattern notify
+    channel: email
+    recipient: staff
+  pattern notify
+    channel: email
+    recipient: manager
+"""
+        )
+        self.assertNotIn("E-CONFLICT", codes)
+
+
+class Discovery(unittest.TestCase):
+    def top(self, query: str) -> str:
+        results = find_patterns(query, REGISTRY)
+        self.assertTrue(results, f"no patterns matched {query!r}")
+        return results[0][1].name
+
+    def test_keyword_query_still_finds_approval(self):
+        self.assertEqual("approval", self.top("申請 承認"))
+
+    def test_natural_japanese_sentence_finds_approval(self):
+        self.assertEqual("approval", self.top("申請を承認したい"))
+
+    def test_natural_japanese_sentence_finds_refund(self):
+        self.assertEqual("refund", self.top("返金をしたい"))
+
+    def test_english_stopwords_do_not_drown_the_match(self):
+        self.assertEqual("refund", self.top("I want a refund flow"))
+
+
+class FieldTypes(unittest.TestCase):
+    MANIFEST = {
+        "name": "typed",
+        "version": "0.1.0",
+        "intent": "test pattern with an enforced field type",
+        "tags": ["typed"],
+        "slots": {"entity": {"type": "entity", "required": True, "desc": "target"}},
+        "field_types": {"work_date": "Date"},
+        "artifacts": [{"path": "lib/typed.ts", "kind": "TS", "lines": 10, "desc": "x"}],
+        "examples": [],
+    }
+
+    def registry(self):
+        m = manifest_from_dict(self.MANIFEST)
+        return {m.name: m}
+
+    def app(self, field_type: str) -> str:
+        return f"""
+app typed_test
+  stack nextjs
+  freedom guided
+  entity Shift
+    id: Id
+    work_date: {field_type}
+  pattern typed Shift
+    entity: Shift
+"""
+
+    def test_field_type_mismatch_is_an_error(self):
+        self.assertIn("E-TYPE", error_codes(self.app("String"), self.registry()))
+
+    def test_field_type_match_is_clean(self):
+        self.assertNotIn("E-TYPE", error_codes(self.app("Date"), self.registry()))
+
+
+if __name__ == "__main__":
+    unittest.main()
