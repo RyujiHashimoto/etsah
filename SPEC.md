@@ -1,3 +1,5 @@
+[English](SPEC.en.md)
+
 # PROUT v0.1 — AIのための契約言語（試作）
 
 ## なぜ新しい言語か

@@ -1,80 +1,114 @@
-# PROUT（プラウト）
+# PROUT
 
-**AIが書き、AIが検証し、人間は自然言語とGUIで読む。**
+**Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.**
+
+[日本語](README.ja.md) · [Spec (English)](SPEC.en.md) · [Spec (Japanese)](SPEC.md)
 
 [![ci](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml)
 
-PROUTは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
+PROUT statically checks what an AI agent is allowed to do before that agent runs. The agent declares its effects and the human approvals those effects require. A separate checker rejects an unsafe automation. A human reads the summary and the GUI.
 
-作者: 橋元 龍二（Ryuji Hashimoto） / [@RyujiHashimoto](https://github.com/RyujiHashimoto)
+Author: Ryuji Hashimoto (J-PROUT Inc.)
 
-## 出発点
+## What the checker is for
 
-AIが開発するなら、人間が作った言語の制約から自由になれるはずです。しかし、あらゆる言語の厳密な上位互換は作れません。意味論も構文もランタイムも衝突するからです。
+An automation is unsafe when it can send mail, take a payment, or change a contract without a bound that was checked ahead of time. PROUT is that bound.
 
-そこでPROUTは、実装言語を置き換えず、その上に**契約と効果の層**をかぶせます。`impl` はPythonでもRustでもSQLでもよい。PROUTが保証するのは「何を読み、何を書き、何を約束するか」です。
-
-その上に、もう一つの層を置きました。**PROUT Patterns** です。人間が欲しがるWebアプリの形は、驚くほど限られたパターンの組み合わせでできています。認証、一覧、作成、検索、決済、返金、通知、アップロード、承認。ならばパターン自体を言語の第一級要素にし、AIがコードを書く代わりにパターンとスロットを書くようにすれば、開発は速くなります。
-
-## 二つの層
-
-| 層 | ファイル | 役割 |
+| Bound | On this tree | Landing next |
 |---|---|---|
-| 契約言語 PROUT | `prout.py`, `SPEC.md` | 型・効果・事前条件・ポリシーを検査し、ASTハッシュと人間向けGUIを生成する |
-| パターン言語 PROUT Patterns | `patterns/proutc.py`, `patterns/registry/` | パターンをJSONで定義し、仕様のスロットを埋めて数百行を決定論的に展開する |
+| Effects (`read`, `write`, `net`, `spend`, `emit`) must be declared, and the declaration must match the implementation | `prout.py` rejects a mismatch with `E-EFF` | |
+| Network targets must sit on the allow list (default `stripe`) | `E-POLICY` | |
+| Preconditions the checker can disprove | `E-PRE`. Unproved conditions stay visible as `W-PRE` runtime guards | |
+| Canonical AST hash for the audit trail | Printed by `prout check`, stamped on the human view | |
+| A human approves before the next side effect | Pattern `approval`, interactive `demo.html` | |
+| Spend and rate budgets (per run, per period) | The effect name `spend` exists. Numeric budgets do not | [PR #10](https://github.com/RyujiHashimoto/prout-lang/pull/10) pattern layer |
+| A mandatory human gate before an external email, a payment, or a contract change | | [PR #10](https://github.com/RyujiHashimoto/prout-lang/pull/10) `approval_gate` |
+| `agent` / `task` syntax | The parser does not accept these declarations | Pattern-layer draft in PR #10. Contract-layer pull request still to come |
 
-パターンはコードではなくデータです。だからAIは、コードを読まずに `registry/index.json` から目的のパターンを発見し、マニフェストの `intent` と `slots` だけを読んで使えます。
+`impl` may be Python, Rust, or SQL. PROUT records what that implementation may read, write, charge, and promise. It is not a superset of those languages.
 
-## 動かす
+## Why it exists
 
-Python 3.12だけで動きます。追加の依存はありません。
+AI writes the specification. A different program verifies it. Humans read a natural-language summary and a GUI.
+
+General-purpose languages optimize for a person at the keyboard. An agent needs an envelope that can be checked before the first side effect: which effects are allowed, which of them wait for a person, and which hash identifies the contract that allowed the run. The same split, applied to ordinary app specs, is the pattern layer below.
+
+## Quickstart
+
+Python 3.12 and the standard library. No extra packages.
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
-
-# 契約言語：壊れた初稿は3件のエラーで止まる
-python3 prout.py check examples/refund_broken.prout
-
-# 修正版はエラー0件、実行時ガード1件
+git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
 python3 prout.py check examples/refund_fixed.prout
-
-# ASTから人間向けGUIを生成
-python3 render.py
-open human-view.html
+python3 patterns/proutc.py build patterns/examples/expense.prout --out patterns/build/expense
 ```
 
-![人間向けビュー](docs/human-view.png)
+The second command checks a repaired refund. On this tree it exits 0, prints AST hash `bae8501e8b3f`, and leaves one runtime guard (`W-PRE`: `order.status == "paid"`). The flow's effects match the operations it calls. The third command expands a 28-line expense spec and writes `patterns/build/expense/demo.html`. Open that file. No server. Submit, approve, send back, and reject. The approved step runs only after approval.
 
-`demo.sh` はここまでをまとめて実行します。
+`patterns/build/` is gitignored. `./demo.sh` reruns the contract check and regenerates `human-view.html`. The intentionally broken draft `examples/refund_broken.prout` must fail `prout check`.
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在133件で、すべて成功します。
+![Approval demo: a human gate before the next step](docs/demo.png)
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-## 承認前後をGUIで確かめる
+133 tests, stdlib `unittest` only.
 
-`proutc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
+### Install the commands locally
+
+The package is not on PyPI. From a clone:
 
 ```bash
-cd patterns
-python3 proutc.py build examples/expense.prout --out build/expense
-open build/expense/demo.html
+python3 -m venv .venv
+.venv/bin/pip install .
+.venv/bin/prout check examples/refund_fixed.prout
+.venv/bin/proutc build patterns/examples/expense.prout --out patterns/build/expense
 ```
 
-![承認デモ](docs/demo.png)
+`prout` and `proutc` call the existing `main` functions. Checker source is unchanged. An installed `proutc` reads the registry copied into the virtualenv. Day-to-day work can keep using `python3 prout.py` and `python3 patterns/proutc.py`.
 
-同じ `approval` から、備品購入申請のデモも生成できます。
+## Contract layer
 
-![備品購入申請の承認デモ](docs/demo-equipment.png)
-
-## フックの引数まで検査する
-
-`approval` の `on_approved` は、適用済みの `notify` を指せます。このとき `notify` の `channel` と `recipient` がフックの引数として検査されます。
+A contract names the operation, the effects it may perform, and the conditions the caller must meet. Abbreviated from [`examples/refund_fixed.prout`](examples/refund_fixed.prout):
 
 ```prout
+op refund(order: Order, amount: Money) -> Receipt
+  doc "注文を指定額だけ返金する"
+  eff write(payments), net(stripe)
+  pre amount <= order.total
+  pre order.status == "paid"
+  post result.status == "refunded"
+  impl stripe.refund(order, amount)
+
+flow handle_refund(order_id: Id) -> Receipt
+  doc "返金リクエストを処理する"
+  eff read(orders), write(payments), net(stripe)
+  let order = orders.get(order_id)
+  let receipt = refund(order, order.total)
+  return receipt
+```
+
+The flow's effects must equal the effects of the operations it calls. A flow that pays without declaring `spend`, or that omits `return`, does not pass. The checker also accepts `spend(stripe)` and `emit(audit)` as effect kinds. A network target outside the allow list is `E-POLICY`.
+
+`python3 render.py` rebuilds [`human-view.html`](human-view.html) from the AST, including the hash. The view is a rendering of the AST.
+
+![Human view generated from the AST](docs/human-view.png)
+
+Full rules: [SPEC.en.md](SPEC.en.md). The Japanese [SPEC.md](SPEC.md) is the original.
+
+## Pattern layer
+
+App specs fill slots. The compiler checks them and expands each pattern into an estimated set of database, API, UI, and test files. It does not yet write those source files. Line counts are estimates from the manifests.
+
+Human approval before a later step, from [`patterns/examples/expense.prout`](patterns/examples/expense.prout) and [`patterns/examples/travel_request.prout`](patterns/examples/travel_request.prout):
+
+```prout
+pattern approval Expense
+  entity: Expense
+  approver: manager
+  on_approved: reimburse
+
 pattern notify
   channel: email
   recipient: accounting
@@ -86,153 +120,121 @@ pattern approval TravelRequest
   on_approved: notify
 ```
 
-`recipient` が `auth.roles` に含まれない場合や、`channel` が `email` / `slack` 以外の場合は `E-HOOK-ARG` で止まります。`notify` を適用していなければ `E-HOOK`、同じ `notify` を複数回適用して参照先が曖昧な場合も `E-HOOK` です。custom ブロックを指すフックは従来どおり使えます。
-
-## パターンで書く
+`on_approved` must name a `custom` block or a pattern applied in the same spec. Pointing it at `notify` checks `channel` (`email` or `slack`) and `recipient` (one of `auth.roles`). A bad argument is `E-HOOK-ARG`. An unknown target is `E-HOOK`.
 
 ```bash
-cd patterns
-
-# 38行の仕様から、1,581行相当のファイル構成を展開する
-python3 proutc.py build examples/shop.prout
-
-# 日本語でパターンを検索する
-python3 proutc.py find "申請 承認"
-
-# 経費精算を、承認デモ付きで組む
-python3 proutc.py build examples/expense.prout --out build/expense
-
-# 出張申請を、承認→経理通知のデモ付きで組む
-python3 proutc.py build examples/travel_request.prout --out build/travel
-
-# PC貸出は、承認パターンを二つのアプリから抽出するための利用例
-python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
-
-# パターン追加前後を比較する
-python3 proutc.py bench
-
-# 人材派遣の基幹（勤怠承認、抵触日、請求単価）。設計は docs/staffing.md
-python3 proutc.py build examples/staffing.prout --out build/staffing
+python3 patterns/proutc.py find "approval"
+python3 patterns/proutc.py find "申請 承認"
 ```
 
-PC貸出は、承認パターンを二つのアプリから抽出するために使った二つ目の利用例です。製品デモとして育てる予定はなく、再利用が効いた証拠としてベンチに残しています。
+`find "申請 承認"` returns `approval` at score 15. Patterns are JSON, so another agent can discover one from [`patterns/registry/index.json`](patterns/registry/index.json) without reading the compiler.
 
-`find "申請 承認"` は `approval` を score 15 で返します。元の会話を知らないAIでも、この索引とマニフェストだけで「申請→承認→差し戻し」を再利用できます。人材派遣の基幹に足した `timesheet`、`dispatch_contract`、`staffing_billing`、`matching` は `docs/staffing.md` にまとめています。
+### Agent tasks, in progress
 
-### パターン追加前後
+Pull request [#10](https://github.com/RyujiHashimoto/prout-lang/pull/10) adds the pattern-layer envelope this README leads with: an `ai_task` declares the effects an agent may use, spend and rate budgets, retry, an idempotency key, and an audit hash. An `approval_gate` stops an external email, an external network call, a payment, or a contract change until a person approves. A spec that emits outside the organization with no gate fails `E-POLICY` on that branch.
 
-| ケース | 仕様 | custom | AIが書く行数 | 生成行数 | 再利用倍率 |
+`agent` / `task` declarations in the contract language are not on main. A contract-layer pull request is still to come. Until it lands, `prout check` will reject those keywords as unknown syntax. The quickstart above does not depend on either pull request.
+
+## Measured reuse
+
+Growth is "the next agent writes less." [`patterns/bench/report.json`](patterns/bench/report.json) compares specs before and after the `approval` pattern existed. Reuse is the generated-line estimate divided by AI-written lines (spec plus custom).
+
+| Case | Spec | Custom | AI-written lines | Generated estimate | Reuse |
 |---|---:|---:|---:|---:|---:|
-| 経費精算（approval追加前） | 24 | 180 | 204 | 981 | 4.8x |
-| 経費精算（approval追加後） | 28 | 30 | **58** | 1,264 | **21.8x** |
-| 出張申請（approval再利用） | 33 | 0 | **33** | 1,386 | **42.0x** |
-| 備品購入申請（approval再利用） | 34 | 0 | **34** | 1,394 | **41.0x** |
-| PC貸出（approval再利用） | 28 | 35 | **63** | 1,269 | **20.1x** |
+| Expense, before `approval` | 24 | 180 | 204 | 981 | 4.8× |
+| Expense, after `approval` | 28 | 30 | 58 | 1,264 | 21.8× |
+| Travel request, `approval` reused | 33 | 0 | 33 | 1,386 | 42.0× |
+| Equipment purchase, `approval` reused | 34 | 0 | 34 | 1,394 | 41.0× |
+| PC lending (bench only) | 28 | 35 | 63 | 1,269 | 20.1× |
 
-同じ「申請→承認→差し戻し」を二度目に書くとき、AIの記述量は204行から58行へ **72%減**、再利用倍率は4.8倍から21.8倍へ改善しました。パターンが言語に追加されたことで、次の開発が短くなったことを示す最初の測定です。出張申請と備品購入申請は、承認後の通知を `custom` から標準の `notify` パターンに移したため、custom 0行・42.0倍/41.0倍になっています。
+The single-build "expansion" figure divides by spec lines only, so it is larger than reuse. PC lending shows the pattern transferred. It is a bench, not a product demo. The write-up of two trials with an agent that had not seen the design conversation is in [README.ja.md](README.ja.md).
 
-## 二回の追試：会話を知らないAIに渡す
+## Features
 
-2026年11月22日、このリポジトリのURLと依頼だけを、開発経緯を知らないAIに渡しました。`approval` という名前は教えていません。
+- Contract language: types, `op`, `flow`, effects, `pre` / `post`, `impl`.
+- Checks for types, effect completeness, linear-arithmetic preconditions, and network policy.
+- Canonical AST and a SHA-256 prefix, so two equivalent specs share a hash.
+- Diagnostics an agent can repair from: code, location, expected, actual, suggestion.
+- Human HTML generated from the AST (`render.py`).
+- 24 pattern manifests, an index, and `find` over intent, tags, name, and slot text.
+- `build` writes `report.html`, `manifest.json`, and, for a valid approval spec, interactive `demo.html`. Scene specs also write `story.html`.
+- Hook checks for `notify`. Unknown slots warn (`W-SLOT`).
+- Service-desk patterns (assignment, queue, due date, checklist, comments, labels, activity, CSV, archive, survey).
+- CI: unit tests, both checkers, registry index, example builds, bench regression guard.
 
-| 回 | 依頼 | 時間 | 納品ビルド | 失敗 | 主な発見 |
-|---|---|---:|---:|---:|---|
-| 1 | 出張申請を作って。上長が承認したら経理に通知して | 8分13秒 | 3回 | 0 | GUIがなく、フックも未検証 |
-| 2 | 備品購入申請を作って。上長が承認したら総務に通知して | **5分48秒** | 2回 | 0 | 標準の `demo.html` で承認前後を確認 |
+## Industry example: a staffing desk
 
-一回目、AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。当時の仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
+The pattern layer also describes one industry. [`patterns/examples/staffing.prout`](patterns/examples/staffing.prout) is a fictional staffing desk: staff, openings, a dispatch contract, a timesheet the client site must approve, and a bill rate that must stay at or above the pay rate. Statutory numbers are configuration. The language does not embed them.
 
-この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。二回目は、出張申請の例をそのままコピーできない「備品購入申請」に変えて試しています。結果は **5分48秒**、納品ビルド2回で失敗0。AIは `demo.html` を標準機能で生成し、Playwrightで承認前・承認後・差し戻し・却下まで確認しました。一回目より **29%短く**、修正も1回減っています。現在の出張申請の例は、当時の custom 40行を標準の `notify` パターンに置き換え、33行・42.0倍に整理しています。
+```prout
+pattern dispatch_contract
+  entity: DispatchContract
+  staff: Staff
+  client: Client
+  start_date: 2026-04-01
+  end_date: 2027-03-31
+  conflict_date: 2029-04-01
 
-`on_approved` が標準の `notify` を指す場合は、`channel` の許可値と `recipient` が `auth.roles` に含まれるかを `E-HOOK-ARG` で検査します。残る穴は、custom ブロックを指すフックの引数まで検証しないことです。次は custom 側にも引数宣言を持たせます。
-
-## 言語が育つループ
-
-PROUTの成長は、コードの行数ではなく、**次のAIが少ない手順で解けるようになったか**で測ります。
-
-1. 観察 — 二つのアプリに同じ形が現れる。
-2. 共通部分を抽出する — 経費精算とPC貸出から始め、出張申請と備品購入で再確認する。
-3. スロットで一般化する — `entity`, `approver`, `on_approved`。
-4. レジストリに公開する — JSONマニフェストと索引。
-5. 別のAIが発見する — `index.json` と `find`。
-6. 使用する — 必須スロットを埋め、`on_approved` でアプリ固有の処理を接続する。
-7. 改良を提案する — Pull RequestとCI。
-
-![言語が育つループ](docs/growth.png)
-
-`patterns/growth_report.py` は、この一周をHTMLレポートにします。ベンチ結果とレジストリから自動生成されるので、パターンを追加するたびに数値が更新されます。
-
-## 現在の範囲
-
-`build` が生成するのは、成果物の一覧と行数見積もりを含む `report.html`、操作できる `demo.html`、`manifest.json` です。APIやDBの実ソースはまだ書き出していません。生成行数はパターン定義からの見積もりで、実際にコンパイルされたコードの行数ではありません。
-
-次の課題は、`approval` の7成果物を実際のファイルとして書き出し、テストを通すことです。現時点のPROUTは、パターンの発見・適用・検証・人間向け表示までを試作した段階です。
-
-## これは「全言語の上位互換」ではない
-
-意味論・構文・ランタイムが衝突するため、厳密な上位互換は作れません。PROUTは実装言語を置き換えず、その上に契約と効果の層をかぶせるメタ言語です。
-
-リバースエンジニアリングへの含意は `SPEC.md` に書きました。契約が存在し、検証されている場合に限り、意味の復元は契約の照合に変わります。契約のないバイナリの解析は、依然として難しいままです。
-
-## リポジトリ構成
-
-```
-prout.py                 契約言語のパーサー・検証器・CLI
-render.py                ASTから人間向けHTMLを生成
-SPEC.md                  契約言語の仕様と設計原則
-examples/                壊れた初稿と修正版
-tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
-patterns/
-  proutc.py              パターンコンパイラ（build / find / add / index / bench）
-  PATTERNS.md            パターン言語の設計思想
-  registry/              24個のパターンマニフェストと index.json
-  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
-  bench/                 パターン追加前後の比較（PC貸出を含む）
-  build/                 生成物（report.html、demo.html、story.html）
-  growth_report.py       成長ループのHTMLレポート
-.github/workflows/ci.yml 単体テスト、契約検査、索引整合、ビルド、ベンチ、回帰ガード
-CONTRIBUTING.md          パターン提案とレビューの基準
+pattern staffing_billing
+  entity: Invoice
+  timesheet: Timesheet
+  bill_rate: 2800
+  pay_rate: 1800
 ```
 
-## ゲームブック・分岐教材を作る
-
-`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
-
-```sh
-cd patterns
-python3 proutc.py build examples/moon_garden.prout --out build/garden
-python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```bash
+python3 patterns/proutc.py build patterns/examples/staffing.prout --out patterns/build/staffing
 ```
 
-## 修理受付・顧客サポートをパターンで組む
+That build is 104 spec lines, an estimated 3,383 generated lines, 32.5×, and 0 errors. The contract-layer twin, [`examples/staffing.prout`](examples/staffing.prout), encodes money as integer yen and dates as day counts: 0 errors, 3 runtime guards. Design and limits: [docs/staffing.md](docs/staffing.md).
 
-`repair_desk` と `support_desk` の2例から、担当割当、作業キュー、期限、チェックリスト、コメント、ラベル、操作履歴、CSV出力、アーカイブ、評価の10パターンを抽出しました。どちらの仕様も52行で、業務固有の記述をパターンの適用に置き換えています。
+## Status and roadmap
 
-```sh
-cd patterns
-python3 proutc.py build examples/repair_desk.prout --out build/repair
-python3 proutc.py build examples/support_desk.prout --out build/support
+Prototype. No release tag. Not published to PyPI. `build` emits a report, a demo, and a manifest. It does not emit API or database source.
+
+1. Finish the pattern-layer agent envelope in [PR #10](https://github.com/RyujiHashimoto/prout-lang/pull/10): budgets, external-effect gates, audit hash.
+2. Open the contract-layer pull request for `agent` / `task` syntax. That syntax is not in `prout.py` on main.
+3. Emit `approval`'s artifacts as real files and run their tests.
+4. Declare arguments on `custom` hooks. Hooks that point at a standard pattern are checked already.
+5. Information-flow labels (`pii`, `secret`) so a value cannot reach a forbidden sink. Design only: [docs/information-flow.md](docs/information-flow.md) (Japanese).
+
+[PR #9](https://github.com/RyujiHashimoto/prout-lang/pull/9) proposes `Date` and `Decimal` literals in the contract layer. Main still uses integer yen and day counts for those examples.
+
+Why this is not a superset of every language: [SPEC.en.md](SPEC.en.md). `1/2`, generics syntax, and undefined behavior cannot be given one meaning. The contract sits on top of an implementation language.
+
+## Documentation
+
+| Doc | Language | Contents |
+|---|---|---|
+| [SPEC.md](SPEC.md) | Japanese, original | Contract language and design rules |
+| [SPEC.en.md](SPEC.en.md) | English translation | Same document. If they disagree, `SPEC.md` wins |
+| [patterns/PATTERNS.md](patterns/PATTERNS.md) | Japanese | Pattern language |
+| [patterns/registry/README.md](patterns/registry/README.md) | Japanese | How an agent should read a manifest |
+| [docs/staffing.md](docs/staffing.md) | English summary, then Japanese | Staffing example, limits, owner questions |
+| [docs/information-flow.md](docs/information-flow.md) | Japanese | Label design. Checker support is later |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | English, short Japanese section | Patterns, review, tests |
+| [SECURITY.md](SECURITY.md) | English | How to report a vulnerability |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | English | Contributor Covenant 2.1 |
+| [CHANGELOG.md](CHANGELOG.md) | English | Unreleased notes |
+| [docs/launch-checklist.md](docs/launch-checklist.md) | Japanese | Owner decisions before a public launch |
+
+## Repository
+
+```
+prout.py                 contract parser, checker, CLI
+render.py                AST to human HTML
+patterns/proutc.py       pattern compiler (build, find, add, index, bench)
+patterns/registry/       24 manifests and index.json
+patterns/examples/       shop, expense, travel, equipment, repair, support, stories, staffing
+patterns/bench/          before/after approval, including PC lending
+examples/                contract samples, including broken ones
+tests/                   unittest
 ```
 
-## 人材派遣の勤怠・契約・単価を検査する
+## Contributing
 
-`timesheet`（勤怠と派遣先承認）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
+New patterns are JSON files in `patterns/registry/`. Human review is required, including when an agent wrote the patch. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-法令の数値は言語に埋め込まず、設定された値の整合だけを見ます。抵触日の3年計算、36協定の上限、社会保険料率、同一労働同一賃金の判断は対象外です。設計と限界は [docs/staffing.md](docs/staffing.md) にまとめています。
+## License
 
-```sh
-cd patterns
-python3 proutc.py build examples/staffing.prout --out build/staffing
-python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
-python3 proutc.py find "勤怠"
-```
-
-## 参加する
-
-新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
-
-詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と [patterns/registry/README.md](patterns/registry/README.md) を参照してください。
-
-## ライセンス
-
-MIT。Copyright (c) 2026 橋元 龍二（Ryuji Hashimoto）。
+[MIT](LICENSE). Copyright (c) 2026 Ryuji Hashimoto (J-PROUT Inc.).
