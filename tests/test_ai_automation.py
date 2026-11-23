@@ -1,7 +1,7 @@
 """Pattern-layer checks for AI tasks and approval gates.
 
-The contract-layer `task` syntax in docs/ai_automation.md is a proposal.
-These tests lock the pattern compiler, which does not import changes into prout.py.
+The contract-layer syntax is checked in tests/test_ai_tasks.py. These tests
+stay on the pattern compiler.
 """
 from __future__ import annotations
 
@@ -465,9 +465,9 @@ class TestAutomationPolicy(unittest.TestCase):
         )
         self.assertIn("E-DUP", _codes(diags))
 
-    def test_contract_layer_rejects_task_declarations(self) -> None:
+    def test_contract_layer_still_rejects_unknown_declarations(self) -> None:
         with self.assertRaises(ProutError) as caught:
-            Parser(snippet("task collect(period: Id) -> Int\n  return 1")).parse()
+            Parser(snippet("widget collect\n")).parse()
         self.assertIn("unknown declaration", str(caught.exception))
 
     def test_automation_manifest_shape_is_checked(self) -> None:

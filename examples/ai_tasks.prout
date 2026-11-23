@@ -1,0 +1,146 @@
+# 契約層の AI タスク。実行はしない。検査は効果の封筒、ゲート、予算、再試行だけ。
+# 社外への emit は policy external に入れ、ゲートが無いと E-POLICY。
+# 社内の書き込み（抵触日のキュー）はゲート無し。日付の3年加算はしない。
+# 請求は下書き（write）と送付（emit）を手順に持つ。送付にはゲートを宣言する。
+# on_approved が送付の唯一の呼び出しであることまでは見ない。
+# 予算は整数円。期間の境界は Asia/Tokyo。cron に MON のような名前は書かない。
+
+type Id
+type Timesheet
+type Invoice
+type Rental
+
+op timesheets.open(period: Id) -> Timesheet
+  doc "未提出の勤怠を読む"
+  eff read(timesheets)
+  impl native
+
+op mail.send(sheet: Timesheet) -> Bool
+  doc "承認された督促を派遣先へ送る"
+  eff emit(mail)
+  impl native
+
+op contracts.flag_conflict(period: Id, on: Date, conflict: Date) -> Int
+  doc "通知された抵触日が近いかを社内キューに載せる。起算はしない"
+  eff read(contracts), write(queues)
+  pre on <= conflict
+  impl native
+
+op invoices.draft(period: Id) -> Invoice
+  doc "請求の下書きを書く"
+  eff read(timesheets), write(invoices)
+  impl native
+
+op mail.send_invoice(invoice: Invoice) -> Bool
+  doc "承認された請求を送る"
+  eff emit(mail)
+  impl native
+
+op rentals.due(period: Id) -> Rental
+  doc "返却日が近いレンタルを読む"
+  eff read(rentals)
+  impl native
+
+op mail.send_return(rental: Rental) -> Bool
+  doc "承認された返却案内を顧客へ送る"
+  eff emit(mail)
+  impl native
+
+policy
+  external emit(mail)
+
+agent staffing_mail
+  doc "承認済みの督促文面だけを社外へ送る"
+  allow read(timesheets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+agent staffing_clerk
+  doc "抵触日の旗を社内キューに書く。社外への送信は持たない"
+  allow read(contracts), write(queues)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+agent billing_clerk
+  doc "請求の下書きと、承認後の送付だけを持つ"
+  allow read(timesheets), write(invoices), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 10 hour
+  audit ast_hash
+
+agent rental_mail
+  doc "承認済みの返却案内だけを顧客へ送る"
+  allow read(rentals), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 30 hour
+  audit ast_hash
+
+gate remind_client
+  doc "督促メールはコーディネーターの承認後だけ送る"
+  approver coordinator
+  before emit(mail)
+  on_approved mail.send
+
+gate send_invoice
+  doc "請求の送付は給与担当の承認後だけ行う"
+  approver payroll
+  before emit(mail)
+  on_approved mail.send_invoice
+
+gate remind_return
+  doc "返却案内は運用担当の承認後だけ送る"
+  approver ops
+  before emit(mail)
+  on_approved mail.send_return
+
+task remind_timesheet(period: Id) -> Bool
+  agent staffing_mail
+  doc "未提出の勤怠について、承認された督促だけを送る"
+  trigger schedule "0 9 * * 1"
+  eff read(timesheets), emit(mail)
+  gate remind_client
+  key period
+  retry 2 escalate coordinator
+  let sheet = timesheets.open(period)
+  let sent = mail.send(sheet)
+  return sent
+
+task flag_conflict_window(period: Id) -> Int
+  agent staffing_clerk
+  doc "抵触日が近い契約を社内キューに載せる"
+  trigger schedule "0 8 * * *"
+  eff read(contracts), write(queues)
+  key period
+  retry 1 escalate coordinator
+  let count = contracts.flag_conflict(period, 2026-11-23, 2029-04-01)
+  return count
+
+task draft_invoice(period: Id) -> Invoice
+  agent billing_clerk
+  doc "請求の下書きを作り、送付には承認ゲートを宣言する"
+  trigger schedule "0 9 1 * *"
+  eff read(timesheets), write(invoices), emit(mail)
+  gate send_invoice
+  key period
+  retry 1 escalate payroll
+  let draft = invoices.draft(period)
+  let sent = mail.send_invoice(draft)
+  return draft
+
+task remind_return(period: Id) -> Bool
+  agent rental_mail
+  doc "返却日が近いレンタルの案内を、承認後に顧客へ送る"
+  trigger schedule "0 9 * * *"
+  eff read(rentals), emit(mail)
+  gate remind_return
+  key period
+  retry 1 escalate ops
+  let rental = rentals.due(period)
+  let sent = mail.send_return(rental)
+  return sent

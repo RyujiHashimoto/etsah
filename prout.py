@@ -118,11 +118,80 @@ class FlowDef:
 
 
 @dataclass
+class AgentDef:
+    """Capability envelope for one AI. Budgets are integer yen."""
+
+    name: str
+    line: int = 0
+    doc: str = ""
+    allow: list[tuple[str, str]] = field(default_factory=list)
+    budget_run: int = 0
+    budget_period: int = 0
+    limit_net: int = 0
+    limit_emit: int = 0
+    audit: str = ""
+    allow_declared: bool = False
+
+
+@dataclass
+class GateDef:
+    """Human approval that must cover an external effect before it runs."""
+
+    name: str
+    line: int = 0
+    doc: str = ""
+    approver: str = ""
+    before: list[tuple[str, str]] = field(default_factory=list)
+    on_approved: str = ""
+
+
+@dataclass
+class PolicyDef:
+    """Which effects are external, payments, or contract changes."""
+
+    line: int = 0
+    external: list[tuple[str, str]] = field(default_factory=list)
+    payment: list[tuple[str, str]] = field(default_factory=list)
+    contract: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class TaskDef:
+    """One job inside an agent's envelope. The body calls existing ops."""
+
+    name: str
+    params: list[tuple[str, str]]
+    ret: str
+    line: int = 0
+    doc: str = ""
+    agent: str = ""
+    trigger_kind: str = ""
+    trigger_value: str = ""
+    effects: list[tuple[str, str]] = field(default_factory=list)
+    gates: list[str] = field(default_factory=list)
+    key: str = ""
+    retry: int = 0
+    escalate: str = ""
+    budget_run: Optional[int] = None
+    budget_period: Optional[int] = None
+    body: list[Stmt] = field(default_factory=list)
+    agent_declared: bool = False
+    trigger_declared: bool = False
+    eff_declared: bool = False
+    key_declared: bool = False
+    retry_declared: bool = False
+
+
+@dataclass
 class Program:
     types: list[TypeDef] = field(default_factory=list)
     ops: list[OpDef] = field(default_factory=list)
     flows: list[FlowDef] = field(default_factory=list)
     source: str = ""
+    agents: list[AgentDef] = field(default_factory=list)
+    tasks: list[TaskDef] = field(default_factory=list)
+    gates: list[GateDef] = field(default_factory=list)
+    policies: list[PolicyDef] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +494,10 @@ class Parser:
         types: list[TypeDef] = []
         ops: list[OpDef] = []
         flows: list[FlowDef] = []
+        agents: list[AgentDef] = []
+        tasks: list[TaskDef] = []
+        gates: list[GateDef] = []
+        policies: list[PolicyDef] = []
         while self.peek():
             line = self.peek()
             if line.indent != 0:
@@ -435,9 +508,17 @@ class Parser:
                 ops.append(self.parse_op())
             elif line.text.startswith("flow "):
                 flows.append(self.parse_flow())
+            elif line.text.startswith("agent "):
+                agents.append(self.parse_agent())
+            elif line.text.startswith("task "):
+                tasks.append(self.parse_task())
+            elif line.text.startswith("gate "):
+                gates.append(self.parse_gate())
+            elif line.text == "policy":
+                policies.append(self.parse_policy())
             else:
                 raise ProutError(f"unknown declaration {line.text!r}", line.no)
-        return Program(types, ops, flows, self.source_text)
+        return Program(types, ops, flows, self.source_text, agents, tasks, gates, policies)
 
     def parse_type(self) -> TypeDef:
         line = self.advance()
@@ -525,6 +606,202 @@ class Parser:
             else:
                 raise ProutError(f"unknown flow statement {text!r}", stmt.no)
         return flow
+
+    def _props(self) -> list[Line]:
+        props: list[Line] = []
+        while self.peek() and self.peek().indent == 2:
+            props.append(self.advance())
+        return props
+
+    def _once(self, seen: set[str], name: str, line: Line) -> None:
+        if name in seen:
+            raise ProutError(f"duplicate {name} in this declaration", line.no)
+        seen.add(name)
+
+    def _parse_budget(self, text: str, line: int) -> tuple[int, int]:
+        matched = re.fullmatch(r"budget\s+run\s+(\S+)\s+period\s+(\S+)", text)
+        if not matched:
+            raise ProutError(f"bad budget {text!r}; expected budget run N period N", line)
+        run_text, period_text = matched.group(1), matched.group(2)
+        if "." in run_text or "." in period_text:
+            raise ProutError("budget must be an integer number of yen", line)
+        if not re.fullmatch(r"\d+", run_text) or not re.fullmatch(r"\d+", period_text):
+            raise ProutError("budget must be an integer number of yen", line)
+        return int(run_text), int(period_text)
+
+    def _parse_body_stmt(self, text: str, line: int) -> Stmt:
+        if text.startswith("let "):
+            matched = re.fullmatch(r"let\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
+            if not matched:
+                raise ProutError(f"bad let statement {text!r}", line)
+            return Stmt("let", line, matched.group(1), parse_expr(matched.group(2), line))
+        if text.startswith("return "):
+            return Stmt("return", line, "", parse_expr(text[7:], line))
+        raise ProutError(f"unknown task statement {text!r}", line)
+
+    def parse_agent(self) -> AgentDef:
+        line = self.advance()
+        matched = re.fullmatch(r"agent\s+([A-Za-z_]\w*)", line.text)
+        if not matched:
+            raise ProutError(f"bad agent header {line.text!r}", line.no)
+        agent = AgentDef(matched.group(1), line.no)
+        seen: set[str] = set()
+        for prop in self._props():
+            text = prop.text
+            if text.startswith("doc "):
+                self._once(seen, "doc", prop)
+                agent.doc = self.parse_string(text[4:], prop.no)
+            elif text == "allow" or text.startswith("allow "):
+                self._once(seen, "allow", prop)
+                agent.allow_declared = True
+                agent.allow = parse_effects(text[5:].strip(), prop.no)
+            elif text.startswith("budget "):
+                self._once(seen, "budget", prop)
+                agent.budget_run, agent.budget_period = self._parse_budget(text, prop.no)
+            elif text.startswith("limit "):
+                limit = re.fullmatch(r"limit\s+(net|emit)\s+(\d+)\s+hour", text)
+                if not limit:
+                    if "." in text:
+                        raise ProutError("hourly limits must be integers", prop.no)
+                    raise ProutError(f"bad limit {text!r}; expected limit net N hour or limit emit N hour", prop.no)
+                slot = f"limit {limit.group(1)}"
+                self._once(seen, slot, prop)
+                value = int(limit.group(2))
+                if limit.group(1) == "net":
+                    agent.limit_net = value
+                else:
+                    agent.limit_emit = value
+            elif text.startswith("audit "):
+                self._once(seen, "audit", prop)
+                agent.audit = text[6:].strip()
+            else:
+                raise ProutError(f"unknown agent property {text!r}", prop.no)
+        return agent
+
+    def parse_task(self) -> TaskDef:
+        line = self.advance()
+        matched = re.fullmatch(
+            r"task\s+([A-Za-z_]\w*)\s*\((.*)\)\s*->\s*(" + TYPE_RE + r")",
+            line.text,
+        )
+        if not matched:
+            raise ProutError(f"bad task header {line.text!r}", line.no)
+        name, params_s, ret = matched.group(1), matched.group(2), matched.group(3)
+        task = TaskDef(name, parse_params(params_s, line.no), ret, line.no)
+        seen: set[str] = set()
+        for prop in self._props():
+            text = prop.text
+            if text.startswith("doc "):
+                self._once(seen, "doc", prop)
+                task.doc = self.parse_string(text[4:], prop.no)
+            elif text.startswith("agent "):
+                self._once(seen, "agent", prop)
+                agent = re.fullmatch(r"agent\s+([A-Za-z_]\w*)", text)
+                if not agent:
+                    raise ProutError(f"bad agent reference {text!r}", prop.no)
+                task.agent_declared = True
+                task.agent = agent.group(1)
+            elif text.startswith("trigger "):
+                self._once(seen, "trigger", prop)
+                task.trigger_declared = True
+                task.trigger_kind, task.trigger_value = self._parse_trigger(text, prop.no)
+            elif text == "eff" or text.startswith("eff "):
+                self._once(seen, "eff", prop)
+                task.eff_declared = True
+                task.effects = parse_effects(text[3:].strip(), prop.no)
+            elif text.startswith("gate "):
+                names = [part.strip() for part in text[5:].split(",")]
+                if not names or any(re.fullmatch(r"[A-Za-z_]\w*", part) is None for part in names):
+                    raise ProutError(f"bad gate list {text!r}", prop.no)
+                task.gates.extend(names)
+            elif text.startswith("key "):
+                self._once(seen, "key", prop)
+                key = re.fullmatch(r"key\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)", text)
+                if not key:
+                    raise ProutError(f"bad idempotency key {text!r}", prop.no)
+                task.key_declared = True
+                task.key = key.group(1)
+            elif text.startswith("retry "):
+                self._once(seen, "retry", prop)
+                retry = re.fullmatch(r"retry\s+(\d+)\s+escalate\s+([A-Za-z_]\w*)", text)
+                if not retry:
+                    raise ProutError(f"bad retry {text!r}; expected retry N escalate role", prop.no)
+                task.retry_declared = True
+                task.retry = int(retry.group(1))
+                task.escalate = retry.group(2)
+            elif text.startswith("budget "):
+                self._once(seen, "budget", prop)
+                task.budget_run, task.budget_period = self._parse_budget(text, prop.no)
+            elif text.startswith("let ") or text.startswith("return "):
+                task.body.append(self._parse_body_stmt(text, prop.no))
+            else:
+                raise ProutError(f"unknown task property {text!r}", prop.no)
+        return task
+
+    def _parse_trigger(self, text: str, line: int) -> tuple[str, str]:
+        schedule = re.fullmatch(r'trigger\s+schedule\s+("(?:\\.|[^"\\])*")', text)
+        if schedule:
+            return "schedule", self.parse_string(schedule.group(1), line)
+        record = re.fullmatch(r"trigger\s+record\s+([A-Za-z_]\w*)", text)
+        if record:
+            return "record", record.group(1)
+        webhook = re.fullmatch(r'trigger\s+webhook\s+("(?:\\.|[^"\\])*")', text)
+        if webhook:
+            return "webhook", self.parse_string(webhook.group(1), line)
+        raise ProutError(
+            "bad trigger; expected schedule \"...\", record Type, or webhook \"...\"",
+            line,
+        )
+
+    def parse_gate(self) -> GateDef:
+        line = self.advance()
+        matched = re.fullmatch(r"gate\s+([A-Za-z_]\w*)", line.text)
+        if not matched:
+            raise ProutError(f"bad gate header {line.text!r}", line.no)
+        gate = GateDef(matched.group(1), line.no)
+        seen: set[str] = set()
+        for prop in self._props():
+            text = prop.text
+            if text.startswith("doc "):
+                self._once(seen, "doc", prop)
+                gate.doc = self.parse_string(text[4:], prop.no)
+            elif text.startswith("approver "):
+                self._once(seen, "approver", prop)
+                approver = re.fullmatch(r"approver\s+([A-Za-z_]\w*)", text)
+                if not approver:
+                    raise ProutError(f"bad approver {text!r}", prop.no)
+                gate.approver = approver.group(1)
+            elif text == "before" or text.startswith("before "):
+                self._once(seen, "before", prop)
+                gate.before = parse_effects(text[6:].strip(), prop.no)
+            elif text.startswith("on_approved "):
+                self._once(seen, "on_approved", prop)
+                hook = re.fullmatch(r"on_approved\s+([A-Za-z_][\w.]*)", text)
+                if not hook:
+                    raise ProutError(f"bad on_approved {text!r}", prop.no)
+                gate.on_approved = hook.group(1)
+            else:
+                raise ProutError(f"unknown gate property {text!r}", prop.no)
+        return gate
+
+    def parse_policy(self) -> PolicyDef:
+        line = self.advance()
+        policy = PolicyDef(line.no)
+        seen: set[str] = set()
+        for prop in self._props():
+            text = prop.text
+            if text == "external" or text.startswith("external "):
+                self._once(seen, "external", prop)
+                policy.external = parse_effects(text[8:].strip(), prop.no)
+            elif text == "payment" or text.startswith("payment "):
+                self._once(seen, "payment", prop)
+                policy.payment = parse_effects(text[7:].strip(), prop.no)
+            elif text == "contract" or text.startswith("contract "):
+                self._once(seen, "contract", prop)
+                policy.contract = parse_effects(text[8:].strip(), prop.no)
+            else:
+                raise ProutError(f"unknown policy property {text!r}", prop.no)
+        return policy
 
     @staticmethod
     def parse_string(s: str, line: int) -> str:
@@ -735,6 +1012,46 @@ def subst(e: Optional[Expr], mapping: dict[str, Expr]) -> Optional[Expr]:
 
 BUILTIN_TYPES = {"Int", "String", "Bool", "Date", "Decimal"}
 EFFECT_KINDS = {"read", "write", "net", "spend", "emit"}
+# Period boundaries for spend. Not a per-program setting in this slice.
+PERIOD_TIMEZONE = "Asia/Tokyo"
+RETRY_MAX = 5
+_CRON_RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
+_WEBHOOK_RE = re.compile(r"[A-Za-z_][\w./-]*\Z")
+
+
+def _cron_atom(part: str, lo: int, hi: int) -> bool:
+    """One numeric cron atom: `*`, `n`, `a-b`, or those with `/step`. Names are rejected."""
+    step: Optional[int] = None
+    if "/" in part:
+        base, step_text = part.split("/", 1)
+        if not step_text.isdigit() or int(step_text) == 0:
+            return False
+        step = int(step_text)
+        part = base
+    if part == "*":
+        return step is None or step <= (hi - lo + 1)
+    if "-" in part:
+        start_text, end_text = part.split("-", 1)
+        if not (start_text.isdigit() and end_text.isdigit()):
+            return False
+        start, end = int(start_text), int(end_text)
+        if start > end or start < lo or end > hi:
+            return False
+        return step is None or step <= (end - start + 1)
+    if part.isdigit() and lo <= int(part) <= hi:
+        return step is None
+    return False
+
+
+def cron_ok(value: str) -> bool:
+    """Five numeric fields: minute hour day-of-month month day-of-week."""
+    fields = value.strip().split()
+    if len(fields) != 5:
+        return False
+    for field_text, (lo, hi) in zip(fields, _CRON_RANGES):
+        if not field_text or any(not _cron_atom(part, lo, hi) for part in field_text.split(",")):
+            return False
+    return True
 
 
 def format_effect(e: tuple[str, str]) -> str:
@@ -769,6 +1086,7 @@ class Checker:
             self.check_flow(flow)
         for op in self.program.ops:
             self.check_policy(op)
+        self.check_ai_tasks()
         return self.diags
 
     def check_duplicates(self) -> None:
@@ -1076,6 +1394,454 @@ class Checker:
                 elif target not in self.allow_net:
                     self.error("E-POLICY", f"network target {target!r} is not allowed by policy", op.line)
 
+    def check_ai_tasks(self) -> None:
+        """Static envelope for agent and task. No counters, cron, or idempotency store."""
+        agents = {agent.name: agent for agent in self.program.agents}
+        gates = {gate.name: gate for gate in self.program.gates}
+        self._check_ai_duplicates()
+        external, contract = self._check_ai_policy()
+        for agent in self.program.agents:
+            self._check_agent_envelope(agent)
+        for gate in self.program.gates:
+            self._check_gate_decl(gate, agents)
+        for task in self.program.tasks:
+            self._check_one_task(task, agents, gates, external, contract)
+
+    def _check_ai_duplicates(self) -> None:
+        seen_agents: dict[str, int] = {}
+        for agent in self.program.agents:
+            if agent.name in seen_agents:
+                self.error("E-DUP", f"duplicate agent {agent.name!r}", agent.line)
+            seen_agents[agent.name] = agent.line
+        seen_tasks: dict[str, int] = {}
+        for task in self.program.tasks:
+            if task.name in seen_tasks:
+                self.error("E-DUP", f"duplicate task {task.name!r}", task.line)
+            seen_tasks[task.name] = task.line
+        seen_gates: dict[str, int] = {}
+        for gate in self.program.gates:
+            if gate.name in seen_gates:
+                self.error("E-DUP", f"duplicate gate {gate.name!r}", gate.line)
+            seen_gates[gate.name] = gate.line
+        if len(self.program.policies) > 1:
+            self.error("E-DUP", "duplicate policy", self.program.policies[1].line)
+
+    def _check_effect_list(self, effects: list[tuple[str, str]], line: int, where: str) -> None:
+        seen: set[tuple[str, str]] = set()
+        for effect in effects:
+            kind, target = effect
+            if kind not in EFFECT_KINDS:
+                self.error("E-EFF", f"unknown effect kind {kind!r}", line)
+            if not target:
+                self.error("E-EFF", f"effect {kind} has no target", line)
+            if effect in seen:
+                self.error("E-DUP", f"duplicate effect {format_effect(effect)} in {where}", line)
+            seen.add(effect)
+
+    def _check_ai_policy(self) -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
+        external: set[tuple[str, str]] = set()
+        contract: set[tuple[str, str]] = set()
+        for policy in self.program.policies:
+            self._check_effect_list(policy.external, policy.line, "policy external")
+            self._check_effect_list(policy.payment, policy.line, "policy payment")
+            self._check_effect_list(policy.contract, policy.line, "policy contract")
+            for effect in policy.external:
+                if effect[0] not in ("emit", "net"):
+                    self.error(
+                        "E-POLICY",
+                        f"policy external accepts emit or net, got {format_effect(effect)}",
+                        policy.line,
+                    )
+            for effect in policy.payment:
+                if effect[0] != "spend":
+                    self.error(
+                        "E-POLICY",
+                        f"policy payment accepts spend, got {format_effect(effect)}",
+                        policy.line,
+                    )
+            for effect in policy.contract:
+                if effect[0] != "write":
+                    self.error(
+                        "E-POLICY",
+                        f"policy contract accepts write, got {format_effect(effect)}",
+                        policy.line,
+                    )
+            external |= set(policy.external)
+            contract |= set(policy.contract)
+        return external, contract
+
+    def _check_budget_pair(self, where: str, line: int, has_spend: bool, run: int, period: int) -> None:
+        if has_spend:
+            if run <= 0 or period <= 0:
+                self.error(
+                    "E-POLICY",
+                    f"{where}: spend effect needs a positive per-run and per-period budget",
+                    line,
+                )
+            elif run > period:
+                self.error(
+                    "E-POLICY",
+                    f"{where}: per-run spend exceeds the period budget ({run} <= {period} is false)",
+                    line,
+                )
+        elif run != 0 or period != 0:
+            self.error(
+                "E-POLICY",
+                f"{where}: spend budget is set but spend is not an allowed effect",
+                line,
+            )
+
+    def _check_rate_limit(self, agent: AgentDef, kind: str, limit: int) -> None:
+        has_kind = any(effect[0] == kind for effect in agent.allow)
+        if has_kind and limit <= 0:
+            self.error(
+                "E-POLICY",
+                f"agent {agent.name}: {kind} effect needs a positive hourly rate limit",
+                agent.line,
+            )
+        elif not has_kind and limit != 0:
+            self.error(
+                "E-POLICY",
+                f"agent {agent.name}: {kind} rate limit is set but {kind} is not an allowed effect",
+                agent.line,
+            )
+
+    def _check_agent_envelope(self, agent: AgentDef) -> None:
+        if not agent.allow_declared:
+            self.error("E-POLICY", f"agent {agent.name} requires an allow list", agent.line)
+        self._check_effect_list(agent.allow, agent.line, f"agent {agent.name}")
+        if agent.audit != "ast_hash":
+            self.error("E-POLICY", f"agent {agent.name}: audit ast_hash is required", agent.line)
+        has_spend = any(effect[0] == "spend" for effect in agent.allow)
+        self._check_budget_pair(
+            f"agent {agent.name}",
+            agent.line,
+            has_spend,
+            agent.budget_run,
+            agent.budget_period,
+        )
+        self._check_rate_limit(agent, "net", agent.limit_net)
+        self._check_rate_limit(agent, "emit", agent.limit_emit)
+
+    def _check_gate_decl(self, gate: GateDef, agents: dict[str, AgentDef]) -> None:
+        if not gate.approver:
+            self.error("E-POLICY", f"gate {gate.name} requires an approver", gate.line)
+        elif gate.approver in agents:
+            self.error(
+                "E-POLICY",
+                f"gate {gate.name}: approver {gate.approver!r} is an agent; approval must be a human role",
+                gate.line,
+            )
+        if not gate.before:
+            self.error("E-POLICY", f"gate {gate.name} requires before", gate.line)
+        self._check_effect_list(gate.before, gate.line, f"gate {gate.name}")
+        if gate.on_approved and gate.on_approved not in self.ops:
+            self.error("E-UNDEF", f"unknown operation {gate.on_approved!r}", gate.line)
+
+    def _needs_gate(self, effect: tuple[str, str], external: set[tuple[str, str]], contract: set[tuple[str, str]]) -> bool:
+        kind, _target = effect
+        if kind == "spend":
+            return True
+        if kind in ("emit", "net") and effect in external:
+            return True
+        if kind == "write" and effect in contract:
+            return True
+        return False
+
+    def _gate_gap_message(self, effect: tuple[str, str], external: set[tuple[str, str]]) -> str:
+        kind, _target = effect
+        shown = format_effect(effect)
+        if kind == "emit" and effect in external:
+            return f"emit to an external party has no approval gate ({shown})"
+        if kind == "net" and effect in external:
+            return f"net to an external party has no approval gate ({shown})"
+        if kind == "spend":
+            return f"spend has no approval gate ({shown})"
+        return f"a contract change has no approval gate ({shown})"
+
+    def _check_task_body(self, task: TaskDef) -> set[tuple[str, str]]:
+        env = {name: typ for name, typ in task.params}
+        for name, typ in task.params:
+            self.check_type_exists(typ, task.line, f"parameter {name}")
+        self.check_type_exists(task.ret, task.line, "return type")
+        inferred: set[tuple[str, str]] = set()
+        seen_return = False
+        for stmt in task.body:
+            if seen_return:
+                self.error(
+                    "E-FLOW",
+                    f"statement after return in task {task.name} is unreachable",
+                    stmt.line,
+                    fix="move this statement before the return, or remove it",
+                )
+                continue
+            if stmt.kind == "let":
+                typ = self.type_of(stmt.expr, env)
+                if stmt.name in env:
+                    self.error("E-DUP", f"variable {stmt.name!r} is already defined", stmt.line)
+                env[stmt.name] = typ
+                inferred |= self.effects_of_expr(stmt.expr)
+                for call in self.calls_in(stmt.expr):
+                    self.check_call_contracts(call, env)
+            elif stmt.kind == "return":
+                seen_return = True
+                typ = self.type_of(stmt.expr, env)
+                if typ != "Unknown" and not self.compatible(task.ret, typ):
+                    self.error("E-TYPE", f"return expects {task.ret}, got {typ}", stmt.line)
+                inferred |= self.effects_of_expr(stmt.expr)
+                for call in self.calls_in(stmt.expr):
+                    self.check_call_contracts(call, env)
+        if not seen_return:
+            self.error(
+                "E-FLOW",
+                f"task {task.name} must end with a return statement",
+                task.line,
+                fix=f"add a return statement that produces {task.ret}",
+            )
+        return inferred
+
+    def _check_task_key(self, task: TaskDef) -> None:
+        if not task.key_declared:
+            self.error("E-POLICY", f"task {task.name}: idempotency key is required", task.line)
+            return
+        params = {name: typ for name, typ in task.params}
+        if "." not in task.key:
+            if task.key not in params:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: idempotency key {task.key!r} is not a parameter or a field of a parameter",
+                    task.line,
+                )
+            return
+        base, field_name = task.key.split(".", 1)
+        if base not in params:
+            self.error(
+                "E-POLICY",
+                f"task {task.name}: idempotency key {task.key!r} is not a parameter or a field of a parameter",
+                task.line,
+            )
+            return
+        type_name = re.sub(r"<.*>", "", params[base]).strip()
+        owner = self.types.get(type_name)
+        if owner is None or field_name not in owner.fields:
+            self.error(
+                "E-FIELD",
+                f"type {type_name} has no field {field_name!r} for idempotency key {task.key!r}",
+                task.line,
+            )
+
+    def _check_task_trigger(self, task: TaskDef) -> None:
+        if not task.trigger_declared:
+            self.error("E-POLICY", f"task {task.name} requires a trigger", task.line)
+            return
+        if task.trigger_kind == "schedule":
+            if not cron_ok(task.trigger_value):
+                self.error(
+                    "E-POLICY",
+                    "task "
+                    + task.name
+                    + ": schedule must be a 5-field numeric cron; names such as MON are not accepted, got "
+                    + repr(task.trigger_value),
+                    task.line,
+                )
+        elif task.trigger_kind == "record":
+            self.check_type_exists(task.trigger_value, task.line, "record trigger")
+        elif task.trigger_kind == "webhook":
+            if _WEBHOOK_RE.fullmatch(task.trigger_value) is None:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: webhook must be a receiver name, got {task.trigger_value!r}",
+                    task.line,
+                )
+
+    def _check_task_budget(
+        self,
+        task: TaskDef,
+        agent: Optional[AgentDef],
+        has_spend: bool,
+    ) -> None:
+        if task.budget_run is None or task.budget_period is None:
+            return
+        self._check_budget_pair(
+            f"task {task.name}",
+            task.line,
+            has_spend,
+            task.budget_run,
+            task.budget_period,
+        )
+        if agent is None or not has_spend:
+            return
+        if task.budget_run > agent.budget_run:
+            self.error(
+                "E-POLICY",
+                f"task {task.name}: per-run spend exceeds the agent budget "
+                f"({task.budget_run} <= {agent.budget_run} is false)",
+                task.line,
+            )
+        if task.budget_period > agent.budget_period:
+            self.error(
+                "E-POLICY",
+                f"task {task.name}: period spend exceeds the agent budget "
+                f"({task.budget_period} <= {agent.budget_period} is false)",
+                task.line,
+            )
+
+    def _check_escalation(
+        self,
+        task: TaskDef,
+        agents: dict[str, AgentDef],
+        external: set[tuple[str, str]],
+        contract: set[tuple[str, str]],
+    ) -> None:
+        if not task.escalate:
+            return
+        target = task.escalate
+        if target in agents:
+            bad = [effect for effect in agents[target].allow if self._needs_gate(effect, external, contract)]
+            if bad:
+                listed = ", ".join(format_effect(effect) for effect in sorted(bad))
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: escalation path produces external effects ({listed})",
+                    task.line,
+                )
+            else:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: escalation target {target!r} is an agent; "
+                    "escalation goes to a human role and must not produce external effects",
+                    task.line,
+                )
+        op = self.ops.get(target)
+        if op is None:
+            return
+        bad = [effect for effect in op.effects if self._needs_gate(effect, external, contract)]
+        if bad:
+            listed = ", ".join(format_effect(effect) for effect in sorted(bad))
+            self.error(
+                "E-POLICY",
+                f"task {task.name}: escalation path produces external effects ({listed})",
+                task.line,
+            )
+
+    def _check_one_task(
+        self,
+        task: TaskDef,
+        agents: dict[str, AgentDef],
+        gates: dict[str, GateDef],
+        external: set[tuple[str, str]],
+        contract: set[tuple[str, str]],
+    ) -> None:
+        if not task.agent_declared:
+            self.error("E-POLICY", f"task {task.name} requires an agent", task.line)
+        elif task.agent not in agents:
+            self.error("E-UNDEF", f"unknown agent {task.agent!r}", task.line)
+        if not task.eff_declared:
+            self.error("E-POLICY", f"task {task.name} requires eff", task.line)
+        if not task.retry_declared:
+            self.error("E-POLICY", f"task {task.name} requires retry and escalate", task.line)
+        elif not 0 <= task.retry <= RETRY_MAX:
+            self.error(
+                "E-POLICY",
+                f"task {task.name}: retries must be from 0 through {RETRY_MAX}, got {task.retry}",
+                task.line,
+            )
+        self._check_task_trigger(task)
+        self._check_task_key(task)
+        self._check_effect_list(task.effects, task.line, f"task {task.name}")
+        inferred = self._check_task_body(task)
+        declared = set(task.effects)
+        if task.eff_declared and declared != inferred:
+            missing = inferred - declared
+            extra = declared - inferred
+            bits = []
+            if missing:
+                bits.append("missing " + ", ".join(format_effect(effect) for effect in sorted(missing)))
+            if extra:
+                bits.append("unused " + ", ".join(format_effect(effect) for effect in sorted(extra)))
+            fix = None
+            if inferred:
+                fix = "eff " + ", ".join(format_effect(effect) for effect in sorted(inferred))
+            self.error(
+                "E-EFF",
+                f"task {task.name} effects do not match implementation ({'; '.join(bits)})",
+                task.line,
+                fix,
+            )
+        agent = agents.get(task.agent)
+        effects = declared | inferred
+        if agent is not None:
+            outside = effects - set(agent.allow)
+            if outside:
+                listed = ", ".join(format_effect(effect) for effect in sorted(outside))
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: effect {listed} is outside agent {agent.name} allow",
+                    task.line,
+                    fix="allow " + ", ".join(format_effect(effect) for effect in sorted(set(agent.allow) | outside)),
+                )
+        has_spend = any(effect[0] == "spend" for effect in effects)
+        self._check_task_budget(task, agent, has_spend)
+        self._check_escalation(task, agents, external, contract)
+        self._check_task_gates(task, gates, effects, external, contract)
+
+    def _check_task_gates(
+        self,
+        task: TaskDef,
+        gates: dict[str, GateDef],
+        effects: set[tuple[str, str]],
+        external: set[tuple[str, str]],
+        contract: set[tuple[str, str]],
+    ) -> None:
+        required = [effect for effect in sorted(effects) if self._needs_gate(effect, external, contract)]
+        if not required:
+            if task.gates:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: approval is set but this task has no gated effect",
+                    task.line,
+                )
+            return
+        if not task.gates:
+            for effect in required:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: {self._gate_gap_message(effect, external)}",
+                    task.line,
+                )
+            return
+        covered: dict[tuple[str, str], str] = {}
+        for name in task.gates:
+            gate = gates.get(name)
+            if gate is None:
+                self.error("E-POLICY", f"task {task.name}: approval gate {name!r} is not declared", task.line)
+                continue
+            hits = [effect for effect in required if effect in set(gate.before)]
+            if not hits:
+                shown = ", ".join(format_effect(effect) for effect in gate.before) or "(none)"
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: approval gate {name!r} action {shown} is not one of the gated effects",
+                    task.line,
+                )
+                continue
+            for effect in hits:
+                if effect in covered:
+                    self.error(
+                        "E-POLICY",
+                        f"task {task.name}: approval gate action {format_effect(effect)} is named more than once",
+                        task.line,
+                    )
+                    continue
+                covered[effect] = name
+        for effect in required:
+            if effect not in covered:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: {self._gate_gap_message(effect, external)}",
+                    task.line,
+                )
+
 
 # ---------------------------------------------------------------------------
 # Canonical AST and hash
@@ -1122,7 +1888,7 @@ def _canonical_expr_list(exprs: list[Expr]) -> list[Expr]:
 
 
 def program_to_dict(p: Program) -> dict:
-    return {
+    data = {
         "types": [
             {"name": t.name, "opaque": t.opaque, "fields": dict(sorted(t.fields.items()))}
             for t in sorted(p.types, key=lambda x: x.name)
@@ -1157,11 +1923,98 @@ def program_to_dict(p: Program) -> dict:
             for f in sorted(p.flows, key=lambda x: x.name)
         ],
     }
+    # Omit empty automation lists so programs without agent/task keep their hash.
+    if p.agents:
+        data["agents"] = [_agent_to_dict(agent) for agent in sorted(p.agents, key=lambda item: item.name)]
+    if p.gates:
+        data["gates"] = [_gate_to_dict(gate) for gate in sorted(p.gates, key=lambda item: item.name)]
+    if p.policies:
+        data["policies"] = [_policy_to_dict(policy) for policy in p.policies]
+    if p.tasks:
+        data["tasks"] = [_task_to_dict(task) for task in sorted(p.tasks, key=lambda item: item.name)]
+    return data
+
+
+def _agent_to_dict(agent: AgentDef) -> dict:
+    return {
+        "name": agent.name,
+        "doc": agent.doc,
+        "allow": sorted(agent.allow),
+        "budget_run": agent.budget_run,
+        "budget_period": agent.budget_period,
+        "limit_net": agent.limit_net,
+        "limit_emit": agent.limit_emit,
+        "audit": agent.audit,
+        "timezone": PERIOD_TIMEZONE,
+    }
+
+
+def _gate_to_dict(gate: GateDef) -> dict:
+    return {
+        "name": gate.name,
+        "doc": gate.doc,
+        "approver": gate.approver,
+        "before": sorted(gate.before),
+        "on_approved": gate.on_approved,
+    }
+
+
+def _policy_to_dict(policy: PolicyDef) -> dict:
+    return {
+        "external": sorted(policy.external),
+        "payment": sorted(policy.payment),
+        "contract": sorted(policy.contract),
+    }
+
+
+def _task_to_dict(task: TaskDef) -> dict:
+    item: dict[str, Any] = {
+        "name": task.name,
+        "params": task.params,
+        "ret": task.ret,
+        "doc": task.doc,
+        "agent": task.agent,
+        "trigger": _trigger_to_dict(task),
+        "effects": sorted(task.effects),
+        "gates": sorted(task.gates),
+        "key": task.key,
+        "retry": task.retry,
+        "escalate": task.escalate,
+        "body": [
+            {"kind": stmt.kind, "name": stmt.name, "expr": expr_to_dict(stmt.expr)}
+            for stmt in task.body
+        ],
+    }
+    if task.budget_run is not None and task.budget_period is not None:
+        item["budget_run"] = task.budget_run
+        item["budget_period"] = task.budget_period
+    return item
+
+
+def _trigger_to_dict(task: TaskDef) -> dict:
+    if task.trigger_kind == "schedule":
+        return {"kind": "schedule", "cron": task.trigger_value, "timezone": PERIOD_TIMEZONE}
+    if task.trigger_kind == "record":
+        # New rows only. Updates do not start the task.
+        return {"kind": "record", "name": task.trigger_value, "on": "insert"}
+    if task.trigger_kind == "webhook":
+        # Receiver name only. Signatures are not part of this check.
+        return {"kind": "webhook", "name": task.trigger_value}
+    return {"kind": task.trigger_kind, "value": task.trigger_value}
+
+
+def canonical_json(p: Program) -> str:
+    return json.dumps(program_to_dict(p), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def ast_digest(p: Program) -> str:
+    """Full SHA-256 of the canonical AST. This is the audit identity."""
+    return hashlib.sha256(canonical_json(p).encode("utf-8")).hexdigest()
 
 
 def ast_hash(p: Program) -> str:
-    blob = json.dumps(program_to_dict(p), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
+    """12-hex display prefix of ast_digest. Existing callers keep this shape."""
+    return ast_digest(p)[:12]
 
 
 # ---------------------------------------------------------------------------
@@ -1193,11 +2046,23 @@ def main() -> None:
 
     checker = Checker(program, allow_net=args.allow_net, deny_net=args.deny_net)
     diags = checker.check()
+    plan = task_plan(program)
     if args.json:
-        print(json.dumps({"hash": ast_hash(program), "diagnostics": [d.as_dict() for d in diags]}, ensure_ascii=False, indent=2))
+        payload: dict[str, Any] = {
+            "hash": ast_hash(program),
+            "diagnostics": [d.as_dict() for d in diags],
+        }
+        if plan:
+            payload["audit_id"] = ast_digest(program)
+            payload["plan"] = plan
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"PROUT check: {args.file}")
         print(f"AST hash: {ast_hash(program)}")
+        if plan:
+            print()
+            for line in plan:
+                print(line)
         if not diags:
             print("OK — no issues")
         for d in diags:
@@ -1206,6 +2071,58 @@ def main() -> None:
         warnings = sum(1 for d in diags if d.severity == "warning")
         print(f"\n{errors} error(s), {warnings} warning(s)")
     sys.exit(1 if any(d.severity == "error" for d in diags) else 0)
+
+
+def task_plan(program: Program) -> list[str]:
+    """Readable summary of each task. Empty when the program declares none."""
+    if not program.tasks:
+        return []
+    agents = {agent.name: agent for agent in program.agents}
+    gates = {gate.name: gate for gate in program.gates}
+    lines = [f"{len(program.tasks)} task(s):"]
+    for task in program.tasks:
+        title = task.doc or task.name
+        lines.append(f"  {task.name} — {title}")
+        lines.append(f"    agent: {task.agent or '?'}")
+        lines.append(f"    trigger: {_format_trigger(task)}")
+        if task.effects:
+            lines.append("    effects: " + ", ".join(format_effect(effect) for effect in task.effects))
+        else:
+            lines.append("    effects: (none)")
+        if task.gates:
+            for name in task.gates:
+                gate = gates.get(name)
+                if gate is None:
+                    lines.append(f"    gate: {name} (not declared)")
+                    continue
+                before = ", ".join(format_effect(effect) for effect in gate.before) or "(none)"
+                hook = f", on_approved {gate.on_approved}" if gate.on_approved else ""
+                lines.append(f"    gate: {name}, approver {gate.approver or '?'}, before {before}{hook}")
+        else:
+            lines.append("    gate: none")
+        lines.append(f"    retry: {task.retry}, escalate {task.escalate or '?'}")
+        lines.append(f"    key: {task.key or '?'}")
+        if task.budget_run is not None and task.budget_period is not None:
+            lines.append(f"    budget: run {task.budget_run} / period {task.budget_period} yen")
+        else:
+            agent = agents.get(task.agent)
+            if agent is not None:
+                lines.append(f"    budget: agent run {agent.budget_run} / period {agent.budget_period} yen")
+        agent = agents.get(task.agent)
+        if agent is not None:
+            lines.append(f"    limits: net {agent.limit_net}/hour, emit {agent.limit_emit}/hour")
+    lines.append(f"audit id: {ast_digest(program)} (display {ast_hash(program)})")
+    return lines
+
+
+def _format_trigger(task: TaskDef) -> str:
+    if task.trigger_kind == "schedule":
+        return f'schedule "{task.trigger_value}" ({PERIOD_TIMEZONE})'
+    if task.trigger_kind == "record":
+        return f"record {task.trigger_value} on insert"
+    if task.trigger_kind == "webhook":
+        return f'webhook "{task.trigger_value}"'
+    return "(none)"
 
 
 if __name__ == "__main__":

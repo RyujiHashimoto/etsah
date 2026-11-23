@@ -10,6 +10,7 @@ cd prout-lang
 
 # 契約言語の検証
 python3 prout.py check examples/refund_fixed.prout
+python3 prout.py check examples/ai_tasks.prout
 python3 render.py
 
 # 単体テスト（標準ライブラリの unittest。追加の依存はない）

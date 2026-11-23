@@ -231,7 +231,13 @@ python3 proutc.py find "勤怠"
 
 `ai_task` は、定期実行・新しい行・webhook のどれで起動するかを宣言し、AIが使ってよい効果、`spend` の1回と期間の上限、`net` と `emit` の時間あたり回数、再試行とエスカレーション、冪等キー、監査（`audit: ast_hash`）をスロットに持つ。`approval_gate` は、社外への `emit` と `net`、支払いの `spend`、契約の変更を、人が承認するまで止める。ゲートの無い社外への `emit` は `E-POLICY` になる。
 
-契約層の `agent` / `task` 構文は提案である。`prout.py` は変更していない。設計、未実装、オーナーの判断が要る箇所は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
+契約層も同じ境界を `agent` と `task` で検査する。手順は既存の op を呼ぶ。社外への `emit` と `net`、`spend`、契約の変更にゲートが無いと `E-POLICY` になる。`check` は各タスクの起動、効果、ゲート、再試行を文章で出す。cron の実行、予算の残数、冪等ストアはまだ無い。
+
+```sh
+python3 prout.py check examples/ai_tasks.prout
+```
+
+設計と、採用した初期値は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
 
 ```sh
 cd patterns

@@ -68,6 +68,66 @@ flow handle_refund(order_id: Id) -> Receipt
 
 フローは `return` で終わらなければならない。`return` がないフローはエラー（E-FLOW）であり、`return` の後ろに書かれた文も到達不能としてエラーになる。
 
+### エージェントとタスク
+
+AIに任せる仕事は、`agent`（持ってよい効果の封筒）と `task`（その中の一つの仕事）の二段で書く。`gate` は人が許可するまで外部効果を止め、`policy` はどの効果が社外か、支払いか、契約の変更かを名指しする。インデントはほかの宣言と同じくスペース2つ。予算の数値は整数円である。
+
+```
+agent staffing_mail
+  doc "承認済みの文面だけを社外へ送る"
+  allow read(timesheets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+policy
+  external emit(mail), net(stripe)
+  payment spend(payroll)
+  contract write(contracts)
+
+gate remind_client
+  doc "督促メールはコーディネーターの承認後だけ送る"
+  approver coordinator
+  before emit(mail)
+  on_approved mail.send
+
+task remind_timesheet(period: Id) -> Bool
+  agent staffing_mail
+  doc "未提出の勤怠について、承認された督促だけを送る"
+  trigger schedule "0 9 * * 1"
+  eff read(timesheets), emit(mail)
+  gate remind_client
+  key period
+  retry 2 escalate coordinator
+  let sheet = timesheets.open(period)
+  let sent = mail.send(sheet)
+  return sent
+```
+
+起動は三種類である。
+
+- `trigger schedule "0 9 * * 1"` は分・時・日・月・曜の5欄。`*`、`a-b`、`*/n`、カンマ区切りを受け、`MON` のような名前は受けない。
+- `trigger record Invoice` は、その型の新しい行だけである。更新では起動しない。
+- `trigger webhook "inbound/inquiry"` は受け口の名前だけを見る。署名は検査しない。
+
+期間の境界は `Asia/Tokyo` である。タスクごとに変える構文は無い。
+
+静的な規則は次である。cron は動かさない。予算の残数も、同じキーの再実行を畳むストアも持たない。
+
+1. `task` の `eff` は、呼んだ op の効果の和集合と一致する（E-EFF）。和集合は、その `agent` の `allow` の部分集合でなければならない。はみ出した効果は E-POLICY。
+2. `policy external` に入る `emit` または `net`、すべての `spend`、`policy contract` の `write` は、`before` がその効果を挙げた `gate` が無いと E-POLICY。社内への `emit`（`policy external` に無いもの）はゲート無しで通す。全社 Slack のような通知を社外にするかは、`policy external` にその宛先を書くかどうかで決める。
+3. `spend` を許す agent は、`budget run` と `budget period` が 1 以上の整数円で、1回は期間以下である。許さない agent の予算は 0 である。タスクが自分の `budget` を書くときも同じで、agent の予算を超えてはならない。
+4. `limit emit` と `limit net` は、その効果を許すとき 1 以上、許さないとき 0 である。単位は1時間である。
+5. `retry` は 0 以上 5 以下。尽きたあとは `escalate` の人のロールへ渡す。その引き渡しは agent の `allow` に入れない。エスカレーションが op や agent を指し、その効果が上のゲート対象なら E-POLICY である。
+6. `key` は引数か、引数のフィールドである。冪等の同一性は agent、task、key であり、プログラムのハッシュが変わっても外部効果をやり直す意味は持たせない。ストア自体はまだ無い。
+7. `audit ast_hash` は agent に必須である。監査の同一性は正規化 AST の SHA-256 全64桁（`ast_digest`）である。表示と既存の `ast_hash` は、その先頭12桁のままである。
+8. 承認者は人のロールである。`approver` に agent の名前は書けない。`on_approved` が外部効果の唯一の呼び出しであることまでは、この検査は見ない。
+
+`net` の宛先が許可リスト（既定は `stripe`）に入っているかは、これまでどおり op のポリシー検査が止める。`policy external` は、その宛先にゲートが要るかである。
+
+`check` は、タスクがあるとき、起動、効果、ゲート、再試行、キー、予算を文章で出す。
+
 ### 式
 
 - 変数、フィールドアクセス（`order.total`）、関数呼び出し（`refund(order, amount)`）
@@ -96,10 +156,10 @@ flow handle_refund(order_id: Id) -> Receipt
 
 1. **構文解析** — 行指向の文法。インデントは2スペース固定。
 2. **型検査** — 引数、戻り値、フィールド、演算の型を検査。
-3. **効果検査** — opの宣言効果と実装が行う効果を比較。フローは呼び出しの和集合と宣言を比較。
+3. **効果検査** — opの宣言効果と実装が行う効果を比較。フローとタスクは呼び出しの和集合と宣言を比較する。
 4. **契約検査** — 呼び出し地点で事前条件を実引数に代入し、線形算術と等価性で判定。真なら通過、偽ならエラー、不明なら実行時ガード。
-5. **ポリシー検査** — 許可されたネットワーク先・効果種別のみを許可。
-6. **正規化** — ASTをソート済みJSONに変換し、SHA-256ハッシュを付与。型・op・flow・フィールド・効果に加え、pre/postの連言も式の正規化キーでソートする。引数や文の順序は意味を持つためソートしない。
+5. **ポリシー検査** — 許可されたネットワーク先・効果種別のみを許可する。AIタスクは、封筒、ゲート、整数円の予算、時間あたり回数、再試行もここで止める。
+6. **正規化** — ASTをソート済みJSONに変換し、SHA-256ハッシュを付与。型・op・flow・フィールド・効果に加え、pre/postの連言も式の正規化キーでソートする。agent、task、gate、policy があるときだけ、その節もハッシュに入る。無いプログラムのハッシュは変えない。引数や文の順序は意味を持つためソートしない。
 
 ## 人間向けビュー
 
@@ -116,10 +176,10 @@ flow handle_refund(order_id: Id) -> Receipt
 
 ## 試作の範囲
 
-- パーサー、型検査、効果検査、事前条件検査、ポリシー検査、HTMLレンダラー。
+- パーサー、型検査、効果検査、事前条件検査、ポリシー検査、HTMLレンダラー。AIタスクの静的検査（封筒、ゲート、整数円の予算、回数、再試行、冪等キーの形）。
 - 線形算術の事前条件のみ。文字列やコレクションの契約は実行時ガード扱い。十進数と暦日の差も、定数まで落ちるものだけを証明する。
 - 実装の意味論は検証しない。`impl` は宣言として扱う。
-- 並行性、時刻、リソース消費の証明は対象外。暦日（`Date`）は対象であり、時刻ではない。
+- 並行性、時刻、リソース消費の証明は対象外。暦日（`Date`）は対象であり、時刻ではない。cron の実行、予算の残数、冪等ストアは対象外である。
 
 これは言語の完全な実装ではなく、「AIが生成し、AIが検証し、人間がGUIで見る」というループが成立するかの試作である。
 

@@ -2,7 +2,7 @@
 
 橋元龍二（J-PROUT）からの依頼は、AIに任せる作業を安全に宣言する機能を考案することである。J-PROUTの事業は、再生PCのレンタルと販売、ZPOOLのクラウド運用支援、AI導入とDXの支援である。人材派遣の基幹（`docs/staffing.md`）で繰り返す定型作業も、同じ境界で扱う。
 
-この文書は設計提案である。契約層の `prout.py` は変更していない。検証器は別途編集中で、別ブランチが日付と小数をそこに足している。動く検査はパターン層に置いた。**要決定** と書いた箇所は、実装の前提にしていない。
+この文書は設計提案である。契約層の静的検査（`agent`、`task`、`gate`、`policy`）は `prout.py` に入った。日付と小数は、そのブランチの字句を同じ検証器で使っている。パターン層の検査はそのまま残る。cron の実行、予算の残数、冪等ストアはまだ無い。**要決定** と書いた箇所は、本文が勧める初期値で入れた。判断の一覧はプルリクエストに残す。
 
 ## 今の言語で既に守れること
 
@@ -35,7 +35,7 @@
 
 ## 契約層への提案
 
-ここは未実装である。`task` で始まる宣言は、今のパーサーが `unknown declaration` で落とす。テスト `test_contract_layer_rejects_task_declarations` がその境界を固定している。字句、型、線形算術には手を入れない。
+契約層は下の形を受け、静的に検査する。字句、型、線形算術には手を入れていない。知らない宣言は、これまでどおり `unknown declaration` で落ちる。
 
 形は、今の `op` と `flow` に揃える。トップレベルは桁0、本体はスペース2つ、文字列は引用符、効果は `kind(target)` の列である。
 
@@ -272,9 +272,9 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 
 ランタイムは無い。cron は動かない。メールは送らない。予算のカウンタも無い。ハッシュも計算しない。
 
-### Phase 2（契約層。`prout.py` はオーナーの編集と、日付・小数のブランチのあとに足す）
+### Phase 2（契約層の静的検査。日付・小数のあとに足した）
 
-`agent`、`task`、`gate`、`policy` をパーサーと検証器に入れる。`task` の効果は op の和集合かつ `allow` の部分集合。外部 op はゲートの `on_approved` からしか呼べない。監査行の列に `ast_hash` の値を載せる。`demo.html` でゲートの承認前と承認後をボタンで見る、はここでもまだ **要決定**。
+`agent`、`task`、`gate`、`policy` をパーサーと検証器に入れた。`task` の効果は op の和集合かつ `allow` の部分集合である。外部 op をゲートの `on_approved` からしか呼べないことまでは見ていない。監査行を実行のたびに追記するストアもまだ無い。表示用ハッシュは先頭12桁、監査の同一性は SHA-256 の64桁である。`demo.html` でゲートの承認前と承認後をボタンで見る、はまだ **要決定** のまま、ボタンは出していない。
 
 ### Phase 3（実行）
 
@@ -289,7 +289,7 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 - `patterns/examples/ai_desk.prout` はエラー 0。仕様 85 行、生成見積もり 1,100 行、展開 12.9 倍。
 - 壊した仕様は上の 3 件の `E-POLICY` だけで失敗する。
 - `find "申請 承認"` の先頭は従来どおり `approval`、score 15。`自動化` は `ai_task`、`承認ゲート` は `approval_gate` を返す。
-- `python3 prout.py check examples/staffing.prout` と `examples/refund_fixed.prout` は、この変更の前と同じ結果である。`task` 宣言は契約層が拒否する。
+- `python3 prout.py check examples/staffing.prout` と `examples/refund_fixed.prout` は、パターンを足した時点ではこの変更の前と同じ結果だった。その後の契約層は `task` を受け、`examples/ai_tasks.prout` をエラー 0 で検査する。
 
 ## オーナーへの質問
 

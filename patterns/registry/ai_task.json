@@ -183,7 +183,7 @@
   ],
   "examples": ["examples/ai_automation.prout", "examples/ai_desk.prout"],
   "notes": [
-    "パターン層はスロットを検査する。契約層の task 構文は提案であり、prout.py は変更していない。",
+    "パターン層はスロットを検査する。契約層の agent / task は prout.py が別途検査する。このコンパイラは prout.py を読まない。",
     "audit が ast_hash であることは必須にする。ハッシュの計算は契約層の ast_hash の仕事で、このコンパイラは呼ばない。",
     "steps は op の呼び出しではない。custom か適用済みパターンの名前である。",
     "予算と回数の数値は宣言である。実行時のカウンタはまだ無い。",
