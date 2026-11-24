@@ -48,6 +48,18 @@ jobs:
           grep -q "2029-04-02 <= 2029-04-01" /tmp/staffing-dates.txt
           grep -q "false == true" /tmp/staffing-dates.txt
 
+      - name: Information flow
+        run: |
+          python3 prout.py check examples/information_flow_safe.prout \
+            --allow-net email --allow-net analytics
+          if python3 prout.py check examples/information_flow_leak.prout \
+            --allow-net email --allow-net analytics > /tmp/iflow-leak.txt 2>&1; then
+            echo "leaking example unexpectedly passed"
+            exit 1
+          fi
+          grep -q "E-IFLOW-ARG" /tmp/iflow-leak.txt
+          grep -q "track_event" /tmp/iflow-leak.txt
+
       - name: Pattern registry
         working-directory: patterns
         run: |

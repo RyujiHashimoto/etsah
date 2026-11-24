@@ -915,6 +915,22 @@ op save_customer(customer: Customer) -> Id
 
 ## 11. 実装計画
 
+### 11.0 実装状況（2026年11月）
+
+v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。既存146件と合わせて189件。`examples/information_flow_safe.prout` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.prout` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.prout` のハッシュは `bae8501e8b3f` のまま変わらない。
+
+| 項目 | 状態 |
+|---|---|
+| `TypeRef` とラベル集合 | 実装済み |
+| AST（`LabelDef`、`SinkRule`、`DeclassifyRule`、`PolicyDef`、`sends`） | 実装済み |
+| パーサー（`label`、`policy`、`sends`、`@label`、`declassify`） | 実装済み |
+| 式のラベル推論と引数・戻り値・契約の検査 | 実装済み |
+| sink 解決と `sends` の必須条件 | 実装済み |
+| `declassify` とポリシー検査 | 実装済み |
+| AST ハッシュの後方互換 | 実装済み |
+| サンプル2件と CI | 実装済み |
+| `SPEC.md` / `README.md` | 実装済み |
+
 ### 11.1 v0.1（契約層の静的検査）
 
 1. **型表現** — `class TypeRef(str)` を追加し、文字列としての基底型と `labels: frozenset[str]` を両立する。既存の `compatible` は基底型で比較する。`TypeRef` の `==` は基底型だけを比べるため、ラベルの比較には必ず `.labels` を使う。文字列操作（`re.sub` など）は `TypeRef` を通常の `str` に落としてラベルを失うため、型を組み立てる箇所では必ず `TypeRef` を作り直す。
@@ -983,7 +999,7 @@ op save_customer(customer: Customer) -> Id
 | ラベル順序非依存 | `test_label_order_irrelevant` | 同一ハッシュ |
 | ポリシー順序非依存 | `test_policy_order_irrelevant` | 同一ハッシュ |
 | ラベル未使用の高速パス | `test_no_labels_skips_information_flow` | OK |
-| 既存テスト | `tests/` 全体 | 133件成功 |
+| 既存テスト | `tests/` 全体 | 189件成功 |
 
 ### 11.5 受け入れ条件
 
@@ -1015,4 +1031,4 @@ op save_customer(customer: Customer) -> Id
 5. **`policy` と CLI の `--allow-net` の統合** — 現在は別系統。`policy` に `allow net(...)` を追加して一本化するか、デプロイ設定とデータポリシーを分けたままにするか。
 6. **パターンの `data_policy` を必須にするか** — 現在は任意で、ない場合は public のみ。ラベル付きデータを扱うパターンには必須にした方がよいか。
 
-回答が得られたら、v0.1 の実装に入る。
+1〜5 は v0.1 の実装で今の挙動（`@public` は `E-LABEL`、レコードの `declassify` は `E-DECLASS`、wildcard reject は上書き不可、ラベル名は小文字のみ）を採用した。6 の `data_policy` は v0.2 でパターン層に入れる。`policy` と `--allow-net` の統合は未決のままで、現在は「データのラベル」と「ネットワーク先の許可」を別々に検査している。
