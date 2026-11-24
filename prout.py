@@ -13,7 +13,9 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Optional, Union
 
 
 # ---------------------------------------------------------------------------
@@ -127,9 +129,14 @@ class Program:
 # Expression lexer and parser
 # ---------------------------------------------------------------------------
 
+# DATE and DECIMAL are tried before NUMBER so `2026-11-23` and `1800.50`
+# are single tokens. A spaced `2026 - 11 - 23` stays subtraction: the
+# hyphens are separated by whitespace, which DATE does not cross.
 TOKEN_RE = re.compile(
     r"""
     (?P<WS>\s+)
+  | (?P<DATE>\d{4}-\d{2}-\d{2})
+  | (?P<DECIMAL>\d+\.\d+)
   | (?P<NUMBER>\d+)
   | (?P<STRING>"(?:\\.|[^"\\])*")
   | (?P<IDENT>[A-Za-z_][A-Za-z0-9_.]*)
@@ -137,6 +144,17 @@ TOKEN_RE = re.compile(
 """,
     re.VERBOSE,
 )
+
+
+def parse_iso_date(value: str) -> Optional[date]:
+    """Zero-padded Gregorian date, or None when the calendar day does not exist."""
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    if parsed.isoformat() != value:
+        return None
+    return parsed
 
 
 def tokenize(s: str, line: int) -> list[tuple[str, str, int]]:
@@ -232,6 +250,15 @@ class ExprParser:
 
     def parse_primary(self) -> Expr:
         kind, value, line = self.peek()
+        if kind == "DATE":
+            self.advance()
+            parsed = parse_iso_date(value)
+            if parsed is None:
+                raise ProutError(f"invalid date {value}", line)
+            return Expr("lit", line=line, name="date", value=parsed)
+        if kind == "DECIMAL":
+            self.advance()
+            return Expr("lit", line=line, name="dec", value=Decimal(value))
         if kind == "NUMBER":
             self.advance()
             return Expr("lit", line=line, name="int", value=int(value))
@@ -549,27 +576,40 @@ def fmt_expr(e: Optional[Expr]) -> str:
     return "?"
 
 
-def add_coeffs(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+Number = Union[int, Decimal]
+
+
+def add_coeffs(a: dict[str, Number], b: dict[str, Number]) -> dict[str, Number]:
     out = dict(a)
     for k, v in b.items():
         out[k] = out.get(k, 0) + v
     return out
 
 
-def neg_coeffs(a: dict[str, int]) -> dict[str, int]:
+def neg_coeffs(a: dict[str, Number]) -> dict[str, Number]:
     return {k: -v for k, v in a.items()}
 
 
-def scale_coeffs(a: dict[str, int], k: int) -> dict[str, int]:
+def scale_coeffs(a: dict[str, Number], k: Number) -> dict[str, Number]:
     return {key: v * k for key, v in a.items()}
 
 
-def linear(e: Optional[Expr]) -> Optional[tuple[dict[str, int], int]]:
-    """Return (coefficients over atomic expressions, constant), or None."""
+def linear(e: Optional[Expr]) -> Optional[tuple[dict[str, Number], Number]]:
+    """Return (coefficients over atomic expressions, constant), or None.
+
+    Integers stay ints. Decimal literals use decimal.Decimal. A date literal
+    is its Gregorian ordinal so that date +/- days and date - date are affine;
+    the ordinal origin cancels in any well-typed comparison. Division is not
+    affine and stays unknown, including decimal division.
+    """
     if e is None:
         return None
     if e.kind == "lit" and e.name == "int":
         return ({}, int(e.value))
+    if e.kind == "lit" and e.name == "dec":
+        return ({}, e.value if isinstance(e.value, Decimal) else Decimal(str(e.value)))
+    if e.kind == "lit" and e.name == "date":
+        return ({}, e.value.toordinal())
     if e.kind in ("var", "field"):
         return ({expr_key(e): 1}, 0)
     if e.kind == "bin":
@@ -596,6 +636,22 @@ def linear(e: Optional[Expr]) -> Optional[tuple[dict[str, int], int]]:
                 return (scale_coeffs(l[0], r[1]), l[1] * r[1])
             return None
     return None
+
+
+def affine_difference(left: Optional[Expr], right: Optional[Expr]) -> Optional[Number]:
+    """Constant value of left - right when both sides are affine, else None.
+
+    None means the checker cannot decide. Callers must report that, not treat
+    it as success.
+    """
+    l = linear(left)
+    r = linear(right)
+    if l is None or r is None:
+        return None
+    coeffs = add_coeffs(l[0], neg_coeffs(r[0]))
+    if any(v != 0 for v in coeffs.values()):
+        return None
+    return l[1] - r[1]
 
 
 def evaluate(e: Optional[Expr]) -> Optional[bool]:
@@ -637,16 +693,14 @@ def evaluate(e: Optional[Expr]) -> Optional[bool]:
                 return eq if op == "==" else not eq
             if l is not None and r is not None and expr_key(l) == expr_key(r):
                 return op == "=="
-            return None
-        if op in ("<", "<=", ">", ">="):
-            l = linear(e.left)
-            r = linear(e.right)
-            if l is None or r is None:
+            const = affine_difference(l, r)
+            if const is None:
                 return None
-            coeffs = add_coeffs(l[0], neg_coeffs(r[0]))
-            coeffs = {k: v for k, v in coeffs.items() if v != 0}
-            const = l[1] - r[1]
-            if coeffs:
+            eq = const == 0
+            return eq if op == "==" else not eq
+        if op in ("<", "<=", ">", ">="):
+            const = affine_difference(e.left, e.right)
+            if const is None:
                 return None
             if op == "<=":
                 return const <= 0
@@ -679,7 +733,7 @@ def subst(e: Optional[Expr], mapping: dict[str, Expr]) -> Optional[Expr]:
 # Checker
 # ---------------------------------------------------------------------------
 
-BUILTIN_TYPES = {"Int", "String", "Bool"}
+BUILTIN_TYPES = {"Int", "String", "Bool", "Date", "Decimal"}
 EFFECT_KINDS = {"read", "write", "net", "spend", "emit"}
 
 
@@ -747,7 +801,7 @@ class Checker:
         if e is None:
             return "Unknown"
         if e.kind == "lit":
-            return {"int": "Int", "str": "String", "bool": "Bool"}.get(e.name, "Unknown")
+            return {"int": "Int", "str": "String", "bool": "Bool", "date": "Date", "dec": "Decimal"}.get(e.name, "Unknown")
         if e.kind == "var":
             if e.name in env:
                 return env[e.name]
@@ -797,7 +851,11 @@ class Checker:
                 lt = self.type_of(e.left, env)
                 rt = self.type_of(e.right, env)
                 if lt != "Unknown" and rt != "Unknown":
-                    orderable = {lt, rt} <= {"Int", "Money"} or (lt == rt and lt in ("Int", "Money", "String"))
+                    orderable = (
+                        {lt, rt} <= {"Int", "Money"}
+                        or {lt, rt} <= {"Int", "Decimal"}
+                        or (lt == rt and lt in ("Int", "Money", "String", "Date", "Decimal"))
+                    )
                     if not orderable:
                         self.error("E-TYPE", f"cannot compare {lt} and {rt} with {op}", e.line)
                 return "Bool"
@@ -810,19 +868,32 @@ class Checker:
             if op == "+":
                 if lt == "Unknown" or rt == "Unknown":
                     return "Unknown"
+                if lt == "Date" and rt == "Date":
+                    self.error("E-TYPE", "cannot add Date and Date", e.line)
+                    return "Unknown"
+                if (lt == "Date" and rt == "Int") or (lt == "Int" and rt == "Date"):
+                    return "Date"
                 if lt == rt:
                     return lt
                 if {lt, rt} == {"Money", "Int"}:
                     return "Money"
+                if {lt, rt} <= {"Int", "Decimal"}:
+                    return "Decimal"
                 self.error("E-TYPE", f"cannot add {lt} and {rt}", e.line)
                 return "Unknown"
             if op == "-":
                 if lt == "Unknown" or rt == "Unknown":
                     return "Unknown"
+                if lt == "Date" and rt == "Date":
+                    return "Int"
+                if lt == "Date" and rt == "Int":
+                    return "Date"
                 if lt == "Money" and rt in ("Money", "Int"):
                     return "Money"
                 if lt == "Int" and rt == "Int":
                     return "Int"
+                if {lt, rt} <= {"Int", "Decimal"}:
+                    return "Decimal"
                 self.error("E-TYPE", f"cannot subtract {rt} from {lt}", e.line)
                 return "Unknown"
             if op == "*":
@@ -830,6 +901,8 @@ class Checker:
                     return "Unknown"
                 if lt == "Int" and rt == "Int":
                     return "Int"
+                if {lt, rt} <= {"Int", "Decimal"}:
+                    return "Decimal"
                 if {lt, rt} == {"Money", "Int"}:
                     return "Money"
                 self.error("E-TYPE", f"cannot multiply {lt} and {rt}", e.line)
@@ -839,6 +912,8 @@ class Checker:
                     return "Unknown"
                 if lt == "Int" and rt == "Int":
                     return "Int"
+                if {lt, rt} <= {"Int", "Decimal"}:
+                    return "Decimal"
                 if lt == "Money" and rt == "Int":
                     return "Money"
                 self.error("E-TYPE", f"cannot divide {lt} by {rt}", e.line)
@@ -848,6 +923,8 @@ class Checker:
     @staticmethod
     def compatible(expected: str, actual: str) -> bool:
         if expected == actual:
+            return True
+        if {expected, actual} <= {"Int", "Decimal"}:
             return True
         if expected == "Status" and actual == "String":
             return True
@@ -1010,7 +1087,12 @@ def expr_to_dict(e: Optional[Expr]) -> Optional[dict]:
     d: dict[str, Any] = {"kind": e.kind}
     if e.kind == "lit":
         d["type"] = e.name
-        d["value"] = e.value
+        if e.name == "date":
+            d["value"] = e.value.isoformat()
+        elif e.name == "dec":
+            d["value"] = format(e.value, "f")
+        else:
+            d["value"] = e.value
     elif e.kind == "var":
         d["name"] = e.name
     elif e.kind == "field":
