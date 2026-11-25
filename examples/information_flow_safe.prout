@@ -1,0 +1,52 @@
+# Information flow, safe version: PII only reaches sinks that accept it.
+#
+#   python3 prout.py check examples/information_flow_safe.prout \
+#     --allow-net email --allow-net analytics
+#
+# Expected: 0 errors, 1 warning (W-DECLASS on the masked e-mail address).
+
+label pii
+label secret
+
+type Id
+type Customer {
+  id: Id
+  email: String @pii
+  internal_note: String @secret
+}
+
+policy
+  sink net(email) accepts pii
+  sink net(analytics) accepts pii
+  sink net(*) rejects secret
+  declassify pii in masked_tracking require role support
+
+op customers.get(id: Id) -> Customer
+  doc "顧客を一件取得する"
+  eff read(customers)
+  impl native
+
+op send_receipt(to: String @pii) -> Bool
+  doc "領収書をメールで送る"
+  eff net(email)
+  sends to -> net(email)
+  impl native
+
+op track_event(event: String) -> Bool
+  doc "分析イベントを送る"
+  eff net(analytics)
+  sends event -> net(analytics)
+  impl native
+
+flow email_receipt(id: Id) -> Bool
+  doc "顧客のメールアドレスに領収書を送る"
+  eff read(customers), net(email)
+  let c = customers.get(id)
+  return send_receipt(c.email)
+
+flow masked_tracking(id: Id) -> Bool
+  doc "メールアドレスをマスクしてから分析に送る"
+  eff read(customers), net(analytics)
+  let c = customers.get(id)
+  let masked = declassify(c.email, pii, "分析用にドメインだけ残す")
+  return track_event(masked)

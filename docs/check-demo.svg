@@ -21,7 +21,7 @@
 <text x="100" y="73" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">prout check  exit 1</text>
 <text x="48" y="112" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 prout.py check examples/agents/support_reply_broken.prout</text>
 <text x="48" y="130" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">PROUT check: examples/agents/support_reply_broken.prout</text>
-<text x="48" y="148" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: aac197ba927a</text>
+<text x="48" y="148" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: 2bce93ed6e30</text>
 <text x="48" y="166" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>
 <text x="48" y="184" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">1 task(s):</text>
 <text x="48" y="202" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">  draft_reply — Read a ticket and email the customer without a gate</text>
@@ -33,7 +33,7 @@
 <text x="48" y="310" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    key: ticket_id</text>
 <text x="48" y="328" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    budget: agent run 0 / period 0 yen</text>
 <text x="48" y="346" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    limits: net 0/hour, emit 20/hour</text>
-<text x="48" y="364" fill="#a3988c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">audit id: aac197ba927ad6bfa2d809984481ae6484aaa6e86edcf1a2315e18ccda823dc2 (display aac197ba927a)</text>
+<text x="48" y="364" fill="#a3988c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">audit id: 2bce93ed6e301c4a58e7d8620250d516ae97be3187005af710a1fb844db556d9 (display 2bce93ed6e30)</text>
 <rect class="hl-bad" x="40" y="369" width="1000" height="18" rx="3" fill="#5c2a24"/>
 <text x="48" y="382" fill="#ffb4a8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">[ERROR] E-POLICY (line 35): task draft_reply: emit to an external party has no approval gate (emit(mail))</text>
 <text x="48" y="400" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>
@@ -48,7 +48,7 @@
 <text x="100" y="511" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">prout check  exit 0</text>
 <text x="48" y="550" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 prout.py check examples/agents/support_reply.prout</text>
 <text x="48" y="568" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">PROUT check: examples/agents/support_reply.prout</text>
-<text x="48" y="586" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: 1968e5eb3c78</text>
+<text x="48" y="586" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: 270d77fe2df0</text>
 <text x="48" y="604" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>
 <text x="48" y="622" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">1 task(s):</text>
 <text x="48" y="640" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">  draft_reply — Read a ticket and send the reply through the approval gate</text>
@@ -60,7 +60,7 @@
 <text x="48" y="748" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    key: ticket_id</text>
 <text x="48" y="766" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    budget: agent run 0 / period 0 yen</text>
 <text x="48" y="784" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">    limits: net 0/hour, emit 20/hour</text>
-<text x="48" y="802" fill="#a3988c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">audit id: 1968e5eb3c7881099db0a62c23a448ef458529e2fe60fad843e48d6ed27034ee (display 1968e5eb3c78)</text>
+<text x="48" y="802" fill="#a3988c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">audit id: 270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0 (display 270d77fe2df0)</text>
 <rect class="hl-ok" x="40" y="807" width="1000" height="18" rx="3" fill="#1e4630"/>
 <text x="48" y="820" fill="#b7e3ad" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">OK — no issues</text>
 <text x="48" y="838" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>

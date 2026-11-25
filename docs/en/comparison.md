@@ -33,6 +33,6 @@ A wrapper is still the right place to allow or deny a real call at the moment it
 - It does not count remaining budget. A budget in the source is a declared ceiling.
 - It does not prove that the native implementation performs only the effects on the `eff` line.
 - It does not treat an MCP hint as permission. A missing hint adds no effect. A guessed effect is a `review` comment, and comments do not change the check.
-- Information-flow labels (`String @pii` and sink policies) are specified in [docs/information-flow.md](../information-flow.md). The current checker does not parse those labels.
+- Information-flow labels (`String @pii`, sink policies, `sends`, `declassify`) are checked statically when a program declares them. [SPEC.md](../../SPEC.md) limits that check to declared label sets: implicit flow, collection element labels, label polymorphism, and runtime enforcement are out of scope. Programs with no labels keep the same AST hash. The design notes are in [docs/information-flow.md](../information-flow.md).
 
 Author: Ryuji Hashimoto (J-PROUT Inc.)
