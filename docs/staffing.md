@@ -8,6 +8,8 @@ The repeating core is staff, client sites and openings, matching, individual dis
 
 The contract layer has `Date` and `Decimal`. A date literal is `YYYY-MM-DD` with no spaces. A decimal looks like `1800.50`. The pattern layer still checks conflict dates and rates. The Japanese note below describes the current tree.
 
+Copy-and-fill contracts for a timesheet, an assignment, and a bill rate are in [examples/templates/README.md](../examples/templates/README.md). Each names its blanks in Japanese and has one fictional filled example. They do not assert an overtime ceiling, a number of years until a conflict date, or a social-insurance rate. Those stay for each company's rules and a specialist.
+
 ### What the contract layer already expresses
 
 `examples/staffing_dates.etsah` uses calendar dates and decimal yen:
@@ -53,6 +55,8 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 対象は、人材派遣会社の基幹で繰り返す部分である。スタッフ、派遣先と案件、マッチング、個別契約と就業条件、勤怠と派遣先承認、請求と給与、粗利。抵触日は仕様に書いた派遣期間から計算し、36協定の上限はスロットである。一般則の天井（月45時間、年360時間、特別条項は年720時間、時間外+休日は月100時間未満、2〜6か月平均80時間、月45時間超は年6回）を超える設定はエラーにする。この天井は法令意見ではなく、社労士の確認が要る。判断が分かれるところはこの文書に残す。
 
 契約層は `Date` と `Decimal` を持つ。日付リテラルは空白なしの `YYYY-MM-DD`、小数は `1800.50` のような十進数である。パターン層の抵触日・単価検査はそのまま残る。
+
+勤怠、配属、請求単価の空欄テンプレートと記入例は [examples/templates/README.md](../examples/templates/README.md) にある。時間外の上限、抵触日までの年数、社会保険料は置いていない。各社の規程や専門家に確認する。
 
 ## 今の言語で既に書けること
 

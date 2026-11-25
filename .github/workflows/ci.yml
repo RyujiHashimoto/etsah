@@ -69,6 +69,12 @@ jobs:
           python3 etsah.py check examples/refund_fixed.etsah
           python3 etsah.py check examples/staffing.etsah
           python3 etsah.py check examples/staffing_dates.etsah
+          python3 etsah.py check examples/templates/timesheet.etsah
+          python3 etsah.py check examples/templates/timesheet_filled.etsah
+          python3 etsah.py check examples/templates/assignment.etsah
+          python3 etsah.py check examples/templates/assignment_filled.etsah
+          python3 etsah.py check examples/templates/bill_rate.etsah
+          python3 etsah.py check examples/templates/bill_rate_filled.etsah
           python3 etsah.py check examples/ai_tasks.etsah
           python3 etsah.py check examples/agents/support_reply.etsah
           python3 etsah.py check examples/agents/invoice.etsah

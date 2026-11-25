@@ -1,0 +1,23 @@
+# 勤怠の記入テンプレート。コピーして【空欄】を埋める。
+# 派遣先が承認するまで、この勤怠は請求に回さない。
+# 時間外の上限時間は置いていない。数値の決め方は各社の規程や専門家に確認。
+# 人の氏名、メールアドレス、実在の会社名は書かない。
+# 仮の値のままでは検査を通る。置き換え方は下の空欄。記入例は timesheet_filled.etsah。
+
+type Id
+
+# 【空欄】承認: true または false。
+# 派遣先のロールが承認したなら true。担当者の個人名は書かない。
+# 仮の値は true。false のまま請求すると E-PRE になる。
+# 【空欄】合計時間: 0 以上の整数。対象期間に働いた時間の合計。
+# 仮の値は 0。法定の時間外上限ではない。上限が要るときは各社の規程や専門家に確認。
+op accept_timesheet(client_approved: Bool, hours: Int) -> Bool
+  doc "派遣先が承認した勤怠だけを閉じる。時間外の法定上限は断定しない"
+  pre client_approved == true
+  pre hours >= 0
+  impl native
+
+flow fill_in() -> Bool
+  doc "仮の値。承認と合計時間を、上の空欄の説明に従って書き換える"
+  let closed = accept_timesheet(true, 0)
+  return closed

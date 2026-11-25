@@ -1,0 +1,16 @@
+# 請求単価の記入例。架空の青葉ブリッジ派遣が、架空の派遣先「月見ヶ丘製作所」へ
+# 請求する時間単価。請求 2600.00 円、支払 1750.50 円。どちらも架空の整数に近い小数。
+# この比較は同一労働同一賃金の判定ではない。
+# 社会保険料、雇用保険料、通勤費は引いていない。各社の規程や専門家に確認。
+
+type Id
+
+op accept_rates(bill_rate: Decimal, pay_rate: Decimal) -> Bool
+  doc "月見ヶ丘製作所（架空）向け。請求単価は支払単価以上"
+  pre bill_rate >= pay_rate
+  impl native
+
+flow example() -> Bool
+  doc "青葉ブリッジ派遣（架空）。2600.00 円/時と 1750.50 円/時"
+  let ok = accept_rates(2600.00, 1750.50)
+  return ok

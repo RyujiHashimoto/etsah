@@ -233,7 +233,7 @@ The longer trial write-up is in [README.ja.md](README.ja.md).
 python3 patterns/etsahc.py build patterns/examples/staffing.etsah --out patterns/build/staffing
 ```
 
-Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can also write those dates and decimal rates directly. See `examples/staffing_dates.etsah`.
+Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can also write those dates and decimal rates directly. See `examples/staffing_dates.etsah`. Copy-and-fill templates for a timesheet, an assignment, and a bill rate, with one fictional filled example each, are in [examples/templates/README.md](examples/templates/README.md).
 
 ## Features
 
