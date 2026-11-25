@@ -129,7 +129,7 @@ Whether a `net` target is on the allow list (default `stripe`) is still the op p
 
 The information-flow `policy` (`sink` and `declassify`) and the task `policy` (`external`, `payment`, `contract`) share a declaration name and are distinguished by the lines inside. One block cannot hold both. A program may contain one information-flow `policy` and one task `policy`.
 
-When a program has a task, `check` prints the trigger, effects, gate, retry, key, and budget in prose.
+When a program has a task, `check` prints the trigger, effects, gate, retry, key, and budget in prose. `check --json` keeps `hash`, `diagnostics`, and, when there are tasks, `audit_id` and `plan`. It also adds `manifest`: `hash`, `audit_id` when there are tasks, and each agent's `allow` list, integer-yen `budget_run` and `budget_period`, `limit_net` and `limit_emit`, `call_limit` and `spend_limit` when declared, and the gate names its tasks name. Agents, `allow` entries, and gate names are in name order, so the same source yields the same bytes. `signature` is always `null`. The field does not sign anything and does not read a key.
 
 ### Expressions
 

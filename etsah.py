@@ -3381,6 +3381,7 @@ def main() -> None:
         if plan:
             payload["audit_id"] = ast_digest(program)
             payload["plan"] = plan
+        payload["manifest"] = capability_manifest(program)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"Etsah check: {args.file}")
@@ -3408,6 +3409,50 @@ def _import_tools(kind: str, path: str) -> None:
     except (ToolImportError, OSError) as ex:
         print(f"[ERROR] {ex}", file=sys.stderr)
         sys.exit(2)
+
+
+def capability_manifest(program: Program) -> dict[str, Any]:
+    """Stable grant list for an auditor. Field order matches the canonical AST.
+
+    ``signature`` is null. This does not sign anything and does not read a key.
+    """
+    tasks_by_agent: dict[str, list[TaskDef]] = {}
+    for task in program.tasks:
+        tasks_by_agent.setdefault(task.agent, []).append(task)
+    agents: list[dict[str, Any]] = []
+    for agent in sorted(program.agents, key=lambda item: item.name):
+        gate_names: list[str] = []
+        seen: set[str] = set()
+        for task in sorted(tasks_by_agent.get(agent.name, []), key=lambda item: item.name):
+            for name in task.gates:
+                if name not in seen:
+                    seen.add(name)
+                    gate_names.append(name)
+        gate_names.sort()
+        item: dict[str, Any] = {
+            "name": agent.name,
+            "allow": [list(effect) for effect in sorted(agent.allow)],
+            "budget_run": agent.budget_run,
+            "budget_period": agent.budget_period,
+            "limit_net": agent.limit_net,
+            "limit_emit": agent.limit_emit,
+            "gates": gate_names,
+        }
+        _put_quotas(item, agent.call_quota, agent.spend_quota)
+        agents.append(item)
+    manifest: dict[str, Any] = {
+        "hash": ast_hash(program),
+        "agents": agents,
+        "signature": None,
+    }
+    if program.tasks:
+        manifest = {
+            "hash": ast_hash(program),
+            "audit_id": ast_digest(program),
+            "agents": agents,
+            "signature": None,
+        }
+    return manifest
 
 
 def task_plan(program: Program) -> list[str]:
