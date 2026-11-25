@@ -102,6 +102,8 @@ The language is Etsah. For one minor version, the old commands `prout`, `proutc`
 
 The checker does not run cron, store the remaining integer-yen budget, or store idempotency keys. A gate stops the static check. It does not send the approval email. `impl` may be Python, Rust, or SQL. Etsah records what that implementation may read, write, charge, and promise.
 
+`etsah check --json` prints one object. `hash` is 12 hex digits. `diagnostics` each have `code`, `severity`, `line`, and `message`, and `fix`, `detail`, or `context` only when set. A file with tasks also has `audit_id` (64 hex digits) and `plan`. `manifest` lists each agent's allow list, budgets, limits, and named gates. `manifest.signature` is `null`. Exit 0 means no errors, warnings included. Exit 1 means at least one error. Exit 2 means the file did not parse. The same rules are in [SPEC.md](SPEC.md) and [SPEC.en.md](SPEC.en.md).
+
 Full rules: [SPEC.md](SPEC.md) (Japanese, the original) and [SPEC.en.md](SPEC.en.md).
 
 ## Contract layer
