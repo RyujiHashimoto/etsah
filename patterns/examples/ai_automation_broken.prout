@@ -1,0 +1,100 @@
+# 意図的に壊した仕様。外部への emit、期間を超える spend、ゲートのない契約変更で落ちる。
+
+app staffing_automation_broken
+  stack nextjs, postgres
+  freedom guided
+
+  entity Timesheet
+    id: Id
+    period_key: String
+    status: String
+
+  entity Invoice
+    id: Id
+    period_key: String
+    status: String
+
+  entity DispatchContract
+    id: Id
+    period_key: String
+    status: String
+
+  pattern auth
+    provider: clerk
+    roles: coordinator, payroll
+
+  pattern approval_gate PayStaff
+    entity: Invoice
+    approver: payroll
+    action: spend
+    audience: external
+    on_approved: send_payment
+
+  pattern ai_task RemindTimesheet
+    entity: Timesheet
+    trigger: schedule
+    schedule: 0 9 * * 1
+    steps: draft_reminder
+    effects: read, emit
+    audience: external
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 20
+    retries: 2
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task PayApprovedHours
+    entity: Invoice
+    trigger: schedule
+    schedule: 0 10 1 * *
+    steps: pay_approved_hours
+    effects: read, spend
+    audience: external
+    approval: PayStaff
+    spend_per_run: 5000
+    spend_per_period: 1000
+    period: monthly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 0
+    escalate_to: payroll
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task ExtendContract
+    entity: DispatchContract
+    trigger: schedule
+    schedule: 0 11 * * 1
+    steps: propose_extension
+    effects: read, write
+    audience: internal
+    changes: contract
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 0
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  custom draft_reminder
+    why "督促の下書き。送信の承認が無い"
+    lines 10
+
+  custom pay_approved_hours
+    why "支払い計算。1回の上限が期間の上限を超えている"
+    lines 10
+
+  custom send_payment
+    why "承認後の支払い"
+    lines 10
+
+  custom propose_extension
+    why "契約延長の案。承認ゲートが無い"
+    lines 10

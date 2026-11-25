@@ -23,6 +23,7 @@ jobs:
           python3 prout.py check examples/refund_fixed.prout
           python3 prout.py check examples/staffing.prout
           python3 prout.py check examples/staffing_dates.prout
+          python3 prout.py check examples/ai_tasks.prout
           python3 render.py
           test -s human-view.html
           git diff --exit-code -- human-view.html
@@ -47,6 +48,17 @@ jobs:
           grep -q "1500.5 >= 1800.50" /tmp/staffing-dates.txt
           grep -q "2029-04-02 <= 2029-04-01" /tmp/staffing-dates.txt
           grep -q "false == true" /tmp/staffing-dates.txt
+          if python3 prout.py check examples/ai_tasks_broken.prout > /tmp/ai-tasks.txt 2>&1; then
+            echo "broken ai task contract unexpectedly passed"
+            exit 1
+          fi
+          grep -q "emit to an external party has no approval gate" /tmp/ai-tasks.txt
+          grep -q "net to an external party has no approval gate" /tmp/ai-tasks.txt
+          grep -q "spend has no approval gate" /tmp/ai-tasks.txt
+          grep -q "a contract change has no approval gate" /tmp/ai-tasks.txt
+          grep -q "5000 <= 1000" /tmp/ai-tasks.txt
+          grep -q "retries must be from 0 through 5" /tmp/ai-tasks.txt
+          grep -q "escalation path produces external effects" /tmp/ai-tasks.txt
 
       - name: Information flow
         run: |
@@ -80,6 +92,17 @@ jobs:
           grep -q "抵触日" /tmp/staffing-pattern.txt
           grep -q "approver" /tmp/staffing-pattern.txt
           grep -q "bill rate is below pay rate" /tmp/staffing-pattern.txt
+          python3 proutc.py build examples/ai_automation.prout
+          python3 proutc.py build examples/ai_desk.prout
+          python3 proutc.py find "自動化" | grep -q ai_task
+          python3 proutc.py find "承認ゲート" | grep -q approval_gate
+          if python3 proutc.py build examples/ai_automation_broken.prout > /tmp/ai-automation.txt 2>&1; then
+            echo "broken ai automation spec unexpectedly passed"
+            exit 1
+          fi
+          grep -q "emit to an external party has no approval gate" /tmp/ai-automation.txt
+          grep -q "5000 <= 1000" /tmp/ai-automation.txt
+          grep -q "a contract change has no approval gate" /tmp/ai-automation.txt
 
       - name: Build service desk examples
         working-directory: patterns

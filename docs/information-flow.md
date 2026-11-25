@@ -917,7 +917,7 @@ op save_customer(customer: Customer) -> Id
 
 ### 11.0 実装状況（2026年11月）
 
-v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。既存146件と合わせて189件。`examples/information_flow_safe.prout` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.prout` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.prout` のハッシュは `bae8501e8b3f` のまま変わらない。
+v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。AIタスクの検査と合わせ、スイート全体は231件。`examples/information_flow_safe.prout` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.prout` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.prout` のハッシュは `bae8501e8b3f` のまま変わらない。
 
 | 項目 | 状態 |
 |---|---|
@@ -999,7 +999,7 @@ v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_
 | ラベル順序非依存 | `test_label_order_irrelevant` | 同一ハッシュ |
 | ポリシー順序非依存 | `test_policy_order_irrelevant` | 同一ハッシュ |
 | ラベル未使用の高速パス | `test_no_labels_skips_information_flow` | OK |
-| 既存テスト | `tests/` 全体 | 189件成功 |
+| 既存テスト | `tests/` 全体 | 231件成功 |
 
 ### 11.5 受け入れ条件
 

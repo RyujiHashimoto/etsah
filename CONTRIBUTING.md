@@ -10,6 +10,7 @@ cd prout-lang
 
 # 契約言語の検証
 python3 prout.py check examples/refund_fixed.prout
+python3 prout.py check examples/ai_tasks.prout
 python3 render.py
 
 # 単体テスト（標準ライブラリの unittest。追加の依存はない）
@@ -23,6 +24,8 @@ python3 proutc.py build examples/expense.prout
 python3 proutc.py build bench/pc_lending.prout
 python3 proutc.py build examples/staffing.prout
 python3 proutc.py build examples/staffing_desk.prout
+python3 proutc.py build examples/ai_automation.prout
+python3 proutc.py build examples/ai_desk.prout
 python3 proutc.py bench
 python3 growth_report.py
 ```

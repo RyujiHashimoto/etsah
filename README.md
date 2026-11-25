@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在189件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在231件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -185,8 +185,8 @@ tests/                   unittest の単体テスト（`python3 -m unittest disc
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              24個のパターンマニフェストと index.json
-  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
+  registry/              26個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣、AIタスクの仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、demo.html、story.html）
   growth_report.py       成長ループのHTMLレポート
@@ -227,9 +227,28 @@ python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
 python3 proutc.py find "勤怠"
 ```
 
+## AIに任せる作業の境界を仕様で止める
+
+`ai_task` は、定期実行・新しい行・webhook のどれで起動するかを宣言し、AIが使ってよい効果、`spend` の1回と期間の上限、`net` と `emit` の時間あたり回数、再試行とエスカレーション、冪等キー、監査（`audit: ast_hash`）をスロットに持つ。`approval_gate` は、社外への `emit` と `net`、支払いの `spend`、契約の変更を、人が承認するまで止める。ゲートの無い社外への `emit` は `E-POLICY` になる。
+
+契約層も同じ境界を `agent` と `task` で検査する。手順は既存の op を呼ぶ。社外への `emit` と `net`、`spend`、契約の変更にゲートが無いと `E-POLICY` になる。`check` は各タスクの起動、効果、ゲート、再試行を文章で出す。cron の実行、予算の残数、冪等ストアはまだ無い。
+
+```sh
+python3 prout.py check examples/ai_tasks.prout
+```
+
+設計と、採用した初期値は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
+
+```sh
+cd patterns
+python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
+python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
+python3 proutc.py find "自動化"
+```
+
 ## 情報フローラベルでPIIの流出を止める
 
-`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
 
 ```prout
 type Customer {

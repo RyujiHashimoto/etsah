@@ -164,6 +164,23 @@ class TestSlots(unittest.TestCase):
             "dispatch_contract": {"entity", "staff", "client", "start_date", "end_date", "conflict_date"},
             "staffing_billing": {"entity", "timesheet", "bill_rate", "pay_rate"},
             "matching": {"staff", "opening", "skills"},
+            "ai_task": {
+                "entity",
+                "trigger",
+                "steps",
+                "effects",
+                "audience",
+                "spend_per_run",
+                "spend_per_period",
+                "period",
+                "net_per_hour",
+                "emit_per_hour",
+                "retries",
+                "escalate_to",
+                "idempotency_key",
+                "audit",
+            },
+            "approval_gate": {"entity", "approver", "action", "audience"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():
