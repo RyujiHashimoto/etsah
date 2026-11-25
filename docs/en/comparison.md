@@ -30,7 +30,7 @@ A wrapper is still the right place to allow or deny a real call at the moment it
 ## What the PROUT check does not do
 
 - It does not run cron, send mail, charge a card, cancel a subscription, or store idempotency keys.
-- It does not count remaining budget. A budget in the source is a declared ceiling.
+- The checker does not count remaining budget. An integer-yen budget in the source is a declared ceiling. `prout guard` does count `limit calls` and `limit spend`.
 - It does not prove that the native implementation performs only the effects on the `eff` line.
 - It does not treat an MCP hint as permission. A missing hint adds no effect. A guessed effect is a `review` comment, and comments do not change the check.
 - Information-flow labels (`String @pii`, sink policies, `sends`, `declassify`) are checked statically when a program declares them. [SPEC.md](../../SPEC.md) limits that check to declared label sets: implicit flow, collection element labels, label polymorphism, and runtime enforcement are out of scope. Programs with no labels keep the same AST hash. The design notes are in [docs/information-flow.md](../information-flow.md).

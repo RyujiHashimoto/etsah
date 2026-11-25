@@ -179,6 +179,9 @@ class OpDef:
     impl: Optional[Expr] = None
     native: bool = False
     sends: list[Sends] = field(default_factory=list)
+    call_quota: Optional[CallQuota] = None
+    spend_quota: Optional[SpendQuota] = None
+    spend_meter: Optional[SpendMeter] = None
 
 
 @dataclass
@@ -191,6 +194,32 @@ class FlowDef:
     summary: str = ""
     effects: list[tuple[str, str]] = field(default_factory=list)
     body: list[Stmt] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CallQuota:
+    """How many times a declaration may run in one period. The guard counts these."""
+
+    count: int
+    period: str
+
+
+@dataclass(frozen=True)
+class SpendQuota:
+    """A decimal spend cap in one currency. The integer-yen budget is separate."""
+
+    amount: Decimal
+    currency: str
+    period: str
+
+
+@dataclass(frozen=True)
+class SpendMeter:
+    """Where a spend op's amount is read from, and which currency that amount is."""
+
+    root: str
+    field: str
+    currency: str
 
 
 @dataclass
@@ -207,6 +236,8 @@ class AgentDef:
     limit_emit: int = 0
     audit: str = ""
     allow_declared: bool = False
+    call_quota: Optional[CallQuota] = None
+    spend_quota: Optional[SpendQuota] = None
 
 
 @dataclass
@@ -240,6 +271,8 @@ class TaskDef:
     escalate: str = ""
     budget_run: Optional[int] = None
     budget_period: Optional[int] = None
+    call_quota: Optional[CallQuota] = None
+    spend_quota: Optional[SpendQuota] = None
     body: list[Stmt] = field(default_factory=list)
     agent_declared: bool = False
     trigger_declared: bool = False
@@ -722,6 +755,7 @@ class Parser:
             parse_type_ref(ret, line.no, self.issues),
             line.no,
         )
+        seen: set[str] = set()
         while self.peek() and self.peek().indent == 2:
             prop = self.advance()
             text = prop.text
@@ -741,6 +775,15 @@ class Parser:
                     op.native = True
                 else:
                     op.impl = parse_expr(rhs, prop.no)
+            elif text.startswith("limit "):
+                if not self._store_runtime_limit(op, text, prop, seen):
+                    raise ProutError(
+                        "bad limit; an op accepts limit calls or limit spend",
+                        prop.no,
+                    )
+            elif text.startswith("spend from"):
+                self._once(seen, "spend from", prop)
+                op.spend_meter = self._parse_spend_from(text, prop.no)
             else:
                 raise ProutError(f"unknown op property {text!r}", prop.no)
         return op
@@ -802,6 +845,59 @@ class Parser:
             raise ProutError("budget must be an integer number of yen", line)
         return int(run_text), int(period_text)
 
+    def _parse_runtime_limit(self, text: str, line: int) -> Optional[tuple[str, Any]]:
+        """``limit calls`` and ``limit spend``. ``None`` means this line is not one of those."""
+        calls = re.fullmatch(r"limit\s+calls\s+(\d+)\s+period\s+(hour|day|month)", text)
+        if calls:
+            count = int(calls.group(1))
+            if count < 1:
+                raise ProutError("call limit must be a positive integer", line)
+            return ("calls", CallQuota(count, calls.group(2)))
+        if text.startswith("limit calls"):
+            raise ProutError(
+                "bad limit; expected limit calls N period hour|day|month",
+                line,
+            )
+        spend = re.fullmatch(
+            r"limit\s+spend\s+(\d+(?:\.\d+)?)\s+([A-Z]{3})\s+period\s+(hour|day|month)",
+            text,
+        )
+        if spend:
+            amount = Decimal(spend.group(1))
+            if amount <= 0:
+                raise ProutError("spend limit must be a positive decimal", line)
+            return ("spend", SpendQuota(amount, spend.group(2), spend.group(3)))
+        if text.startswith("limit spend"):
+            raise ProutError(
+                "bad limit; expected limit spend AMOUNT CURRENCY period hour|day|month",
+                line,
+            )
+        return None
+
+    def _parse_spend_from(self, text: str, line: int) -> SpendMeter:
+        matched = re.fullmatch(
+            r"spend\s+from\s+([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?\s+currency\s+([A-Z]{3})",
+            text,
+        )
+        if not matched:
+            raise ProutError(
+                "bad spend from; expected spend from name[.field] currency CURRENCY",
+                line,
+            )
+        return SpendMeter(matched.group(1), matched.group(2) or "", matched.group(3))
+
+    def _store_runtime_limit(self, owner: Any, text: str, line: Line, seen: set[str]) -> bool:
+        parsed = self._parse_runtime_limit(text, line.no)
+        if parsed is None:
+            return False
+        kind, quota = parsed
+        self._once(seen, f"limit {kind}", line)
+        if kind == "calls":
+            owner.call_quota = quota
+        else:
+            owner.spend_quota = quota
+        return True
+
     def _parse_body_stmt(self, text: str, line: int) -> Stmt:
         if text.startswith("let "):
             matched = re.fullmatch(r"let\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
@@ -831,6 +927,8 @@ class Parser:
             elif text.startswith("budget "):
                 self._once(seen, "budget", prop)
                 agent.budget_run, agent.budget_period = self._parse_budget(text, prop.no)
+            elif text.startswith("limit ") and self._store_runtime_limit(agent, text, prop, seen):
+                pass
             elif text.startswith("limit "):
                 limit = re.fullmatch(r"limit\s+(net|emit)\s+(\d+)\s+hour", text)
                 if not limit:
@@ -910,6 +1008,12 @@ class Parser:
             elif text.startswith("budget "):
                 self._once(seen, "budget", prop)
                 task.budget_run, task.budget_period = self._parse_budget(text, prop.no)
+            elif text.startswith("limit "):
+                if not self._store_runtime_limit(task, text, prop, seen):
+                    raise ProutError(
+                        "bad limit; a task accepts limit calls or limit spend",
+                        prop.no,
+                    )
             elif text.startswith("let ") or text.startswith("return "):
                 task.body.append(self._parse_body_stmt(text, prop.no))
             else:
@@ -2149,8 +2253,171 @@ class Checker:
                 elif target not in self.allow_net:
                     self.error("E-POLICY", f"network target {target!r} is not allowed by policy", op.line)
 
+    def _base_type(self, ref: Any) -> str:
+        return re.sub(r"<.*>", "", str(ref)).strip()
+
+    def _check_spend_meter(self, op: OpDef) -> None:
+        meter = op.spend_meter
+        if meter is None:
+            return
+        params = {name: typ for name, typ in op.params}
+        if meter.root not in params:
+            self.error(
+                "E-POLICY",
+                f"op {op.name}: spend amount {meter.root!r} is not a parameter",
+                op.line,
+            )
+            return
+        if not meter.field:
+            if self._base_type(params[meter.root]) != "Decimal":
+                self.error(
+                    "E-TYPE",
+                    f"op {op.name}: spend amount must be Decimal, got {params[meter.root]}",
+                    op.line,
+                )
+            return
+        owner = self.types.get(self._base_type(params[meter.root]))
+        if owner is None or meter.field not in owner.fields:
+            shown = f"{meter.root}.{meter.field}"
+            self.error(
+                "E-FIELD",
+                f"op {op.name}: spend amount {shown} is not a field of the argument",
+                op.line,
+            )
+            return
+        field_type = owner.fields[meter.field]
+        if self._base_type(field_type) != "Decimal":
+            self.error(
+                "E-TYPE",
+                f"op {op.name}: spend amount must be Decimal, got {field_type}",
+                op.line,
+            )
+
+    def _quota_pair_fits(self, where: str, line: int, child: Any, parent: Any) -> None:
+        if child is None or parent is None:
+            return
+        if isinstance(child, CallQuota) and isinstance(parent, CallQuota):
+            if child.period == parent.period and child.count > parent.count:
+                self.error(
+                    "E-POLICY",
+                    f"{where}: call limit exceeds the enclosing limit "
+                    f"({child.count} <= {parent.count} per {child.period} is false)",
+                    line,
+                )
+            return
+        if not isinstance(child, SpendQuota) or not isinstance(parent, SpendQuota):
+            return
+        if child.currency != parent.currency:
+            self.error(
+                "E-POLICY",
+                f"{where}: spend currency {child.currency} does not match {parent.currency}",
+                line,
+            )
+            return
+        if child.period == parent.period and child.amount > parent.amount:
+            self.error(
+                "E-POLICY",
+                f"{where}: spend limit exceeds the enclosing limit "
+                f"({child.amount} <= {parent.amount} {child.currency} per {child.period} is false)",
+                line,
+            )
+
+    def _called_op_names(self, task: TaskDef) -> set[str]:
+        found: set[str] = set()
+
+        def walk(expr: Optional[Expr]) -> None:
+            if expr is None:
+                return
+            if expr.kind == "call" and expr.name:
+                found.add(expr.name)
+            walk(expr.left)
+            walk(expr.right)
+            walk(expr.base)
+            for arg in expr.args or []:
+                walk(arg)
+
+        for stmt in task.body:
+            walk(stmt.expr)
+        return found
+
+    def _check_runtime_limits(self, agents: dict[str, AgentDef]) -> None:
+        """Decimal spend caps are warnings when missing. The integer-yen budget stays an error."""
+        ops = {op.name: op for op in self.program.ops}
+        for op in self.program.ops:
+            spends = any(effect[0] == "spend" for effect in op.effects)
+            if op.spend_meter is not None and not spends:
+                self.error(
+                    "E-POLICY",
+                    f"op {op.name}: spend from is set but the op does not spend",
+                    op.line,
+                )
+            if op.spend_quota is not None and not spends:
+                self.error(
+                    "E-POLICY",
+                    f"op {op.name}: spend limit is set but the op does not spend",
+                    op.line,
+                )
+            self._check_spend_meter(op)
+            if (
+                op.spend_meter is not None
+                and op.spend_quota is not None
+                and op.spend_meter.currency != op.spend_quota.currency
+            ):
+                self.error(
+                    "E-POLICY",
+                    f"op {op.name}: spend limit currency {op.spend_quota.currency} "
+                    f"does not match {op.spend_meter.currency}",
+                    op.line,
+                )
+        for agent in self.program.agents:
+            has_spend = any(effect[0] == "spend" for effect in agent.allow)
+            if agent.spend_quota is not None and not has_spend:
+                self.error(
+                    "E-POLICY",
+                    f"agent {agent.name}: spend limit is set but spend is not an allowed effect",
+                    agent.line,
+                )
+        for task in self.program.tasks:
+            has_spend = any(effect[0] == "spend" for effect in task.effects)
+            agent = agents.get(task.agent)
+            if task.spend_quota is not None and not has_spend:
+                self.error(
+                    "E-POLICY",
+                    f"task {task.name}: spend limit is set but the task does not spend",
+                    task.line,
+                )
+            if not has_spend:
+                continue
+            called = [ops[name] for name in self._called_op_names(task) if name in ops]
+            spend_ops = [op for op in called if any(effect[0] == "spend" for effect in op.effects)]
+            covered = (
+                task.spend_quota is not None
+                or (agent is not None and agent.spend_quota is not None)
+                or any(op.spend_quota is not None for op in spend_ops)
+            )
+            if not covered:
+                self.warn(
+                    "W-BUDGET",
+                    f"task {task.name}: spend has no decimal amount limit",
+                    task.line,
+                    fix="limit spend AMOUNT CURRENCY period day",
+                )
+            if agent is not None:
+                self._quota_pair_fits(
+                    f"task {task.name}",
+                    task.line,
+                    task.call_quota,
+                    agent.call_quota,
+                )
+                self._quota_pair_fits(
+                    f"task {task.name}",
+                    task.line,
+                    task.spend_quota,
+                    agent.spend_quota,
+                )
+
     def check_ai_tasks(self) -> None:
-        """Static envelope for agent and task. No counters, cron, or idempotency store."""
+        """Static envelope for agent and task. Cron and the idempotency store are not run."""
         agents = {agent.name: agent for agent in self.program.agents}
         gates = {gate.name: gate for gate in self.program.gates}
         self._check_ai_duplicates()
@@ -2161,6 +2428,7 @@ class Checker:
             self._check_gate_decl(gate, agents)
         for task in self.program.tasks:
             self._check_one_task(task, agents, gates, external, contract)
+        self._check_runtime_limits(agents)
 
     def _check_ai_duplicates(self) -> None:
         seen_agents: dict[str, int] = {}
@@ -2698,6 +2966,13 @@ def program_to_dict(p: Program) -> dict:
                 {"args": sorted(set(s.args)), "effect": list(s.effect)}
                 for s in sorted(o.sends, key=lambda s: (s.effect, tuple(sorted(set(s.args)))))
             ]
+        _put_quotas(od, o.call_quota, o.spend_quota)
+        if o.spend_meter is not None:
+            od["spend_from"] = {
+                "argument": o.spend_meter.root,
+                "field": o.spend_meter.field,
+                "currency": o.spend_meter.currency,
+            }
         ops.append(od)
     d["ops"] = ops
 
@@ -2764,7 +3039,7 @@ def program_to_dict(p: Program) -> dict:
 
 
 def _agent_to_dict(agent: AgentDef) -> dict:
-    return {
+    item = {
         "name": agent.name,
         "doc": agent.doc,
         "allow": sorted(agent.allow),
@@ -2775,6 +3050,8 @@ def _agent_to_dict(agent: AgentDef) -> dict:
         "audit": agent.audit,
         "timezone": PERIOD_TIMEZONE,
     }
+    _put_quotas(item, agent.call_quota, agent.spend_quota)
+    return item
 
 
 def _gate_to_dict(gate: GateDef) -> dict:
@@ -2822,7 +3099,29 @@ def _task_to_dict(task: TaskDef) -> dict:
     if task.budget_run is not None and task.budget_period is not None:
         item["budget_run"] = task.budget_run
         item["budget_period"] = task.budget_period
+    _put_quotas(item, task.call_quota, task.spend_quota)
     return item
+
+
+def _quota_lines(calls: Optional[CallQuota], spend: Optional[SpendQuota]) -> list[str]:
+    lines: list[str] = []
+    if calls is not None:
+        lines.append(f"calls: {calls.count} per {calls.period}")
+    if spend is not None:
+        lines.append(f"spend: {format(spend.amount, 'f')} {spend.currency} per {spend.period}")
+    return lines
+
+
+def _put_quotas(item: dict[str, Any], calls: Optional[CallQuota], spend: Optional[SpendQuota]) -> None:
+    """Omit absent quotas so programs that do not declare them keep their hash."""
+    if calls is not None:
+        item["call_limit"] = {"count": calls.count, "period": calls.period}
+    if spend is not None:
+        item["spend_limit"] = {
+            "amount": format(spend.amount, "f"),
+            "currency": spend.currency,
+            "period": spend.period,
+        }
 
 
 def _trigger_to_dict(task: TaskDef) -> dict:
@@ -2878,6 +3177,7 @@ def main() -> None:
     guard_cmd.add_argument("--approval-token", default=None)
     guard_cmd.add_argument("--approval-key-file", default=None)
     guard_cmd.add_argument("--nonce-file", default=None)
+    guard_cmd.add_argument("--ledger-file", default=None)
     guard_cmd.add_argument("--allow-legacy-approval-token", action="store_true")
     guard_cmd.add_argument("upstream", nargs=argparse.REMAINDER)
     approve_cmd = sub.add_parser("approve", help="issue a signed one-time approval for one ASK call")
@@ -2915,6 +3215,7 @@ def main() -> None:
                 allow_legacy=args.allow_legacy_approval_token,
                 approval_key_file=args.approval_key_file,
                 nonce_file=args.nonce_file,
+                ledger_file=args.ledger_file,
             )
         )
     if args.cmd == "approve":
@@ -3015,6 +3316,11 @@ def task_plan(program: Program) -> list[str]:
         agent = agents.get(task.agent)
         if agent is not None:
             lines.append(f"    limits: net {agent.limit_net}/hour, emit {agent.limit_emit}/hour")
+        for line in _quota_lines(task.call_quota, task.spend_quota):
+            lines.append("    " + line)
+        if agent is not None:
+            for line in _quota_lines(agent.call_quota, agent.spend_quota):
+                lines.append("    agent " + line)
     lines.append(f"audit id: {ast_digest(program)} (display {ast_hash(program)})")
     return lines
 

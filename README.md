@@ -73,12 +73,12 @@ python3 -m venv .venv
 | A task's effects stay inside its agent's `allow` list | `E-POLICY` |
 | External `emit` / `net`, every `spend`, and a `write` marked as a contract change name a human `gate` | `E-POLICY` |
 | Network targets sit on the allow list (default `stripe`; override with `--allow-net`) | `E-POLICY` |
-| Spend budgets are integer yen, and per-run does not exceed the period. Rate limits are per hour | Declared and checked. The running totals are not counted yet |
+| Spend budgets are integer yen, and per-run does not exceed the period. Hourly `net` and `emit` limits are static | Declared and checked. Those running totals are not counted. `limit calls` and `limit spend` are counted by `prout guard` |
 | `audit ast_hash` on the agent | Required. The full id is 64 hex digits. `prout check` prints the 12-digit prefix |
 | Preconditions in linear arithmetic, including `Decimal` and calendar `Date` | False is `E-PRE`. Unproved is a visible `W-PRE` guard |
 | Information-flow labels (`pii`, `secret`) when the program declares them | `E-IFLOW-*`, `E-DECLASS`. Programs with no labels keep their old AST hash |
 
-The checker does not run cron, store remaining budget, or store idempotency keys. A gate stops the static check. It does not send the approval email. `impl` may be Python, Rust, or SQL. PROUT records what that implementation may read, write, charge, and promise.
+The checker does not run cron, store the remaining integer-yen budget, or store idempotency keys. A gate stops the static check. It does not send the approval email. `impl` may be Python, Rust, or SQL. PROUT records what that implementation may read, write, charge, and promise.
 
 Full rules: [SPEC.md](SPEC.md) (Japanese, the original) and [SPEC.en.md](SPEC.en.md).
 
@@ -146,7 +146,7 @@ python3 prout.py import mcp examples/agents/tools/mcp_tools.json
 python3 prout.py guard --contract examples/agents/support_reply.prout -- python3 path/to/upstream_server.py
 ```
 
-`prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `prout approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
+`prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `prout approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. `limit calls` and `limit spend` are counted in a ledger file, and a signed approval does not raise those caps. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
 
 ## Pattern layer
 

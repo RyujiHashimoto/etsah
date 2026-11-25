@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 
 ### Added
 
+- `limit calls` and `limit spend` declare a per-period call cap and a decimal spend cap, with a currency, on an agent, a task, or an op. `prout guard` counts them in a ledger file and blocks a call that would pass the cap, including one with a signed approval. A spend op names the decimal argument with `spend from`. A spend task with no decimal cap is a warning, `W-BUDGET`.
 - `prout approve` issues an HMAC-SHA256 approval for one ASK call. `prout guard` forwards that call only when the signature matches the approver, contract `audit_id`, gate, tool, and argument hash, and the nonce has not been used. The shared key comes from the environment or a file and is not logged. The old non-empty token remains only behind `--allow-legacy-approval-token`.
 - English README. The previous Japanese README is preserved in full as `README.ja.md`.
 - The English README leads with contracts for AI agents: declare effects and approvals, and catch an unsafe automation before it runs. After merging main through #16, that page also covers `agent` / `task`, MCP, and the browser playground.

@@ -37,6 +37,7 @@ from prout_mcp.approval import (
     load_key,
 )
 from prout_mcp.decide import ALLOW, ASK, BLOCK, LoadedContract, decide_call, gates_for_tool, load_contract
+from prout_mcp.ledger import reserve
 from prout_mcp.framing import read_message, write_message
 from prout_mcp.server import initialize_result, protocol_version, rpc_error, rpc_ok
 
@@ -151,6 +152,7 @@ def run_guard(
     allow_legacy: bool = False,
     approval_key_file: Optional[str] = None,
     nonce_file: Optional[str] = None,
+    ledger_file: Optional[str] = None,
     stdin: Optional[BinaryIO] = None,
     stdout: Optional[BinaryIO] = None,
     timeout: float = _TIMEOUT,
@@ -180,7 +182,17 @@ def run_guard(
         return 2
     try:
         _initialize_upstream(peer, timeout)
-        _serve(incoming, outgoing, peer, loaded, agent=agent, approval=setup, timeout=timeout)
+        ledger = ledger_file if ledger_file is not None else os.environ.get("PROUT_LEDGER_FILE", "")
+        _serve(
+            incoming,
+            outgoing,
+            peer,
+            loaded,
+            agent=agent,
+            approval=setup,
+            ledger_file=ledger.strip(),
+            timeout=timeout,
+        )
     finally:
         peer.close()
     return 0
@@ -249,6 +261,7 @@ def _serve(
     *,
     agent: str,
     approval: _ApprovalSetup,
+    ledger_file: str,
     timeout: float,
 ) -> None:
     while True:
@@ -266,6 +279,7 @@ def _serve(
                 loaded,
                 agent=agent,
                 approval=approval,
+                ledger_file=ledger_file,
                 timeout=timeout,
             )
         except BrokenPipeError:
@@ -284,6 +298,7 @@ def handle_client(
     *,
     agent: str,
     approval: _ApprovalSetup,
+    ledger_file: str,
     timeout: float,
 ) -> Optional[dict[str, Any]]:
     method = message.get("method")
@@ -314,7 +329,16 @@ def handle_client(
     if method == "tools/call":
         if not has_id:
             return None
-        return guard_call(message["id"], params, peer, loaded, agent=agent, approval=approval, timeout=timeout)
+        return guard_call(
+            message["id"],
+            params,
+            peer,
+            loaded,
+            agent=agent,
+            approval=approval,
+            ledger_file=ledger_file,
+            timeout=timeout,
+        )
     if not has_id:
         try:
             peer.notify(method, params)
@@ -332,6 +356,7 @@ def guard_call(
     *,
     agent: str,
     approval: _ApprovalSetup,
+    ledger_file: str,
     timeout: float,
 ) -> dict[str, Any]:
     name = params.get("name", "")
@@ -345,6 +370,42 @@ def guard_call(
         args_hash = hash_arguments(arguments)
     except ApprovalError:
         args_hash = ""
+    reservation = None
+    if decision.verdict != BLOCK:
+        reservation = reserve(
+            loaded,
+            decision.tool,
+            arguments,
+            agent=agent,
+            path=ledger_file,
+        )
+    if reservation is not None and reservation.blocked:
+        record = _audit_record(
+            loaded.audit_id,
+            decision.tool,
+            BLOCK,
+            reservation.reason,
+            forwarded=False,
+            approved=False,
+            args_hash=args_hash,
+            remaining_calls=reservation.remaining_calls,
+            remaining_spend=reservation.remaining_spend,
+            spend_currency=reservation.currency,
+        )
+        log_decision(record)
+        return rpc_ok(
+            msg_id,
+            decision_result(
+                BLOCK,
+                decision.tool,
+                reservation.reason,
+                loaded.audit_id,
+                args_hash=args_hash,
+                remaining_calls=reservation.remaining_calls,
+                remaining_spend=reservation.remaining_spend,
+                spend_currency=reservation.currency,
+            ),
+        )
     approver_id = ""
     approval_id = ""
     approval_error = ""
@@ -364,21 +425,29 @@ def guard_call(
             else:
                 approval_error = granted.error
     forward_call = decision.verdict == ALLOW or token_used
-    record: dict[str, Any] = {
-        "audit_id": loaded.audit_id,
-        "tool": decision.tool,
-        "verdict": decision.verdict,
-        "reason": decision.reason,
-        "forwarded": forward_call,
-        "approved": token_used,
-        "approver_id": approver_id,
-        "approval_id": approval_id,
-        "args_hash": args_hash,
-    }
-    if approval_mode:
-        record["approval_mode"] = approval_mode
-    if approval_error:
-        record["approval_error"] = approval_error
+    remaining_calls = None if reservation is None else reservation.remaining_calls
+    remaining_spend = None if reservation is None else reservation.remaining_spend
+    spend_currency = "" if reservation is None else reservation.currency
+    if not forward_call and reservation is not None and reservation._rollback:
+        reservation.rollback()
+        remaining_calls = reservation.prior_calls
+        remaining_spend = reservation.prior_spend
+    record = _audit_record(
+        loaded.audit_id,
+        decision.tool,
+        decision.verdict,
+        decision.reason,
+        forwarded=forward_call,
+        approved=token_used,
+        approver_id=approver_id,
+        approval_id=approval_id,
+        args_hash=args_hash,
+        remaining_calls=remaining_calls,
+        remaining_spend=remaining_spend,
+        spend_currency=spend_currency,
+        approval_mode=approval_mode,
+        approval_error=approval_error,
+    )
     log_decision(record)
     if not forward_call:
         return rpc_ok(
@@ -392,9 +461,50 @@ def guard_call(
                 approver_id=approver_id,
                 approval_id=approval_id,
                 approval_error=approval_error,
+                remaining_calls=remaining_calls,
+                remaining_spend=remaining_spend,
+                spend_currency=spend_currency,
             ),
         )
     return forward(msg_id, "tools/call", params, peer, timeout)
+
+
+def _audit_record(
+    audit_id: str,
+    tool: str,
+    verdict: str,
+    reason: str,
+    *,
+    forwarded: bool,
+    approved: bool,
+    args_hash: str,
+    remaining_calls: Optional[int],
+    remaining_spend: Optional[str],
+    spend_currency: str,
+    approver_id: str = "",
+    approval_id: str = "",
+    approval_mode: str = "",
+    approval_error: str = "",
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "audit_id": audit_id,
+        "tool": tool,
+        "verdict": verdict,
+        "reason": reason,
+        "forwarded": forwarded,
+        "approved": approved,
+        "approver_id": approver_id,
+        "approval_id": approval_id,
+        "args_hash": args_hash,
+        "remaining_calls": remaining_calls,
+        "remaining_spend": remaining_spend,
+        "spend_currency": spend_currency,
+    }
+    if approval_mode:
+        record["approval_mode"] = approval_mode
+    if approval_error:
+        record["approval_error"] = approval_error
+    return record
 
 
 def _authorize_ask(approval: _ApprovalSetup, loaded: LoadedContract, tool: str, arguments: Any) -> Authorization:
@@ -421,6 +531,9 @@ def decision_result(
     approver_id: str = "",
     approval_id: str = "",
     approval_error: str = "",
+    remaining_calls: Optional[int] = None,
+    remaining_spend: Optional[str] = None,
+    spend_currency: str = "",
 ) -> dict[str, Any]:
     """Tool result for a call that was not forwarded."""
     asking = verdict == ASK
@@ -444,6 +557,9 @@ def decision_result(
         "approver_id": approver_id,
         "approval_id": approval_id,
         "args_hash": args_hash,
+        "remaining_calls": remaining_calls,
+        "remaining_spend": remaining_spend,
+        "spend_currency": spend_currency,
     }
     if approval_error:
         payload["approval_error"] = approval_error
@@ -507,6 +623,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         action="store_true",
         help="deprecated: forward every ASK when the token is a non-empty string. BLOCK is still not forwarded",
     )
+    parser.add_argument(
+        "--ledger-file",
+        default=None,
+        help="file that stores call counts and spend. Otherwise PROUT_LEDGER_FILE",
+    )
     parser.add_argument("upstream", nargs=argparse.REMAINDER, help="upstream command after --")
     args = parser.parse_args(argv)
     upstream = list(args.upstream)
@@ -523,5 +644,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             allow_legacy=args.allow_legacy_approval_token,
             approval_key_file=args.approval_key_file,
             nonce_file=args.nonce_file,
+            ledger_file=args.ledger_file,
         )
     )
