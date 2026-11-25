@@ -1071,7 +1071,7 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         if not e.fields:
             err("E-ENTITY", f"entity {e.name!r} has no fields", e.line)
 
-    seen_patterns: set[tuple[str, str]] = set()
+    seen_patterns: set[tuple[str, str, str]] = set()
     seen_targets: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
     applied_patterns = {p.name for p in app.patterns}
@@ -1125,6 +1125,20 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             for fname in m.requires_fields:
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
+        # Applying the same pattern twice to the same target expands the
+        # same artifacts twice. Patterns without a target (notify, scene)
+        # may legitimately appear more than once, and auth has its own
+        # singleton check below, so only target-bearing uses are keyed
+        # here. Named uses (pattern ai_task RemindTimesheet) are distinct
+        # instances by design — several tasks may serve one entity — so
+        # the instance name is part of the key when it differs from the
+        # resolved entity target.
+        if p.name != "auth" and target:
+            instance = p.target if p.target and p.target != target else ""
+            key = (p.name, target, instance)
+            if key in seen_patterns:
+                err("E-CONFLICT", f"{p.name} is already applied to {target}", p.line)
+            seen_patterns.add(key)
         check_pattern_policy(app, p, m, entity, err, warn)
         hook_spec = m.hooks.get("on_approved")
         hook_raw = p.slots.get("on_approved")
@@ -1188,11 +1202,6 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             auth_count += 1
             if auth_count > 1:
                 err("E-CONFLICT", "auth can only be applied once", p.line)
-        if p.name in ("checkout", "refund") and target:
-            key = (p.name, target)
-            if key in seen_patterns:
-                err("E-CONFLICT", f"{p.name} is already applied to {target}", p.line)
-            seen_patterns.add(key)
 
     seen_custom: set[str] = set()
     for c in app.customs:
@@ -1940,19 +1949,34 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
         slots = [s.lower() for s in m.slots]
         descriptions = [str(v.get("desc", "")).lower() for v in m.slots.values()]
         for token in tokens:
-            if token in name:
+            # Match in both directions for short registry terms (names,
+            # tags, slots): a natural request like 「申請を承認したい」
+            # arrives as one token, and the tags 申請 / 承認 appear inside
+            # it. Sentences (intent, descriptions) only match token-in-text,
+            # so a long token cannot swallow a whole description.
+            # Very short ASCII tokens ("a", "I", "to") are stopwords, not
+            # search terms: they only count on an exact term match.
+            short_ascii = len(token) <= 2 and token.isascii()
+
+            def hit(term: str) -> bool:
+                if short_ascii:
+                    return token == term
+                return token in term or (len(term) >= 2 and term in token)
+
+            if hit(name):
                 score += 5
-            if token in intent:
+            if not short_ascii and token in intent:
                 score += 3
             for tag in tags:
-                if token in tag:
+                if hit(tag):
                     score += 3
             for slot in slots:
-                if token in slot:
+                if hit(slot):
                     score += 1
-            for description in descriptions:
-                if token in description:
-                    score += 1
+            if not short_ascii:
+                for description in descriptions:
+                    if token in description:
+                        score += 1
         if score:
             results.append((score, m))
     return sorted(results, key=lambda x: (-x[0], x[1].name))
