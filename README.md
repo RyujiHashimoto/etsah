@@ -48,7 +48,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在148件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在231件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -182,7 +182,7 @@ prout_api.py             check_source と check_file
 prout_import.py          MCP と OpenAI のツール定義を op にする
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
-examples/                壊れた初稿、修正版、examples/agents のエージェント契約
+examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
 tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
@@ -260,7 +260,7 @@ python3 prout.py check examples/agents/github_triage.prout --allow-net github
 
 ## 情報フローラベルでPIIの流出を止める
 
-`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出する設計を [docs/information-flow.md](docs/information-flow.md) にまとめました。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装はこれからで、現在の `prout.py` はまだラベルを解析しません。
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
 
 ```prout
 type Customer {
@@ -270,6 +270,7 @@ type Customer {
 policy
   sink net(email) accepts pii
   sink net(*) rejects secret
+  declassify pii in masked_tracking require role support
 
 op send_receipt(to: String @pii) -> Receipt
   eff net(email)
@@ -277,7 +278,19 @@ op send_receipt(to: String @pii) -> Receipt
   impl native
 ```
 
-設計には、EBNF、式のラベル推論規則、sink の解決アルゴリズム、診断コード、AST ハッシュへの影響、パターン層の `data_policy`、実装計画とテストマトリクスを含めています。
+顧客のメールアドレスをそのまま分析に渡すと `E-IFLOW-ARG` で止まり、`declassify` を通せば `W-DECLASS` として監査に残ります。実際に動く2つの例で確かめられます。
+
+```bash
+# 0エラー、1警告（declassify の監査ログ）
+python3 prout.py check examples/information_flow_safe.prout \
+  --allow-net email --allow-net analytics
+
+# E-IFLOW-ARG で失敗する
+python3 prout.py check examples/information_flow_leak.prout \
+  --allow-net email --allow-net analytics
+```
+
+ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（暗黙のフロー、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
 
 ## 参加する
 

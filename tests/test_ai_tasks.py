@@ -604,6 +604,79 @@ class PolicyChecks(unittest.TestCase):
         self.assertTrue(any("audit ast_hash is required" in item.message for item in found))
 
 
+class BothPolicies(unittest.TestCase):
+    def test_information_flow_and_task_policy_in_one_program(self) -> None:
+        text = """
+            label pii
+
+            type Id
+            type Customer {
+              id: Id
+              email: String @pii
+            }
+
+            policy
+              sink net(email) accepts pii
+
+            policy
+              external net(email)
+
+            op customers.get(id: Id) -> Customer
+              doc "load"
+              eff read(customers)
+              impl native
+
+            op send_receipt(to: String @pii) -> Bool
+              doc "mail"
+              eff net(email)
+              sends to -> net(email)
+              impl native
+
+            agent mailer
+              doc "sends an approved receipt"
+              allow read(customers), net(email)
+              budget run 0 period 0
+              limit net 5 hour
+              limit emit 0 hour
+              audit ast_hash
+
+            gate send_mail
+              doc "a person approves the mail"
+              approver support
+              before net(email)
+              on_approved send_receipt
+
+            flow email_receipt(id: Id) -> Bool
+              doc "send the receipt"
+              eff read(customers), net(email)
+              let customer = customers.get(id)
+              return send_receipt(customer.email)
+
+            task remind(period: Id) -> Bool
+              agent mailer
+              doc "send a receipt after approval"
+              trigger schedule "0 9 * * 1"
+              eff read(customers), net(email)
+              gate send_mail
+              key period
+              retry 1 escalate support
+              let customer = customers.get(period)
+              let sent = send_receipt(customer.email)
+              return sent
+        """
+        found = check(text, allow_net=["email", "stripe"])
+        self.assertEqual(codes(found, "error"), [], [item.message for item in found])
+        program = parse(text)
+        self.assertEqual([item.kind for item in program.policies], ["flow", "task"])
+        data = program_to_dict(program)
+        self.assertEqual(data["policy"]["sinks"][0]["effect"], ["net", "email"])
+        self.assertEqual(data["policies"][0]["kind"], "task")
+        self.assertEqual(data["policies"][0]["external"], [("net", "email")])
+        self.assertIn("pii", [item["name"] for item in data["labels"]])
+        self.assertIn("remind", [item["name"] for item in data["tasks"]])
+        self.assertIn("email_receipt", [item["name"] for item in data["flows"]])
+
+
 class AstHash(unittest.TestCase):
     def test_existing_samples_keep_their_hashes(self) -> None:
         for name, digest in SAMPLE_HASHES.items():
