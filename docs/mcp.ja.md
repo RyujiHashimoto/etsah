@@ -51,17 +51,47 @@ python3 prout.py guard --contract examples/agents/support_reply.prout -- python3
 |---|---|---|
 | `ALLOW` | 上流の結果 | 転送する |
 | `BLOCK` | `isError: true` のツール結果と理由 | 呼ばない |
-| `ASK` | 人に承認を求めるツール結果 | 呼ばない。承認トークンがあるときだけ転送する |
+| `ASK` | 人に承認を求めるツール結果 | 呼ばない。この呼び出しに合う署名付き承認があるときだけ転送する |
 
-`PROUT_APPROVAL_TOKEN` か `--approval-token` が空でないとき、`ASK` を転送します。このトークンは、この段階では「置いてあるか」だけを見ます。ゲートを選びません。`BLOCK` は覆しません。ログにも書きません。判定は stderr に JSON を 1 行ずつ出します。
+`ASK` を転送するには、`prout approve` が発行した署名が要ります。署名は HMAC-SHA256 で、鍵は標準ライブラリだけを使います。共有鍵は `PROUT_APPROVAL_KEY` か、`--approval-key-file` / `PROUT_APPROVAL_KEY_FILE` のファイルです。ファイルは 1 行で、先頭の BOM と末尾の改行 1 つは無視します。鍵の置き場所は一つだけにし、コマンド引数にもログにも書きません。
+
+承認は次を縛ります。
+
+| 項目 | 意味 |
+|---|---|
+| 承認者 | ゲートに書いてある `approver` と一致する |
+| 契約 | `audit_id`（契約の SHA-256） |
+| ゲート | そのツールのゲート付き効果をすべて覆う、タスクが名指ししたゲート |
+| ツール | op の名前 |
+| 引数 | 引数 JSON の SHA-256。キーの順は関係しない。`1` と `1.0` は別の値。無い引数は `{}` |
+| 期限 | `exp`（Unix 秒）。`now >= exp` で期限切れ。最長 366 日 |
+| 一度きり | `nonce` と `approval_id` をファイルに記録し、どちらかの再使用を拒否する |
+
+署名が合わない、期限切れ、別の契約、別のゲート、別のツール、別の引数、承認者の不一致、再使用は、どれも転送しません。合わないトークンでは nonce を消費しません。転送すると決めたあとに上流が失敗しても、nonce は戻しません。`BLOCK` は署名があっても覆しません。
+
+```bash
+python3 prout.py approve \
+  --contract examples/agents/support_reply.prout \
+  --gate approve_reply \
+  --op mail.send_reply \
+  --approver support_lead \
+  --args '{}' \
+  --ttl 300
+```
+
+トークンは標準出力に 1 行です。`PROUT_APPROVAL_TOKEN` に渡します。`--approval-token` も読めますが、プロセス一覧に出るので、他の利用者のいるマシンでは使いません。ガード側には同じ鍵と、使用済みを書く `--nonce-file`（または `PROUT_APPROVAL_NONCE_FILE`）が要ります。一度きりの範囲は、同じファイルを見るガードの間だけです。
+
+判定は stderr に JSON を 1 行ずつ出します。署名が通った承認は `approver_id` と `approval_id` を残します。鍵とトークンは残しません。
 
 ```json
-{"audit_id":"<SHA-256 の64桁>","tool":"mail.send_reply","verdict":"ASK","reason":"...","forwarded":false,"approved":false}
+{"audit_id":"<SHA-256 の64桁>","tool":"mail.send_reply","verdict":"ASK","reason":"...","forwarded":true,"approved":true,"approver_id":"support_lead","approval_id":"<16文字以上>","approval_mode":"signed","args_hash":"<SHA-256 の64桁>"}
 ```
 
 `audit_id` は契約の SHA-256 です。ソースが解析できないときは空です。
 
-時間あたりの回数も、予算の残数も、ここでは減らしません。`on_approved` がその効果の唯一の呼び出しであることも証明しません。
+以前の「空でない文字列なら `ASK` を転送する」動作は、既定では使いません。`--allow-legacy-approval-token` か `PROUT_ALLOW_LEGACY_APPROVAL_TOKEN=1` のときだけ残します。これは非推奨です。フラグがあると署名も引数も見ず、空でない文字列でそのプロセスのすべての `ASK` を転送します。nonce は記録しません。`BLOCK` はこれまでどおり転送しません。
+
+時間あたりの回数も、予算の残数も、ここでは減らしません。`on_approved` がその効果の唯一の呼び出しであることも証明しません。一つのゲートが、そのツールのゲート付き効果を全部は覆っていないとき、そのツールの `ASK` は署名では通せません。
 
 ## Claude Desktop
 
@@ -99,10 +129,20 @@ python3 prout.py guard --contract examples/agents/support_reply.prout -- python3
 }
 ```
 
-手元の実験で `ASK` を通すときは、そのサーバの `env` にトークンを置きます。本物の秘密はリポジトリに入れません。
+鍵と、使用済み nonce のファイルは、そのサーバの `env` に置きます。トークンは呼び出しのたびに `prout approve` で作り、ガードを起動するときの `PROUT_APPROVAL_TOKEN` に渡します。下の値は架空の例です。本物の鍵はリポジトリに入れません。
 
 ```json
 "env": {
+  "PROUT_APPROVAL_KEY_FILE": "/path/to/approval.key",
+  "PROUT_APPROVAL_NONCE_FILE": "/path/to/used-approvals.json"
+}
+```
+
+非推奨の互換フラグを使う実験だけ、空でない文字列をトークンにします。既定のガードはこれを承認にしません。
+
+```json
+"env": {
+  "PROUT_ALLOW_LEGACY_APPROVAL_TOKEN": "1",
   "PROUT_APPROVAL_TOKEN": "example-approval"
 }
 ```
@@ -141,6 +181,6 @@ stdio のサーバを起動できるクライアントなら、次で足りま�
 
 ## ここまででしないこと
 
-cron の実行、冪等キーの保存、予算の減算はしません。それらは契約の文面に残ります。ガードは実行時の最初の一歩で、呼び出しごとに 1 回判定し、契約のハッシュと一緒に残します。
+cron の実行、上流の冪等キーの保存、予算の減算はしません。それらは契約の文面に残ります。ガードは呼び出しごとに 1 回判定し、契約のハッシュと、通した承認の承認者 ID・承認 ID を残します。使用済み nonce は承認の再使用を拒むための記録で、上流の結果を覚えるものではありません。
 
 英語の手順は [docs/en/mcp.md](en/mcp.md) です。

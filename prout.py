@@ -2876,7 +2876,21 @@ def main() -> None:
     guard_cmd.add_argument("--allow-net", action="append", default=None)
     guard_cmd.add_argument("--deny-net", action="append", default=None)
     guard_cmd.add_argument("--approval-token", default=None)
+    guard_cmd.add_argument("--approval-key-file", default=None)
+    guard_cmd.add_argument("--nonce-file", default=None)
+    guard_cmd.add_argument("--allow-legacy-approval-token", action="store_true")
     guard_cmd.add_argument("upstream", nargs=argparse.REMAINDER)
+    approve_cmd = sub.add_parser("approve", help="issue a signed one-time approval for one ASK call")
+    approve_cmd.add_argument("--contract", required=True)
+    approve_cmd.add_argument("--gate", required=True)
+    approve_cmd.add_argument("--op", required=True)
+    approve_cmd.add_argument("--approver", required=True)
+    approve_cmd.add_argument("--args", default=None)
+    approve_cmd.add_argument("--args-file", default=None)
+    approve_cmd.add_argument("--ttl", default=None)
+    approve_cmd.add_argument("--expires-at", default=None)
+    approve_cmd.add_argument("--approval-key-file", default=None)
+    approve_cmd.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if args.cmd == "mcp":
@@ -2898,8 +2912,15 @@ def main() -> None:
                 allow_net=args.allow_net,
                 deny_net=args.deny_net,
                 approval_token=args.approval_token,
+                allow_legacy=args.allow_legacy_approval_token,
+                approval_key_file=args.approval_key_file,
+                nonce_file=args.nonce_file,
             )
         )
+    if args.cmd == "approve":
+        from prout_mcp.approval import run_approve
+
+        sys.exit(run_approve(args))
 
     if args.cmd == "import":
         _import_tools(args.kind, args.file)

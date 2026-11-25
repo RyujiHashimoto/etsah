@@ -264,7 +264,7 @@ python3 prout.py check examples/agents/support_reply.prout
 python3 prout.py check examples/agents/github_triage.prout --allow-net github
 ```
 
-同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
+同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。`ASK` を通すのは、`prout approve` が発行した署名付きの一度きりの承認が、契約・ゲート・ツール・引数ハッシュと一致するときだけです。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
 
 ## 情報フローラベルでPIIの流出を止める
 

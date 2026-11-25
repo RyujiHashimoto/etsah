@@ -334,11 +334,19 @@ def main(argv: Optional[list[str]] = None) -> None:
 
         guard_main(args[1:])
         return
+    if args and args[0] == "approve":
+        from prout_mcp.approval import main as approve_main
+
+        approve_main(args[1:])
+        return
     if args and args[0] in {"-h", "--help"}:
         print(
             "usage: prout-mcp [mcp]\n"
             "       prout-mcp guard --contract FILE [--agent NAME] "
-            "[--allow-net HOST] [--deny-net HOST] [--approval-token TOKEN] -- UPSTREAM..."
+            "[--allow-net HOST] [--deny-net HOST] [--approval-key-file FILE] "
+            "[--nonce-file FILE] [--approval-token TOKEN] [--allow-legacy-approval-token] -- UPSTREAM...\n"
+            "       prout-mcp approve --contract FILE --gate NAME --op NAME --approver ID "
+            "(--args JSON | --args-file FILE) (--ttl SECONDS | --expires-at UNIX)"
         )
         return
     if args and args[0] != "mcp":

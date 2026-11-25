@@ -7,24 +7,62 @@ import select
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 import support  # noqa: F401
 from prout_api import check_file
+from prout_mcp.approval import hash_arguments, sign_payload
+from prout_mcp.decide import load_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "examples" / "agents"
 FAKE = ROOT / "tests" / "fake_mcp_upstream.py"
+KEY = "example-harbor-lane-key"
+_SECRET_ENV = (
+    "PROUT_APPROVAL_TOKEN",
+    "PROUT_APPROVAL_KEY",
+    "PROUT_APPROVAL_KEY_FILE",
+    "PROUT_APPROVAL_NONCE_FILE",
+    "PROUT_ALLOW_LEGACY_APPROVAL_TOKEN",
+)
+
+
+def _approval_token(**overrides) -> tuple[str, dict]:
+    loaded = load_contract((AGENTS / "support_reply.prout").read_text(encoding="utf-8"))
+    payload = {
+        "v": 1,
+        "approval_id": "a" * 32,
+        "nonce": "b" * 32,
+        "approver_id": "support_lead",
+        "audit_id": loaded.audit_id,
+        "gate": "approve_reply",
+        "op": "mail.send_reply",
+        "args_hash": hash_arguments({}),
+        "exp": int(time.time()) + 600,
+    }
+    payload.update(overrides)
+    return sign_payload(payload, KEY.encode("utf-8")), payload
 
 
 class GuardProcess:
-    def __init__(self, contract: Path, log_path: Path, extra: list[str] | None = None, token: str | None = None):
+    def __init__(
+        self,
+        contract: Path,
+        log_path: Path,
+        extra: list[str] | None = None,
+        token: str | None = None,
+        env_extra: dict[str, str] | None = None,
+    ):
         env = os.environ.copy()
-        env.pop("PROUT_APPROVAL_TOKEN", None)
+        for name in _SECRET_ENV:
+            env.pop(name, None)
         env["FAKE_MCP_LOG"] = str(log_path)
         if token is not None:
             env["PROUT_APPROVAL_TOKEN"] = token
+        if env_extra:
+            env.update(env_extra)
         argv = [
             sys.executable,
             str(ROOT / "prout.py"),
@@ -141,13 +179,72 @@ class GuardTests(unittest.TestCase):
             self.assertEqual([row["forwarded"] for row in audit], [True, False, False])
             self.assertNotIn(b"PROUT_APPROVAL_TOKEN", stderr)
 
-    def test_approval_token_forwards_ask_and_still_blocks(self) -> None:
+    def test_signed_approval_forwards_the_matching_ask_and_still_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "calls.jsonl"
+            key_path = Path(tmp) / "approval.key"
+            nonce_path = Path(tmp) / "nonces.json"
+            key_path.write_text(KEY + "\n", encoding="utf-8")
+            token, payload = _approval_token()
             guard = GuardProcess(
                 AGENTS / "support_reply.prout",
                 log_path,
-                extra=["--approval-token", "example-approval"],
+                extra=[
+                    "--approval-key-file",
+                    str(key_path),
+                    "--nonce-file",
+                    str(nonce_path),
+                    "--approval-token",
+                    token,
+                ],
+            )
+            try:
+                guard.request(
+                    "initialize",
+                    {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                )
+                blocked = guard.request("tools/call", {"name": "payments.charge", "arguments": {}})
+                self.assertTrue(blocked["result"]["isError"])
+                self.assertIn("BLOCK:", blocked["result"]["content"][0]["text"])
+                asked = guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertEqual(asked["result"]["content"][0]["text"], "upstream:mail.send_reply")
+            finally:
+                stderr = guard.close()
+            self.assertEqual(_logged_tools(log_path), ["mail.send_reply"])
+            audit = [row for row in _audit(stderr) if row.get("tool")]
+            self.assertEqual(audit[0]["verdict"], "BLOCK")
+            self.assertFalse(audit[0]["approved"])
+            self.assertEqual(audit[0]["approver_id"], "")
+            self.assertEqual(audit[0]["approval_id"], "")
+            self.assertEqual(audit[1]["verdict"], "ASK")
+            self.assertTrue(audit[1]["approved"])
+            self.assertTrue(audit[1]["forwarded"])
+            self.assertEqual(audit[1]["approver_id"], "support_lead")
+            self.assertEqual(audit[1]["approval_id"], payload["approval_id"])
+            self.assertEqual(audit[1]["approval_mode"], "signed")
+            self.assertNotIn(token.encode("utf-8"), stderr)
+            self.assertNotIn(KEY.encode("utf-8"), stderr)
+            stored = nonce_path.read_text(encoding="utf-8")
+            self.assertIn(payload["nonce"], stored)
+            self.assertNotIn(KEY, stored)
+
+    def test_plain_token_is_not_enough(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "calls.jsonl"
+            key_path = Path(tmp) / "approval.key"
+            nonce_path = Path(tmp) / "nonces.json"
+            key_path.write_text(KEY + "\n", encoding="utf-8")
+            guard = GuardProcess(
+                AGENTS / "support_reply.prout",
+                log_path,
+                extra=[
+                    "--approval-key-file",
+                    str(key_path),
+                    "--nonce-file",
+                    str(nonce_path),
+                    "--approval-token",
+                    "example-approval",
+                ],
             )
             try:
                 guard.request(
@@ -155,18 +252,159 @@ class GuardTests(unittest.TestCase):
                     {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
                 )
                 asked = guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
-                self.assertEqual(asked["result"]["content"][0]["text"], "upstream:mail.send_reply")
+                self.assertFalse(asked["result"]["structuredContent"]["forwarded"])
+                self.assertIn("malformed approval", asked["result"]["content"][0]["text"])
+            finally:
+                stderr = guard.close()
+            self.assertEqual(_logged_tools(log_path), [])
+            audit = [row for row in _audit(stderr) if row.get("tool")]
+            self.assertEqual(audit[0]["approval_error"], "malformed approval")
+            self.assertEqual(audit[0]["approver_id"], "")
+            self.assertFalse(audit[0]["approved"])
+            self.assertNotIn(b"example-approval", stderr)
+            self.assertNotIn(KEY.encode("utf-8"), stderr)
+
+    def test_legacy_flag_forwards_ask_without_binding_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "calls.jsonl"
+            guard = GuardProcess(
+                AGENTS / "support_reply.prout",
+                log_path,
+                extra=["--allow-legacy-approval-token", "--approval-token", "example-approval"],
+            )
+            try:
+                guard.request(
+                    "initialize",
+                    {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                )
+                first = guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                second = guard.request(
+                    "tools/call",
+                    {"name": "mail.send_reply", "arguments": {"body": "fictional"}},
+                )
                 blocked = guard.request("tools/call", {"name": "payments.charge", "arguments": {}})
+                self.assertEqual(first["result"]["content"][0]["text"], "upstream:mail.send_reply")
+                self.assertEqual(second["result"]["content"][0]["text"], "upstream:mail.send_reply")
                 self.assertTrue(blocked["result"]["isError"])
-                self.assertIn("BLOCK:", blocked["result"]["content"][0]["text"])
+            finally:
+                stderr = guard.close()
+            self.assertEqual(_logged_tools(log_path), ["mail.send_reply", "mail.send_reply"])
+            audit = [row for row in _audit(stderr) if row.get("tool")]
+            self.assertEqual(audit[0]["approval_mode"], "legacy")
+            self.assertEqual(audit[0]["approver_id"], "")
+            self.assertEqual(audit[0]["approval_id"], "")
+            self.assertTrue(audit[1]["approved"])
+            self.assertFalse(audit[2]["approved"])
+            self.assertNotIn(b"example-approval", stderr)
+
+    def test_reuse_wrong_contract_wrong_args_and_expiry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            key_path = root / "approval.key"
+            key_path.write_text(KEY + "\n", encoding="utf-8")
+            nonce_path = root / "nonces.json"
+            token, payload = _approval_token()
+            log_path = root / "reuse.jsonl"
+            guard = GuardProcess(
+                AGENTS / "support_reply.prout",
+                log_path,
+                env_extra={
+                    "PROUT_APPROVAL_KEY": KEY,
+                    "PROUT_APPROVAL_NONCE_FILE": str(nonce_path),
+                    "PROUT_APPROVAL_TOKEN": token,
+                },
+            )
+            try:
+                guard.request(
+                    "initialize",
+                    {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                )
+                mismatch = guard.request(
+                    "tools/call",
+                    {"name": "mail.send_reply", "arguments": {"body": "fictional"}},
+                )
+                self.assertIn("different arguments", mismatch["result"]["content"][0]["text"])
+                self.assertEqual(mismatch["result"]["structuredContent"]["approval_id"], payload["approval_id"])
+                forwarded = guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertEqual(forwarded["result"]["content"][0]["text"], "upstream:mail.send_reply")
+                reused = guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertIn("already used", reused["result"]["content"][0]["text"])
             finally:
                 stderr = guard.close()
             self.assertEqual(_logged_tools(log_path), ["mail.send_reply"])
-            audit = [row for row in _audit(stderr) if row.get("tool")]
-            self.assertEqual(audit[0]["verdict"], "ASK")
-            self.assertTrue(audit[0]["approved"])
-            self.assertTrue(audit[0]["forwarded"])
-            self.assertNotIn(b"example-approval", stderr)
+            self.assertNotIn(token.encode("utf-8"), stderr)
+            self.assertNotIn(KEY.encode("utf-8"), stderr)
+
+            other, _ = _approval_token(audit_id="ab" * 32, nonce="c" * 32, approval_id="d" * 32)
+            other_log = root / "other.jsonl"
+            other_guard = GuardProcess(
+                AGENTS / "support_reply.prout",
+                other_log,
+                env_extra={
+                    "PROUT_APPROVAL_KEY": KEY,
+                    "PROUT_APPROVAL_NONCE_FILE": str(root / "other-nonces.json"),
+                    "PROUT_APPROVAL_TOKEN": other,
+                },
+            )
+            try:
+                other_guard.request(
+                    "initialize",
+                    {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                )
+                rejected = other_guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertIn("different contract", rejected["result"]["content"][0]["text"])
+            finally:
+                other_guard.close()
+            self.assertEqual(_logged_tools(other_log), [])
+
+            expired, _ = _approval_token(exp=int(time.time()) - 10, nonce="e" * 32, approval_id="f" * 32)
+            expired_log = root / "expired.jsonl"
+            expired_guard = GuardProcess(
+                AGENTS / "support_reply.prout",
+                expired_log,
+                env_extra={
+                    "PROUT_APPROVAL_KEY": KEY,
+                    "PROUT_APPROVAL_NONCE_FILE": str(root / "expired-nonces.json"),
+                    "PROUT_APPROVAL_TOKEN": expired,
+                },
+            )
+            try:
+                expired_guard.request(
+                    "initialize",
+                    {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                )
+                rejected = expired_guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertIn("approval expired", rejected["result"]["content"][0]["text"])
+                again = expired_guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                self.assertIn("approval expired", again["result"]["content"][0]["text"])
+            finally:
+                expired_guard.close()
+            self.assertEqual(_logged_tools(expired_log), [])
+            self.assertFalse((root / "expired-nonces.json").exists())
+
+            wrong_tool, _ = _approval_token(op="tickets.read", nonce="1" * 32, approval_id="2" * 32)
+            wrong_gate, _ = _approval_token(gate="other_gate", nonce="3" * 32, approval_id="4" * 32)
+            for label, bad in (("different tool", wrong_tool), ("different gate", wrong_gate)):
+                bad_log = root / f"{label}.jsonl"
+                bad_guard = GuardProcess(
+                    AGENTS / "support_reply.prout",
+                    bad_log,
+                    env_extra={
+                        "PROUT_APPROVAL_KEY": KEY,
+                        "PROUT_APPROVAL_NONCE_FILE": str(root / f"{label}-nonces.json"),
+                        "PROUT_APPROVAL_TOKEN": bad,
+                    },
+                )
+                try:
+                    bad_guard.request(
+                        "initialize",
+                        {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
+                    )
+                    rejected = bad_guard.request("tools/call", {"name": "mail.send_reply", "arguments": {}})
+                    self.assertIn(label, rejected["result"]["content"][0]["text"])
+                finally:
+                    bad_guard.close()
+                self.assertEqual(_logged_tools(bad_log), [])
 
     def test_net_allow_list_and_a_broken_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -226,7 +464,8 @@ class GuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "calls.jsonl"
             env = os.environ.copy()
-            env.pop("PROUT_APPROVAL_TOKEN", None)
+            for name in _SECRET_ENV:
+                env.pop(name, None)
             env["FAKE_MCP_LOG"] = str(log_path)
             proc = subprocess.Popen(
                 [
