@@ -146,7 +146,7 @@ python3 prout.py import mcp examples/agents/tools/mcp_tools.json
 python3 prout.py guard --contract examples/agents/support_reply.prout -- python3 path/to/upstream_server.py
 ```
 
-`prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
+`prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `prout approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
 
 ## Pattern layer
 

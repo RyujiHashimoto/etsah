@@ -2,13 +2,17 @@
 
 ``prout guard --contract file.prout -- <upstream command>`` answers the MCP
 client itself and forwards ``tools/list`` and allowed ``tools/call`` messages
-to the upstream server. BLOCK is a tool result with ``isError`` true. ASK is
-a tool result that asks for a person, and the upstream call is not made,
-unless ``PROUT_APPROVAL_TOKEN`` or ``--approval-token`` is a non-empty string.
-The token is a presence flag for this first step. It does not override BLOCK,
-and it is not written to the log.
+to the upstream server. BLOCK is a tool result with ``isError`` true and is
+never forwarded. ASK is forwarded only when ``PROUT_APPROVAL_TOKEN`` or
+``--approval-token`` is a signed approval for this contract, gate, tool, and
+argument hash, and the nonce has not been used. The shared key is read from
+the environment or from a file and is not written to the log.
 
-Each decision is one JSON object on stderr, including ``audit_id``.
+``--allow-legacy-approval-token`` (or ``PROUT_ALLOW_LEGACY_APPROVAL_TOKEN=1``)
+restores the old presence check. That flag is deprecated.
+
+Each decision is one JSON object on stderr, including ``audit_id``. A signed
+approval also records ``approver_id`` and ``approval_id``.
 """
 from __future__ import annotations
 
@@ -19,11 +23,20 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Optional
 
 from prout_mcp import __version__
-from prout_mcp.decide import ALLOW, ASK, BLOCK, LoadedContract, decide_call, load_contract
+from prout_mcp.approval import (
+    ApprovalError,
+    Authorization,
+    authorize,
+    hash_arguments,
+    legacy_enabled,
+    load_key,
+)
+from prout_mcp.decide import ALLOW, ASK, BLOCK, LoadedContract, decide_call, gates_for_tool, load_contract
 from prout_mcp.framing import read_message, write_message
 from prout_mcp.server import initialize_result, protocol_version, rpc_error, rpc_ok
 
@@ -32,7 +45,7 @@ _TIMEOUT = 5.0
 _GUARD_INSTRUCTIONS = (
     "This proxy checks every tools/call against a PROUT contract before the upstream server sees it. "
     "ALLOW is forwarded. BLOCK is returned as an error and is not forwarded. "
-    "ASK is not forwarded unless PROUT_APPROVAL_TOKEN or --approval-token is set. "
+    "ASK is forwarded only for a signed, unexpired, unused approval of this contract, gate, tool, and arguments. "
     "The checker does not send mail or move money."
 )
 
@@ -118,6 +131,15 @@ class Upstream:
                 self.proc.kill()
 
 
+@dataclass
+class _ApprovalSetup:
+    token: str
+    legacy: bool
+    key: Optional[bytes]
+    key_error: str
+    nonce_file: str
+
+
 def run_guard(
     *,
     contract: str,
@@ -126,6 +148,9 @@ def run_guard(
     allow_net: Optional[list[str]] = None,
     deny_net: Optional[list[str]] = None,
     approval_token: Optional[str] = None,
+    allow_legacy: bool = False,
+    approval_key_file: Optional[str] = None,
+    nonce_file: Optional[str] = None,
     stdin: Optional[BinaryIO] = None,
     stdout: Optional[BinaryIO] = None,
     timeout: float = _TIMEOUT,
@@ -140,8 +165,12 @@ def run_guard(
         print(f"[ERROR] {ex}", file=sys.stderr)
         return 2
     loaded = load_contract(source, allow_net=allow_net, deny_net=deny_net)
-    token = approval_token if approval_token is not None else os.environ.get("PROUT_APPROVAL_TOKEN", "")
-    approved = bool(isinstance(token, str) and token.strip())
+    setup = _approval_setup(
+        approval_token=approval_token,
+        allow_legacy=allow_legacy,
+        approval_key_file=approval_key_file,
+        nonce_file=nonce_file,
+    )
     incoming = stdin if stdin is not None else sys.stdin.buffer
     outgoing = stdout if stdout is not None else sys.stdout.buffer
     try:
@@ -151,10 +180,40 @@ def run_guard(
         return 2
     try:
         _initialize_upstream(peer, timeout)
-        _serve(incoming, outgoing, peer, loaded, agent=agent, approved=approved, timeout=timeout)
+        _serve(incoming, outgoing, peer, loaded, agent=agent, approval=setup, timeout=timeout)
     finally:
         peer.close()
     return 0
+
+
+def _approval_setup(
+    *,
+    approval_token: Optional[str],
+    allow_legacy: bool,
+    approval_key_file: Optional[str],
+    nonce_file: Optional[str],
+) -> _ApprovalSetup:
+    if approval_token is None:
+        token = os.environ.get("PROUT_APPROVAL_TOKEN", "")
+    else:
+        token = approval_token
+    token = token.strip() if isinstance(token, str) else ""
+    legacy = legacy_enabled(allow_legacy)
+    store = nonce_file if nonce_file is not None else os.environ.get("PROUT_APPROVAL_NONCE_FILE", "")
+    key: Optional[bytes] = None
+    key_error = ""
+    if token and not legacy:
+        try:
+            key = load_key(approval_key_file)
+        except ApprovalError as ex:
+            key_error = str(ex)
+    return _ApprovalSetup(
+        token=token,
+        legacy=legacy,
+        key=key,
+        key_error=key_error,
+        nonce_file=store.strip(),
+    )
 
 
 def _initialize_upstream(peer: Upstream, timeout: float) -> None:
@@ -189,7 +248,7 @@ def _serve(
     loaded: LoadedContract,
     *,
     agent: str,
-    approved: bool,
+    approval: _ApprovalSetup,
     timeout: float,
 ) -> None:
     while True:
@@ -206,7 +265,7 @@ def _serve(
                 peer,
                 loaded,
                 agent=agent,
-                approved=approved,
+                approval=approval,
                 timeout=timeout,
             )
         except BrokenPipeError:
@@ -224,7 +283,7 @@ def handle_client(
     loaded: LoadedContract,
     *,
     agent: str,
-    approved: bool,
+    approval: _ApprovalSetup,
     timeout: float,
 ) -> Optional[dict[str, Any]]:
     method = message.get("method")
@@ -255,7 +314,7 @@ def handle_client(
     if method == "tools/call":
         if not has_id:
             return None
-        return guard_call(message["id"], params, peer, loaded, agent=agent, approved=approved, timeout=timeout)
+        return guard_call(message["id"], params, peer, loaded, agent=agent, approval=approval, timeout=timeout)
     if not has_id:
         try:
             peer.notify(method, params)
@@ -272,38 +331,107 @@ def guard_call(
     loaded: LoadedContract,
     *,
     agent: str,
-    approved: bool,
+    approval: _ApprovalSetup,
     timeout: float,
 ) -> dict[str, Any]:
     name = params.get("name", "")
     if not isinstance(name, str):
         name = ""
+    arguments = params.get("arguments", {})
+    if arguments is None:
+        arguments = {}
     decision = decide_call(loaded, name.strip(), agent=agent)
-    token_used = bool(approved and decision.verdict == ASK)
+    try:
+        args_hash = hash_arguments(arguments)
+    except ApprovalError:
+        args_hash = ""
+    approver_id = ""
+    approval_id = ""
+    approval_error = ""
+    approval_mode = ""
+    token_used = False
+    if decision.verdict == ASK and approval.token:
+        if approval.legacy:
+            token_used = True
+            approval_mode = "legacy"
+        else:
+            granted = _authorize_ask(approval, loaded, decision.tool, arguments)
+            approver_id = granted.approver_id
+            approval_id = granted.approval_id
+            if granted.accepted:
+                token_used = True
+                approval_mode = "signed"
+            else:
+                approval_error = granted.error
     forward_call = decision.verdict == ALLOW or token_used
-    log_decision(
-        {
-            "audit_id": loaded.audit_id,
-            "tool": decision.tool,
-            "verdict": decision.verdict,
-            "reason": decision.reason,
-            "forwarded": forward_call,
-            "approved": token_used,
-        }
-    )
+    record: dict[str, Any] = {
+        "audit_id": loaded.audit_id,
+        "tool": decision.tool,
+        "verdict": decision.verdict,
+        "reason": decision.reason,
+        "forwarded": forward_call,
+        "approved": token_used,
+        "approver_id": approver_id,
+        "approval_id": approval_id,
+        "args_hash": args_hash,
+    }
+    if approval_mode:
+        record["approval_mode"] = approval_mode
+    if approval_error:
+        record["approval_error"] = approval_error
+    log_decision(record)
     if not forward_call:
-        return rpc_ok(msg_id, decision_result(decision.verdict, decision.tool, decision.reason, loaded.audit_id))
+        return rpc_ok(
+            msg_id,
+            decision_result(
+                decision.verdict,
+                decision.tool,
+                decision.reason,
+                loaded.audit_id,
+                args_hash=args_hash,
+                approver_id=approver_id,
+                approval_id=approval_id,
+                approval_error=approval_error,
+            ),
+        )
     return forward(msg_id, "tools/call", params, peer, timeout)
 
 
-def decision_result(verdict: str, tool: str, reason: str, audit_id: str) -> dict[str, Any]:
+def _authorize_ask(approval: _ApprovalSetup, loaded: LoadedContract, tool: str, arguments: Any) -> Authorization:
+    if approval.key_error:
+        return Authorization(False, error=approval.key_error)
+    return authorize(
+        approval.token,
+        key=approval.key,
+        nonce_file=approval.nonce_file,
+        audit_id=loaded.audit_id,
+        op=tool,
+        arguments=arguments,
+        gates=gates_for_tool(loaded, tool),
+    )
+
+
+def decision_result(
+    verdict: str,
+    tool: str,
+    reason: str,
+    audit_id: str,
+    *,
+    args_hash: str = "",
+    approver_id: str = "",
+    approval_id: str = "",
+    approval_error: str = "",
+) -> dict[str, Any]:
     """Tool result for a call that was not forwarded."""
     asking = verdict == ASK
     if asking:
         text = (
             f"ASK: human approval required before calling {tool}. {reason} "
-            "No upstream call was made. Set PROUT_APPROVAL_TOKEN or pass --approval-token to forward this call."
+            "No upstream call was made. "
+            "Forwarding requires a signed approval from `prout approve` for this contract, gate, tool, and arguments."
         )
+        if approval_error:
+            text += f" Approval was not accepted: {approval_error}."
     else:
         text = f"BLOCK: {reason}"
     payload = {
@@ -313,7 +441,12 @@ def decision_result(verdict: str, tool: str, reason: str, audit_id: str) -> dict
         "audit_id": audit_id,
         "forwarded": False,
         "approval_required": asking,
+        "approver_id": approver_id,
+        "approval_id": approval_id,
+        "args_hash": args_hash,
     }
+    if approval_error:
+        payload["approval_error"] = approval_error
     return {
         "content": [{"type": "text", "text": text}],
         "structuredContent": payload,
@@ -344,7 +477,7 @@ def forward(msg_id: Any, method: str, params: dict[str, Any], peer: Upstream, ti
 
 
 def log_decision(record: dict[str, Any]) -> None:
-    """Write one audit record to stderr. The token is never included."""
+    """Write one audit record to stderr. The token and the shared key are never included."""
     write_message(sys.stderr.buffer, record)
 
 
@@ -357,7 +490,22 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument(
         "--approval-token",
         default=None,
-        help="forward ASK calls when this value is non-empty; otherwise PROUT_APPROVAL_TOKEN is read",
+        help="signed approval for one ASK call; otherwise PROUT_APPROVAL_TOKEN is read. The key is not this value",
+    )
+    parser.add_argument(
+        "--approval-key-file",
+        default=None,
+        help="shared HMAC key file. Otherwise PROUT_APPROVAL_KEY_FILE or PROUT_APPROVAL_KEY",
+    )
+    parser.add_argument(
+        "--nonce-file",
+        default=None,
+        help="file that records used nonces. Otherwise PROUT_APPROVAL_NONCE_FILE",
+    )
+    parser.add_argument(
+        "--allow-legacy-approval-token",
+        action="store_true",
+        help="deprecated: forward every ASK when the token is a non-empty string. BLOCK is still not forwarded",
     )
     parser.add_argument("upstream", nargs=argparse.REMAINDER, help="upstream command after --")
     args = parser.parse_args(argv)
@@ -372,5 +520,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             allow_net=args.allow_net,
             deny_net=args.deny_net,
             approval_token=args.approval_token,
+            allow_legacy=args.allow_legacy_approval_token,
+            approval_key_file=args.approval_key_file,
+            nonce_file=args.nonce_file,
         )
     )

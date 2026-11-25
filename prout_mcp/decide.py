@@ -137,6 +137,30 @@ def decide_call(loaded: LoadedContract, tool: str, *, agent: str = "") -> StepDe
     return _decide_tool(loaded, tool, agent=agent)
 
 
+def gates_for_tool(loaded: LoadedContract, tool: str) -> list[tuple[str, str]]:
+    """Named gates that cover every gated effect of ``tool``.
+
+    Each item is ``(gate name, approver)``. A gate that no task names is
+    omitted. An op that does not need a gate returns an empty list. This is
+    the set a signed approval may name. It does not change the verdict.
+    """
+    if loaded.parse_error or not loaded.ok or loaded.program is None or not tool:
+        return []
+    ops = {op.name: op for op in loaded.program.ops}
+    op = ops.get(tool)
+    if op is None:
+        return []
+    gated = [effect for effect in op.effects if _needs_gate(effect, loaded)]
+    if not gated:
+        return []
+    found: list[tuple[str, str]] = []
+    for gate in _named_gates(loaded.program):
+        covered = set(gate.before)
+        if all(effect in covered for effect in gated):
+            found.append((gate.name, gate.approver))
+    return found
+
+
 def decide_step(loaded: LoadedContract, step: Any, *, agent: str = "") -> StepDecision:
     if not isinstance(step, dict):
         return StepDecision(tool="", verdict=BLOCK, reason="a plan step must be an object with a tool name")

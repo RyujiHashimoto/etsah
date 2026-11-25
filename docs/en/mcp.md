@@ -53,17 +53,47 @@ python3 prout.py guard --contract examples/agents/support_reply.prout -- python3
 |---|---|---|
 | `ALLOW` | The upstream result | The call is forwarded |
 | `BLOCK` | A tool result with `isError: true` and the reason | No call |
-| `ASK` | A tool result that asks for a person | No call, unless an approval token is set |
+| `ASK` | A tool result that asks for a person | No call, unless a signed approval matches this call |
 
-`PROUT_APPROVAL_TOKEN` or `--approval-token` forwards `ASK` when the value is non-empty. The token is a presence flag for this first step. It does not select a gate, it does not override `BLOCK`, and it is not written to the log. Each decision is one JSON object on stderr:
+Forwarding `ASK` requires a signature from `prout approve`. The signature is HMAC-SHA256 from the Python standard library. The shared key is `PROUT_APPROVAL_KEY`, or a file named by `--approval-key-file` / `PROUT_APPROVAL_KEY_FILE`. A key file is one line. A leading BOM and one trailing newline are ignored. Set only one key source. The key is not a command-line argument and it is not written to the log.
+
+An approval binds all of the following:
+
+| Claim | What must match |
+|---|---|
+| Approver | The `approver` declared on the gate |
+| Contract | `audit_id`, the contract's SHA-256 |
+| Gate | A gate a task names, covering every gated effect of the tool |
+| Tool | The op name |
+| Arguments | SHA-256 of the arguments as canonical JSON. Key order does not matter. `1` and `1.0` are different values. Omitted arguments hash as `{}` |
+| Expiry | `exp`, a unix time. The approval is expired when `now >= exp`. The maximum life is 366 days |
+| One use | The `nonce` and the `approval_id` are recorded in a file. Reusing either is rejected |
+
+A bad signature, an expired approval, a different contract, a different gate, a different tool, different arguments, a different approver, or a reuse are all refused. A token that does not match is not recorded as used. Once the guard decides to forward, a later upstream failure does not return the nonce. `BLOCK` is not overridden by a signature.
+
+```bash
+python3 prout.py approve \
+  --contract examples/agents/support_reply.prout \
+  --gate approve_reply \
+  --op mail.send_reply \
+  --approver support_lead \
+  --args '{}' \
+  --ttl 300
+```
+
+The token is one line on stdout. Pass it as `PROUT_APPROVAL_TOKEN`. `--approval-token` is also read, but it shows up in the process list, so leave it unused on a machine with other users. The guard needs the same key and a nonce file (`--nonce-file` or `PROUT_APPROVAL_NONCE_FILE`). One-time use holds across the guards that share that file.
+
+Each decision is one JSON object on stderr. A signature that verifies records `approver_id` and `approval_id`. The key and the token are not recorded.
 
 ```json
-{"audit_id":"<64 hex digits>","tool":"mail.send_reply","verdict":"ASK","reason":"...","forwarded":false,"approved":false}
+{"audit_id":"<64 hex digits>","tool":"mail.send_reply","verdict":"ASK","reason":"...","forwarded":true,"approved":true,"approver_id":"support_lead","approval_id":"<16 or more characters>","approval_mode":"signed","args_hash":"<64 hex digits>"}
 ```
 
 `audit_id` is the contract's SHA-256. It is empty when the source does not parse.
 
-The proxy does not count hourly limits or spend budgets, and it does not prove that `on_approved` is the only call that performs the effect.
+The previous rule, "any non-empty string forwards `ASK`", is not the default. It remains only with `--allow-legacy-approval-token` or `PROUT_ALLOW_LEGACY_APPROVAL_TOKEN=1`. That flag is deprecated. With it set, the guard does not check a signature or the arguments: a non-empty string forwards every `ASK` for that process, and no nonce is recorded. `BLOCK` is still not forwarded.
+
+The proxy does not count hourly limits or spend budgets, and it does not prove that `on_approved` is the only call that performs the effect. If no single named gate covers every gated effect of a tool, a signature cannot forward that `ASK`.
 
 ## Claude Desktop
 
@@ -101,10 +131,20 @@ A guarded upstream server, with fictional ticket mail held for approval:
 }
 ```
 
-To let `ASK` through for a local experiment, set `env` on that server entry. Do not commit a real token.
+Put the key and the used-nonce file in `env` on that server entry. Issue a token with `prout approve` for each call, and pass it as `PROUT_APPROVAL_TOKEN` when starting the guard. The values below are fictional. Do not commit a real key.
 
 ```json
 "env": {
+  "PROUT_APPROVAL_KEY_FILE": "/path/to/approval.key",
+  "PROUT_APPROVAL_NONCE_FILE": "/path/to/used-approvals.json"
+}
+```
+
+The deprecated compatibility flag is the only way to treat a non-empty string as approval. The default guard does not.
+
+```json
+"env": {
+  "PROUT_ALLOW_LEGACY_APPROVAL_TOKEN": "1",
   "PROUT_APPROVAL_TOKEN": "example-approval"
 }
 ```
@@ -143,6 +183,6 @@ The wire format is JSON-RPC 2.0, one JSON object per line. `initialize`, `tools/
 
 ## What this does not do
 
-It does not run cron, store idempotency keys, or decrement a budget. Those checks stay in the contract text. The guard is the first runtime step: one decision per call, logged with the contract hash.
+It does not run cron, store upstream idempotency keys, or decrement a budget. Those checks stay in the contract text. The guard decides once per call and logs the contract hash. A forwarded ASK also logs the approver id and the approval id. The nonce file records used approvals so they cannot be replayed. It does not remember the upstream result.
 
 日本語の手順は [docs/mcp.ja.md](../mcp.ja.md) です。
