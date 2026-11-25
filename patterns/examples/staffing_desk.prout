@@ -1,5 +1,6 @@
-# 短期案件のデスク。同じ4パターンを別の単価・期間で再利用する合成例。
-# 日次の時間外上限 7.5 は協定の設定であり、法定の1日の上限ではない。
+# 短期案件のデスク。同じ派遣パターンを別の単価・期間で再利用する合成例。
+# 日次の時間外上限 7.5 は協定の設定であり、法定の1日の上限ではない。月45時間とは比べない。
+# 特別条項は付けない。抵触日は 2026-06-01 の3年後である 2029-06-01。
 
 app staffing_desk
   stack nextjs, postgres
@@ -39,6 +40,10 @@ app staffing_desk
     hours: Duration
     status: String
 
+  entity OvertimeAgreement
+    id: Id
+    status: String
+
   entity Invoice
     id: Id
     client: Client
@@ -59,7 +64,7 @@ app staffing_desk
     client: Client
     start_date: 2026-06-01
     end_date: 2026-08-31
-    conflict_date: 2028-06-01
+    conflict_date: 2029-06-01
     exempt: none
 
   pattern timesheet
@@ -67,6 +72,14 @@ app staffing_desk
     approver: client_supervisor
     period: daily
     overtime_cap_hours: 7.5
+
+  pattern overtime_agreement
+    entity: OvertimeAgreement
+    timesheet: Timesheet
+    special_clause: none
+    warn_at_hours: 30
+    on_warning: notify
+    on_limit: reject
 
   pattern staffing_billing
     entity: Invoice

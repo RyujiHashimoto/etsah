@@ -157,7 +157,7 @@ python3 patterns/proutc.py find "approval"
 python3 patterns/proutc.py find "申請 承認"
 ```
 
-`find "申請 承認"` returns `approval`. The registry has 26 manifests, including `ai_task` and `approval_gate`. Patterns are JSON, so another agent can discover one from [`patterns/registry/index.json`](patterns/registry/index.json) without reading the compiler.
+`find "申請 承認"` returns `approval`. The registry has 27 manifests, including `overtime_agreement`, `ai_task`, and `approval_gate`. Patterns are JSON, so another agent can discover one from [`patterns/registry/index.json`](patterns/registry/index.json) without reading the compiler.
 
 [`patterns/bench/report.json`](patterns/bench/report.json) compares specs before and after `approval` existed. Reuse is the generated-line estimate divided by AI-written lines (spec plus custom).
 
@@ -173,7 +173,7 @@ The longer trial write-up is in [README.ja.md](README.ja.md).
 
 ## Industry example: a staffing desk
 
-[`patterns/examples/staffing.prout`](patterns/examples/staffing.prout) is one industry, not the center of the language. It is a fictional staffing desk: staff, openings, a dispatch contract, a timesheet the client site must approve, and a bill rate at or above the pay rate. Statutory numbers are configuration. The language does not embed them.
+[`patterns/examples/staffing.prout`](patterns/examples/staffing.prout) is one industry, not the center of the language. It is a fictional staffing desk: staff, openings, a dispatch contract, a timesheet the client site must approve, a 36-agreement whose limits are slots, and a bill rate at or above the pay rate. Omitted agreement limits default to the general statutory ceilings, and a higher cap is an error. The conflict date is both the date the client notified and a date calculated from the earliest dispatch start at the same office and for the same person and organizational unit. The compiler reads the spec only. Live hours and stored contracts are described as runtime checks and are not evaluated. Social-insurance rates and equal-pay determinations are out of scope.
 
 ```bash
 python3 patterns/proutc.py build patterns/examples/staffing.prout --out patterns/build/staffing
@@ -191,7 +191,7 @@ Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can 
 - Human HTML from the AST (`render.py`) and a static browser playground (`docs/playground/`).
 - Import of MCP and OpenAI tool lists into `op` declarations (`prout import`).
 - MCP server and a stdio guard (`prout mcp`, `prout guard`, `prout-mcp`).
-- 26 pattern manifests, `find`, and an approval `demo.html`.
+- 27 pattern manifests, `find`, and an approval `demo.html`.
 - CI on GitHub Actions.
 
 ## Status
@@ -228,7 +228,7 @@ prout_import.py          MCP and OpenAI tool lists become ops
 prout_mcp/               MCP server (prout mcp) and guard (prout guard)
 render.py                AST to human HTML
 patterns/proutc.py       pattern compiler (build, find, add, index, bench)
-patterns/registry/       26 manifests and index.json
+patterns/registry/       27 manifests and index.json
 examples/agents/         agent contracts, including broken ones
 docs/playground/         browser checker (static, Pyodide)
 ```

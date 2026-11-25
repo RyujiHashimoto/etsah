@@ -9,7 +9,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 - English README. The previous Japanese README is preserved in full as `README.ja.md`.
 - The English README leads with contracts for AI agents: declare effects and approvals, and catch an unsafe automation before it runs. After merging main through #16, that page also covers `agent` / `task`, MCP, and the browser playground.
 - `SPEC.en.md`, an English translation of `SPEC.md`. The Japanese spec remains the original.
-- An English summary at the top of `docs/staffing.md`. The Japanese note is unchanged.
+- An English summary at the top of `docs/staffing.md`. The Japanese note now also describes calculated conflict dates and 36-agreement ceilings, and the English summary matches it.
+- Pattern `overtime_agreement`, and a calculated 抵触日 on `dispatch_contract`. Both check spec constants only. Runtime checks are described, not executed.
 - `CONTRIBUTING.md` in English, with a short Japanese section.
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md`, `CHANGELOG.md`.
 - GitHub issue templates (bug, feature, new pattern) and a pull request template.

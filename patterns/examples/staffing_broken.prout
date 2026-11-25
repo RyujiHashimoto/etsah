@@ -1,7 +1,8 @@
-# 意図的に壊した派遣仕様。proutc build は次の3件で失敗する。
+# 意図的に壊した派遣仕様。proutc build は少なくとも次で失敗する。
 # 1. 請求単価 1500 が支払単価 1800.50 を下回る
 # 2. 契約終了 2029-04-02 が抵触日 2029-04-01 を超える
 # 3. 勤怠に approver が無く、派遣先承認が欠けている
+# 4. overtime_hours があるのに 36協定（overtime_agreement）が無い
 
 app staffing_broken
   stack nextjs, postgres
@@ -37,6 +38,7 @@ app staffing_broken
     contract: DispatchContract
     work_date: Date
     hours: Duration
+    overtime_hours: Duration
     status: String
 
   entity Invoice

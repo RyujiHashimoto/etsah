@@ -26,6 +26,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Union
 
+import staffing_rules
+
 ROOT = Path(__file__).resolve().parent
 DEFAULT_REGISTRY = ROOT / "registry"
 
@@ -1231,6 +1233,9 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             if destination not in scene_ids:
                 err("E-SCENE", f"{label!r} links to unknown scene {destination!r}", scene.line)
 
+    for note in staffing_rules.analyze(app):
+        diags.append(Diagnostic(note.code, note.message, note.line, note.severity))
+
     return diags
 
 
@@ -1312,6 +1317,9 @@ def expand(app: App, registry: dict[str, PatternManifest]) -> list[Artifact]:
     for c in app.customs:
         arts.append(Artifact("custom", f"custom/{c.name}.ts", "TS", c.lines, c.why or "custom logic"))
 
+    for pattern, path, kind, lines, desc in staffing_rules.runtime_artifacts(app):
+        arts.append(Artifact(pattern, path, kind, lines, desc))
+
     return arts
 
 
@@ -1358,6 +1366,7 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         "approval_gate": "承認ゲート",
         "custom": "カスタム",
     }
+    pattern_labels["overtime_agreement"] = "36協定"
 
     group_html = []
     for key in pattern_order:
@@ -2042,6 +2051,11 @@ def cmd_build(args: argparse.Namespace) -> int:
             print(d.render())
     else:
         print("OK — no issues")
+    checks = staffing_rules.runtime_checks(app)
+    rendered_checks = staffing_rules.format_checks(checks)
+    if rendered_checks:
+        print()
+        print(rendered_checks)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -2072,6 +2086,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             for a in arts
         ],
         "diagnostics": [d.render() for d in diags],
+        "runtime_checks": checks,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote {out / 'report.html'}")

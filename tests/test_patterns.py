@@ -164,6 +164,13 @@ class TestSlots(unittest.TestCase):
             "dispatch_contract": {"entity", "staff", "client", "start_date", "end_date", "conflict_date"},
             "staffing_billing": {"entity", "timesheet", "bill_rate", "pay_rate"},
             "matching": {"staff", "opening", "skills"},
+            "overtime_agreement": {
+                "entity",
+                "timesheet",
+                "warn_at_hours",
+                "on_warning",
+                "on_limit",
+            },
             "ai_task": {
                 "entity",
                 "trigger",
