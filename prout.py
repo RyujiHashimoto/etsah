@@ -37,6 +37,7 @@ class Diagnostic:
     line: int = 0
     fix: Optional[str] = None
     detail: Optional[str] = None
+    context: Optional[dict] = None
 
     def as_dict(self) -> dict:
         d = {
@@ -49,6 +50,8 @@ class Diagnostic:
             d["fix"] = self.fix
         if self.detail:
             d["detail"] = self.detail
+        if self.context:
+            d["context"] = self.context
         return d
 
     def render(self) -> str:
@@ -62,6 +65,28 @@ class Diagnostic:
 # ---------------------------------------------------------------------------
 # AST
 # ---------------------------------------------------------------------------
+
+class TypeRef(str):
+    """A base type name plus an unordered set of information-flow labels.
+
+    ``TypeRef`` is a ``str`` so existing base-type comparisons keep working.
+    Labels are intentionally not part of ``==``; compare ``.labels`` when the
+    information-flow meaning matters.
+    """
+
+    labels: frozenset[str]
+
+    def __new__(cls, base: str, labels: "frozenset[str] | set[str] | None" = None):
+        obj = super().__new__(cls, base)
+        obj.labels = frozenset(labels or ())
+        return obj
+
+    def with_labels(self, labels: "frozenset[str] | set[str]") -> "TypeRef":
+        return TypeRef(str(self), labels)
+
+    def __repr__(self) -> str:
+        return f"TypeRef({str(self)!r}, {sorted(self.labels)!r})"
+
 
 @dataclass
 class Expr:
@@ -86,16 +111,66 @@ class Stmt:
 @dataclass
 class TypeDef:
     name: str
-    fields: dict[str, str] = field(default_factory=dict)
+    fields: dict[str, TypeRef] = field(default_factory=dict)
     opaque: bool = False
     line: int = 0
+    labels: frozenset[str] = frozenset()
+
+
+@dataclass
+class LabelDef:
+    name: str
+    doc: str = ""
+    line: int = 0
+
+
+@dataclass
+class Sends:
+    args: list[str] = field(default_factory=list)
+    effect: tuple[str, str] = ("", "")
+    line: int = 0
+
+
+@dataclass
+class SinkRule:
+    kind: str
+    target: str
+    mode: str
+    labels: list[str] = field(default_factory=list)
+    line: int = 0
+
+
+@dataclass
+class DeclassifyRule:
+    label: str
+    scope: str
+    role: str
+    line: int = 0
+
+
+@dataclass
+class PolicyDef:
+    """One policy block.
+
+    ``kind`` is ``"flow"`` for information-flow ``sink`` / ``declassify`` rules,
+    and ``"task"`` for the agent envelope (``external`` / ``payment`` / ``contract``).
+    A program may contain one of each. The two shapes do not share fields.
+    """
+
+    line: int = 0
+    kind: str = ""
+    sinks: list[SinkRule] = field(default_factory=list)
+    declassify: list[DeclassifyRule] = field(default_factory=list)
+    external: list[tuple[str, str]] = field(default_factory=list)
+    payment: list[tuple[str, str]] = field(default_factory=list)
+    contract: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
 class OpDef:
     name: str
-    params: list[tuple[str, str]]
-    ret: str
+    params: list[tuple[str, TypeRef]]
+    ret: TypeRef
     line: int = 0
     doc: str = ""
     effects: list[tuple[str, str]] = field(default_factory=list)
@@ -103,13 +178,14 @@ class OpDef:
     posts: list[Expr] = field(default_factory=list)
     impl: Optional[Expr] = None
     native: bool = False
+    sends: list[Sends] = field(default_factory=list)
 
 
 @dataclass
 class FlowDef:
     name: str
-    params: list[tuple[str, str]]
-    ret: str
+    params: list[tuple[str, TypeRef]]
+    ret: TypeRef
     line: int = 0
     doc: str = ""
     summary: str = ""
@@ -143,16 +219,6 @@ class GateDef:
     approver: str = ""
     before: list[tuple[str, str]] = field(default_factory=list)
     on_approved: str = ""
-
-
-@dataclass
-class PolicyDef:
-    """Which effects are external, payments, or contract changes."""
-
-    line: int = 0
-    external: list[tuple[str, str]] = field(default_factory=list)
-    payment: list[tuple[str, str]] = field(default_factory=list)
-    contract: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -191,7 +257,9 @@ class Program:
     agents: list[AgentDef] = field(default_factory=list)
     tasks: list[TaskDef] = field(default_factory=list)
     gates: list[GateDef] = field(default_factory=list)
+    labels: list[LabelDef] = field(default_factory=list)
     policies: list[PolicyDef] = field(default_factory=list)
+    label_errors: list[tuple[str, int]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +405,15 @@ class ExprParser:
         if kind == "IDENT":
             self.advance()
             name = value
+            if name == "declassify" and self.peek()[1] == "(":
+                self.advance()
+                args = [self.parse_or()]
+                while self.match(","):
+                    args.append(self.parse_or())
+                self.expect(")")
+                if len(args) != 3:
+                    raise ProutError("declassify expects 3 arguments", line)
+                return Expr("declassify", line=line, name="declassify", args=args)
             if self.match("("):
                 args: list[Expr] = []
                 if not self.match(")"):
@@ -453,13 +530,75 @@ def split_top_level(s: str, sep: str = ",") -> list[str]:
     return [p for p in parts if p]
 
 
-def parse_params(s: str, line: int) -> list[tuple[str, str]]:
-    out: list[tuple[str, str]] = []
+EFFECT_KINDS = {"read", "write", "net", "spend", "emit"}
+LABEL_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+TYPE_RE = r"[A-Za-z_]\w*(?:<[^>]+>)?"
+
+
+def parse_type_ref(s: str, line: int, issues: list[tuple[str, int]]) -> TypeRef:
+    """Parse ``Base @label @label`` into a TypeRef.
+
+    Structural label problems are collected as ``E-LABEL`` diagnostics rather
+    than parse errors, so the rest of the program can still be checked.
+    """
+    s = s.strip()
+    if not s:
+        raise ProutError("empty type", line)
+
+    depth = 0
+    cut = -1
+    for i, ch in enumerate(s):
+        if ch == "<":
+            depth += 1
+        elif ch == ">":
+            depth -= 1
+        elif ch == "@" and depth == 0:
+            cut = i
+            break
+
+    if cut < 0:
+        if "@" in s:
+            issues.append((f"label inside a type argument is not supported in v0.1: {s!r}", line))
+            s = re.sub(r"\s*@\s*[A-Za-z_]\w*", "", s)
+        base = s.strip()
+        if not re.fullmatch(TYPE_RE, base):
+            raise ProutError(f"bad type {s!r}", line)
+        return TypeRef(base)
+
+    base = s[:cut].strip()
+    rest = s[cut:]
+    if not re.fullmatch(TYPE_RE, base):
+        raise ProutError(f"bad type {base!r}", line)
+
+    labels: list[str] = []
+    pos = 0
+    for m in re.finditer(r"@\s*([A-Za-z_]\w*)", rest):
+        if rest[pos:m.start()].strip():
+            raise ProutError(f"bad label list {rest!r}", line)
+        pos = m.end()
+        name = m.group(1)
+        if name == "public":
+            issues.append(("public is implicit and cannot be written as a label", line))
+        elif not LABEL_RE.fullmatch(name):
+            issues.append((f"label {name!r} must be lowercase", line))
+        elif name in EFFECT_KINDS:
+            issues.append((f"label {name!r} conflicts with an effect kind", line))
+        elif name in labels:
+            issues.append((f"duplicate label {name!r}", line))
+        else:
+            labels.append(name)
+    if rest[pos:].strip():
+        raise ProutError(f"bad label list {rest!r}", line)
+    return TypeRef(base, labels)
+
+
+def parse_params(s: str, line: int, issues: list[tuple[str, int]]) -> list[tuple[str, TypeRef]]:
+    out: list[tuple[str, TypeRef]] = []
     for p in split_top_level(s):
         if ":" not in p:
             raise ProutError(f"bad parameter {p!r}; expected name: Type", line)
         n, t = p.split(":", 1)
-        out.append((n.strip(), t.strip()))
+        out.append((n.strip(), parse_type_ref(t, line, issues)))
     return out
 
 
@@ -473,14 +612,12 @@ def parse_effects(s: str, line: int) -> list[tuple[str, str]]:
     return out
 
 
-TYPE_RE = r"[A-Za-z_]\w*(?:<[^>]+>)?"
-
-
 class Parser:
     def __init__(self, text: str):
         self.source_text = text
         self.lines = preprocess(text)
         self.i = 0
+        self.issues: list[tuple[str, int]] = []
 
     def peek(self) -> Optional[Line]:
         return self.lines[self.i] if self.i < len(self.lines) else None
@@ -497,6 +634,7 @@ class Parser:
         agents: list[AgentDef] = []
         tasks: list[TaskDef] = []
         gates: list[GateDef] = []
+        labels: list[LabelDef] = []
         policies: list[PolicyDef] = []
         while self.peek():
             line = self.peek()
@@ -514,18 +652,40 @@ class Parser:
                 tasks.append(self.parse_task())
             elif line.text.startswith("gate "):
                 gates.append(self.parse_gate())
+            elif line.text.startswith("label "):
+                labels.append(self.parse_label())
             elif line.text == "policy":
                 policies.append(self.parse_policy())
             else:
                 raise ProutError(f"unknown declaration {line.text!r}", line.no)
-        return Program(types, ops, flows, self.source_text, agents, tasks, gates, policies)
+        return Program(
+            types,
+            ops,
+            flows,
+            self.source_text,
+            agents,
+            tasks,
+            gates,
+            labels,
+            policies,
+            self.issues,
+        )
+
+    def parse_label(self) -> LabelDef:
+        line = self.advance()
+        m = re.fullmatch(r"label\s+([A-Za-z_]\w*)(?:\s+(.+))?", line.text)
+        if not m:
+            raise ProutError(f"bad label declaration {line.text!r}", line.no)
+        doc = self.parse_string(m.group(2), line.no) if m.group(2) else ""
+        return LabelDef(m.group(1), doc, line.no)
 
     def parse_type(self) -> TypeDef:
         line = self.advance()
-        m = re.fullmatch(r"type\s+([A-Za-z_]\w*)\s*\{", line.text)
+        m = re.fullmatch(r"type\s+([A-Za-z_]\w*)((?:\s*@\s*[A-Za-z_]\w*)*)\s*\{", line.text)
         if m:
             name = m.group(1)
-            fields: dict[str, str] = {}
+            labels = parse_type_ref(name + m.group(2), line.no, self.issues).labels
+            fields: dict[str, TypeRef] = {}
             while True:
                 nxt = self.peek()
                 if nxt is None:
@@ -535,27 +695,33 @@ class Parser:
                     break
                 if nxt.indent != 2:
                     raise ProutError("type fields must be indented by 2 spaces", nxt.no)
-                fm = re.fullmatch(r"([A-Za-z_]\w*)\s*:\s*(" + TYPE_RE + r")", nxt.text)
+                fm = re.fullmatch(r"([A-Za-z_]\w*)\s*:\s*(.+)", nxt.text)
                 if not fm:
                     raise ProutError(f"bad field declaration {nxt.text!r}", nxt.no)
-                fields[fm.group(1)] = fm.group(2)
+                fields[fm.group(1)] = parse_type_ref(fm.group(2), nxt.no, self.issues)
                 self.advance()
-            return TypeDef(name, fields, False, line.no)
-        m = re.fullmatch(r"type\s+([A-Za-z_]\w*)", line.text)
+            return TypeDef(name, fields, False, line.no, labels)
+        m = re.fullmatch(r"type\s+([A-Za-z_]\w*)((?:\s*@\s*[A-Za-z_]\w*)*)", line.text)
         if m:
-            return TypeDef(m.group(1), {}, True, line.no)
+            ref = parse_type_ref(m.group(1) + m.group(2), line.no, self.issues)
+            return TypeDef(m.group(1), {}, True, line.no, ref.labels)
         raise ProutError(f"bad type declaration {line.text!r}", line.no)
 
     def parse_op(self) -> OpDef:
         line = self.advance()
         m = re.fullmatch(
-            r"op\s+([A-Za-z_][\w.]*)\s*\((.*)\)\s*->\s*(" + TYPE_RE + r")",
+            r"op\s+([A-Za-z_][\w.]*)\s*\((.*?)\)\s*->\s*(.+)",
             line.text,
         )
         if not m:
             raise ProutError(f"bad op header {line.text!r}", line.no)
         name, params_s, ret = m.group(1), m.group(2), m.group(3)
-        op = OpDef(name, parse_params(params_s, line.no), ret, line.no)
+        op = OpDef(
+            name,
+            parse_params(params_s, line.no, self.issues),
+            parse_type_ref(ret, line.no, self.issues),
+            line.no,
+        )
         while self.peek() and self.peek().indent == 2:
             prop = self.advance()
             text = prop.text
@@ -563,6 +729,8 @@ class Parser:
                 op.doc = self.parse_string(text[4:], prop.no)
             elif text.startswith("eff "):
                 op.effects = parse_effects(text[4:], prop.no)
+            elif text.startswith("sends "):
+                op.sends.append(self.parse_sends(text[6:], prop.no))
             elif text.startswith("pre "):
                 op.pres.append(parse_expr(text[4:], prop.no))
             elif text.startswith("post "):
@@ -580,13 +748,18 @@ class Parser:
     def parse_flow(self) -> FlowDef:
         line = self.advance()
         m = re.fullmatch(
-            r"flow\s+([A-Za-z_]\w*)\s*\((.*)\)\s*->\s*(" + TYPE_RE + r")",
+            r"flow\s+([A-Za-z_]\w*)\s*\((.*?)\)\s*->\s*(.+)",
             line.text,
         )
         if not m:
             raise ProutError(f"bad flow header {line.text!r}", line.no)
         name, params_s, ret = m.group(1), m.group(2), m.group(3)
-        flow = FlowDef(name, parse_params(params_s, line.no), ret, line.no)
+        flow = FlowDef(
+            name,
+            parse_params(params_s, line.no, self.issues),
+            parse_type_ref(ret, line.no, self.issues),
+            line.no,
+        )
         while self.peek() and self.peek().indent == 2:
             stmt = self.advance()
             text = stmt.text
@@ -681,13 +854,18 @@ class Parser:
     def parse_task(self) -> TaskDef:
         line = self.advance()
         matched = re.fullmatch(
-            r"task\s+([A-Za-z_]\w*)\s*\((.*)\)\s*->\s*(" + TYPE_RE + r")",
+            r"task\s+([A-Za-z_]\w*)\s*\((.*?)\)\s*->\s*(.+)",
             line.text,
         )
         if not matched:
             raise ProutError(f"bad task header {line.text!r}", line.no)
         name, params_s, ret = matched.group(1), matched.group(2), matched.group(3)
-        task = TaskDef(name, parse_params(params_s, line.no), ret, line.no)
+        task = TaskDef(
+            name,
+            parse_params(params_s, line.no, self.issues),
+            parse_type_ref(ret, line.no, self.issues),
+            line.no,
+        )
         seen: set[str] = set()
         for prop in self._props():
             text = prop.text
@@ -784,12 +962,91 @@ class Parser:
                 raise ProutError(f"unknown gate property {text!r}", prop.no)
         return gate
 
+    def parse_sends(self, s: str, line: int) -> Sends:
+        if "->" not in s:
+            raise ProutError(f"bad sends clause {s!r}; expected args -> effect", line)
+        left, right = s.split("->", 1)
+        left = left.strip()
+        right = right.strip()
+        if left == "none":
+            args: list[str] = []
+        else:
+            args = [a.strip() for a in split_top_level(left)]
+            if not args or not all(re.fullmatch(r"[A-Za-z_]\w*", a) for a in args):
+                raise ProutError(f"bad sends arguments {left!r}", line)
+        m = re.fullmatch(r"([A-Za-z_]\w*)\s*\(\s*([^)]*)\s*\)", right)
+        if not m:
+            raise ProutError(f"bad sends effect {right!r}", line)
+        return Sends(args, (m.group(1), m.group(2).strip()), line)
+
     def parse_policy(self) -> PolicyDef:
         line = self.advance()
-        policy = PolicyDef(line.no)
+        props = self._props()
+        if not props:
+            raise ProutError("policy block is empty", line.no)
+        first = props[0].text
+        if self._is_flow_policy_line(first):
+            return self._parse_flow_policy(line, props)
+        if self._is_task_policy_line(first):
+            return self._parse_task_policy(line, props)
+        raise ProutError(f"unknown policy property {first!r}", props[0].no)
+
+    @staticmethod
+    def _is_flow_policy_line(text: str) -> bool:
+        return text.startswith("sink ") or text.startswith("declassify ")
+
+    @staticmethod
+    def _is_task_policy_line(text: str) -> bool:
+        return (
+            text == "external"
+            or text.startswith("external ")
+            or text == "payment"
+            or text.startswith("payment ")
+            or text == "contract"
+            or text.startswith("contract ")
+        )
+
+    def _parse_flow_policy(self, line: Line, props: list[Line]) -> PolicyDef:
+        policy = PolicyDef(line=line.no, kind="flow")
+        for rule in props:
+            text = rule.text
+            if self._is_task_policy_line(text):
+                raise ProutError(
+                    "a policy block is either information-flow (sink, declassify) or a task envelope (external, payment, contract)",
+                    rule.no,
+                )
+            m = re.fullmatch(
+                r"sink\s+([A-Za-z_]\w*)\s*\(\s*([^)]*)\s*\)\s+(accepts|rejects)\s+(.+)",
+                text,
+            )
+            if m:
+                labels = [x.strip() for x in split_top_level(m.group(4))]
+                policy.sinks.append(
+                    SinkRule(m.group(1), m.group(2).strip(), m.group(3), labels, rule.no)
+                )
+                continue
+            m = re.fullmatch(
+                r"declassify\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)\s+require\s+role\s+([A-Za-z_]\w*)",
+                text,
+            )
+            if m:
+                policy.declassify.append(
+                    DeclassifyRule(m.group(1), m.group(2), m.group(3), rule.no)
+                )
+                continue
+            raise ProutError(f"bad policy rule {text!r}", rule.no)
+        return policy
+
+    def _parse_task_policy(self, line: Line, props: list[Line]) -> PolicyDef:
+        policy = PolicyDef(line=line.no, kind="task")
         seen: set[str] = set()
-        for prop in self._props():
+        for prop in props:
             text = prop.text
+            if self._is_flow_policy_line(text):
+                raise ProutError(
+                    "a policy block is either information-flow (sink, declassify) or a task envelope (external, payment, contract)",
+                    prop.no,
+                )
             if text == "external" or text.startswith("external "):
                 self._once(seen, "external", prop)
                 policy.external = parse_effects(text[8:].strip(), prop.no)
@@ -1069,6 +1326,27 @@ class Checker:
         self.flows = {f.name: f for f in program.flows}
         self.allow_net = set(allow_net) if allow_net else {"stripe"}
         self.deny_net = set(deny_net or [])
+        self.labels = {l.name: l for l in program.labels}
+        flow_policies = [item for item in program.policies if item.kind == "flow"]
+        self.policy = flow_policies[0] if flow_policies else PolicyDef(kind="flow")
+        self.scope = ""
+        self.in_contract = False
+        self.has_labels = bool(program.labels or flow_policies or program.label_errors) or self._has_annotations()
+        self._type_cache: dict[int, TypeRef] = {}
+        self._declass_cache: dict[int, TypeRef] = {}
+        self._seen: set[tuple[str, int, str]] = set()
+
+    def _has_annotations(self) -> bool:
+        for t in self.program.types:
+            if t.labels or any(f.labels for f in t.fields.values()):
+                return True
+        for o in self.program.ops:
+            if o.ret.labels or any(t.labels for _, t in o.params) or o.sends:
+                return True
+        for f in self.program.flows:
+            if f.ret.labels or any(t.labels for _, t in f.params):
+                return True
+        return False
 
     def error(self, code: str, message: str, line: int = 0, fix: Optional[str] = None, detail: Optional[str] = None) -> None:
         self.diags.append(Diagnostic(code, "error", message, line, fix, detail))
@@ -1077,6 +1355,7 @@ class Checker:
         self.diags.append(Diagnostic(code, "warning", message, line, fix, detail))
 
     def check(self) -> list[Diagnostic]:
+        self.check_label_declarations()
         self.check_duplicates()
         for t in self.program.types:
             self.check_type(t)
@@ -1086,8 +1365,56 @@ class Checker:
             self.check_flow(flow)
         for op in self.program.ops:
             self.check_policy(op)
+        if self.has_labels:
+            self.check_policy_rules()
+            for op in self.program.ops:
+                self.check_sends(op)
         self.check_ai_tasks()
         return self.diags
+
+    def _once(self, code: str, line: int, message: str) -> bool:
+        key = (code, line, message)
+        if key in self._seen:
+            return False
+        self._seen.add(key)
+        return True
+
+    def iflow_error(
+        self,
+        code: str,
+        message: str,
+        line: int = 0,
+        fix: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> None:
+        if self._once(code, line, message):
+            self.diags.append(Diagnostic(code, "error", message, line, fix, None, context))
+
+    def iflow_warn(
+        self,
+        code: str,
+        message: str,
+        line: int = 0,
+        fix: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> None:
+        if self._once(code, line, message):
+            self.diags.append(Diagnostic(code, "warning", message, line, fix, None, context))
+
+    def check_label_declarations(self) -> None:
+        for message, line in self.program.label_errors:
+            self.iflow_error("E-LABEL", message, line)
+        seen: dict[str, int] = {}
+        for label in self.program.labels:
+            if label.name == "public":
+                self.iflow_error("E-LABEL", "public is reserved and cannot be declared as a label", label.line)
+            elif not LABEL_RE.fullmatch(label.name):
+                self.iflow_error("E-LABEL", f"label {label.name!r} must match [a-z][a-z0-9_]*", label.line)
+            elif label.name in EFFECT_KINDS:
+                self.iflow_error("E-LABEL", f"label {label.name!r} conflicts with an effect kind", label.line)
+            if label.name in seen:
+                self.iflow_error("E-LABEL", f"duplicate label {label.name!r}", label.line)
+            seen[label.name] = label.line
 
     def check_duplicates(self) -> None:
         seen: dict[str, int] = {}
@@ -1107,51 +1434,112 @@ class Checker:
             seen_flows[flow.name] = flow.line
 
     def check_type(self, t: TypeDef) -> None:
+        if t.labels:
+            if t.opaque:
+                self.check_ref_labels(TypeRef(t.name, t.labels), t.line, f"type {t.name}")
+            else:
+                self.iflow_error(
+                    "E-LABEL",
+                    f"record type {t.name!r} cannot carry labels; label its fields",
+                    t.line,
+                )
         for fname, ftype in t.fields.items():
             self.check_type_exists(ftype, t.line, f"field {t.name}.{fname}")
+            self.check_ref_labels(ftype, t.line, f"field {t.name}.{fname}")
 
     def check_type_exists(self, tname: str, line: int, where: str = "") -> None:
-        base = re.sub(r"<.*>", "", tname).strip()
+        base = re.sub(r"<.*>", "", str(tname)).strip()
         if base not in self.types and base not in ("Unknown",):
             self.error("E-TYPE", f"unknown type {tname!r}" + (f" in {where}" if where else ""), line)
 
-    def type_of(self, e: Optional[Expr], env: dict[str, str]) -> str:
+    def check_ref_labels(self, ref: TypeRef, line: int, where: str = "") -> None:
+        if not self.has_labels:
+            return
+        for label in sorted(ref.labels):
+            if label not in self.labels:
+                self.iflow_error(
+                    "E-LABEL",
+                    f"unknown label {label!r}" + (f" in {where}" if where else ""),
+                    line,
+                )
+        base = str(ref)
+        t = self.types.get(base)
+        if t is not None and not t.opaque and ref.labels:
+            self.iflow_error(
+                "E-LABEL",
+                f"record type {base!r} cannot carry labels; label its fields",
+                line,
+            )
+
+    def type_labels(self, base: str, seen: frozenset[str] = frozenset()) -> frozenset[str]:
+        if base in seen:
+            return frozenset()
+        t = self.types.get(base)
+        if t is None:
+            return frozenset()
+        if t.opaque:
+            return t.labels
+        out: set[str] = set(t.labels)
+        seen = seen | {base}
+        for field_type in t.fields.values():
+            out |= set(field_type.labels)
+            out |= self.type_labels(str(field_type), seen)
+        return frozenset(out)
+
+    def effective(self, ref: TypeRef) -> frozenset[str]:
+        labels = ref.labels | self.type_labels(str(ref))
+        return frozenset(label for label in labels if label in self.labels)
+
+    def type_of(self, e: Optional[Expr], env: dict[str, TypeRef]) -> TypeRef:
         if e is None:
-            return "Unknown"
+            return TypeRef("Unknown")
+        key = id(e)
+        if key in self._type_cache:
+            return self._type_cache[key]
+        result = self._type_of(e, env)
+        self._type_cache[key] = result
+        return result
+
+    def _type_of(self, e: Expr, env: dict[str, TypeRef]) -> TypeRef:
         if e.kind == "lit":
-            return {"int": "Int", "str": "String", "bool": "Bool", "date": "Date", "dec": "Decimal"}.get(e.name, "Unknown")
+            base = {"int": "Int", "str": "String", "bool": "Bool", "date": "Date", "dec": "Decimal"}.get(e.name, "Unknown")
+            return TypeRef(base)
         if e.kind == "var":
             if e.name in env:
-                return env[e.name]
+                ref = env[e.name]
+                return TypeRef(str(ref), self.effective(ref))
             self.error("E-UNDEF", f"unknown variable {e.name!r}", e.line)
-            return "Unknown"
+            return TypeRef("Unknown")
         if e.kind == "field":
             bt = self.type_of(e.base, env)
-            t = self.types.get(bt)
+            t = self.types.get(str(bt))
             if t is None or e.name not in t.fields:
                 self.error("E-FIELD", f"type {bt} has no field {e.name!r}", e.line)
-                return "Unknown"
-            return t.fields[e.name]
+                return TypeRef("Unknown")
+            ref = t.fields[e.name]
+            return TypeRef(str(ref), self.effective(ref))
         if e.kind == "call":
             op = self.ops.get(e.name)
             if op is None:
                 self.error("E-UNDEF", f"unknown operation {e.name!r}", e.line)
-                return "Unknown"
+                return TypeRef("Unknown")
             if len(e.args) != len(op.params):
                 self.error("E-ARITY", f"{e.name} expects {len(op.params)} argument(s), got {len(e.args)}", e.line)
-                return op.ret
+                return TypeRef(str(op.ret), self.effective(op.ret))
             for (pname, ptype), arg in zip(op.params, e.args):
                 at = self.type_of(arg, env)
                 if at != "Unknown" and not self.compatible(ptype, at):
                     self.error("E-TYPE", f"argument {pname!r} of {e.name} expects {ptype}, got {at}", arg.line or e.line)
-            return op.ret
+            return TypeRef(str(op.ret), self.effective(op.ret))
+        if e.kind == "declassify":
+            return self.declassify_type(e, env)
         if e.kind == "unary":
             lt = self.type_of(e.left, env)
             if e.name == "!":
                 if lt not in ("Bool", "Unknown"):
                     self.error("E-TYPE", f"operator ! expects a Bool operand, got {lt}", e.line)
-                return "Bool"
-            return "Unknown"
+                return TypeRef("Bool", lt.labels)
+            return TypeRef("Unknown")
         if e.kind == "bin":
             op = e.name
             if op in ("==", "!="):
@@ -1164,7 +1552,7 @@ class Checker:
                     and not self.compatible(rt, lt)
                 ):
                     self.error("E-TYPE", f"cannot compare {lt} and {rt} with {op}", e.line)
-                return "Bool"
+                return TypeRef("Bool", lt.labels | rt.labels)
             if op in ("<", "<=", ">", ">="):
                 lt = self.type_of(e.left, env)
                 rt = self.type_of(e.right, env)
@@ -1176,67 +1564,156 @@ class Checker:
                     )
                     if not orderable:
                         self.error("E-TYPE", f"cannot compare {lt} and {rt} with {op}", e.line)
-                return "Bool"
+                return TypeRef("Bool", lt.labels | rt.labels)
             lt = self.type_of(e.left, env)
             rt = self.type_of(e.right, env)
+            labels = lt.labels | rt.labels
             if op in ("&&", "||"):
                 if lt not in ("Bool", "Unknown") or rt not in ("Bool", "Unknown"):
                     self.error("E-TYPE", f"operator {op} expects Bool operands, got {lt} and {rt}", e.line)
-                return "Bool"
+                return TypeRef("Bool", labels)
             if op == "+":
                 if lt == "Unknown" or rt == "Unknown":
-                    return "Unknown"
+                    return TypeRef("Unknown", labels)
                 if lt == "Date" and rt == "Date":
                     self.error("E-TYPE", "cannot add Date and Date", e.line)
-                    return "Unknown"
+                    return TypeRef("Unknown", labels)
                 if (lt == "Date" and rt == "Int") or (lt == "Int" and rt == "Date"):
-                    return "Date"
+                    return TypeRef("Date", labels)
                 if lt == rt:
-                    return lt
+                    return TypeRef(str(lt), labels)
                 if {lt, rt} == {"Money", "Int"}:
-                    return "Money"
+                    return TypeRef("Money", labels)
                 if {lt, rt} <= {"Int", "Decimal"}:
-                    return "Decimal"
+                    return TypeRef("Decimal", labels)
                 self.error("E-TYPE", f"cannot add {lt} and {rt}", e.line)
-                return "Unknown"
+                return TypeRef("Unknown", labels)
             if op == "-":
                 if lt == "Unknown" or rt == "Unknown":
-                    return "Unknown"
+                    return TypeRef("Unknown", labels)
                 if lt == "Date" and rt == "Date":
-                    return "Int"
+                    return TypeRef("Int", labels)
                 if lt == "Date" and rt == "Int":
-                    return "Date"
+                    return TypeRef("Date", labels)
                 if lt == "Money" and rt in ("Money", "Int"):
-                    return "Money"
+                    return TypeRef("Money", labels)
                 if lt == "Int" and rt == "Int":
-                    return "Int"
+                    return TypeRef("Int", labels)
                 if {lt, rt} <= {"Int", "Decimal"}:
-                    return "Decimal"
+                    return TypeRef("Decimal", labels)
                 self.error("E-TYPE", f"cannot subtract {rt} from {lt}", e.line)
-                return "Unknown"
+                return TypeRef("Unknown", labels)
             if op == "*":
                 if lt == "Unknown" or rt == "Unknown":
-                    return "Unknown"
+                    return TypeRef("Unknown", labels)
                 if lt == "Int" and rt == "Int":
-                    return "Int"
+                    return TypeRef("Int", labels)
                 if {lt, rt} <= {"Int", "Decimal"}:
-                    return "Decimal"
+                    return TypeRef("Decimal", labels)
                 if {lt, rt} == {"Money", "Int"}:
-                    return "Money"
+                    return TypeRef("Money", labels)
                 self.error("E-TYPE", f"cannot multiply {lt} and {rt}", e.line)
-                return "Unknown"
+                return TypeRef("Unknown", labels)
             if op == "/":
                 if lt == "Unknown" or rt == "Unknown":
-                    return "Unknown"
+                    return TypeRef("Unknown", labels)
                 if lt == "Int" and rt == "Int":
-                    return "Int"
+                    return TypeRef("Int", labels)
                 if {lt, rt} <= {"Int", "Decimal"}:
-                    return "Decimal"
+                    return TypeRef("Decimal", labels)
                 if lt == "Money" and rt == "Int":
-                    return "Money"
+                    return TypeRef("Money", labels)
                 self.error("E-TYPE", f"cannot divide {lt} by {rt}", e.line)
-                return "Unknown"
-        return "Unknown"
+                return TypeRef("Unknown", labels)
+        return TypeRef("Unknown")
+
+    def declassify_type(self, e: Expr, env: dict[str, TypeRef]) -> TypeRef:
+        key = id(e)
+        if key in self._declass_cache:
+            return self._declass_cache[key]
+        if len(e.args) != 3:
+            self.iflow_error("E-DECLASS", "declassify expects 3 arguments", e.line)
+            result = TypeRef("Unknown")
+            self._declass_cache[key] = result
+            return result
+
+        val = self.type_of(e.args[0], env)
+        label_expr = e.args[1]
+        label = label_expr.name if label_expr.kind == "var" else ""
+        reason_expr = e.args[2]
+        result = TypeRef(str(val), val.labels)
+
+        def fail(message: str, fix: Optional[str] = None, context: Optional[dict] = None) -> TypeRef:
+            self.iflow_error("E-DECLASS", message, e.line, fix, context)
+            self._declass_cache[key] = result
+            return result
+
+        if not label or (label != "public" and label not in self.labels):
+            return fail(
+                "declassify target must be a declared label or public",
+                fix="declare the label, or use public to remove every label",
+            )
+
+        if reason_expr.kind != "lit" or reason_expr.name != "str":
+            return fail(
+                "declassify reason must be a string literal",
+                fix='pass a quoted reason, for example "support ticket"',
+                context={"label": label, "scope": self.scope, "reason_kind": "not_string"},
+            )
+        reason = str(reason_expr.value)
+        if "\n" in reason or "\r" in reason:
+            return fail(
+                "declassify reason must not contain a newline",
+                context={"label": label, "scope": self.scope, "reason_kind": "newline"},
+            )
+        if not reason.strip():
+            return fail(
+                "declassify reason must not be empty",
+                context={"label": label, "scope": self.scope, "reason_kind": "empty"},
+            )
+        if len(reason.strip()) > 200:
+            return fail(
+                "declassify reason must be 200 characters or fewer",
+                context={"label": label, "scope": self.scope, "reason_kind": "too_long"},
+            )
+
+        if label == "public":
+            if not val.labels:
+                return fail("declassify public requires a value with at least one label")
+        elif label not in val.labels:
+            return fail(f"declassify target label {label!r} is not present on the value")
+
+        if not any(rule.label == label and rule.scope == self.scope for rule in self.policy.declassify):
+            return fail(
+                f"declassify {label} is not allowed in {self.scope or 'this scope'}",
+                fix=f"add: declassify {label} in {self.scope} require role <role>",
+            )
+
+        base_type = self.types.get(str(val))
+        if base_type is not None and not base_type.opaque:
+            return fail("record values cannot be declassified as a whole; declassify each field")
+
+        if self.in_contract:
+            return fail("declassify is not allowed in pre or post contracts")
+
+        if label == "public":
+            result = TypeRef(str(val), frozenset())
+        else:
+            result = TypeRef(str(val), val.labels - {label})
+        self.iflow_warn(
+            "W-DECLASS",
+            f"{label} declassified in {self.scope or 'this scope'}",
+            e.line,
+            fix=f"review the declassification policy for role {self._role_for(label)}",
+        )
+        self._declass_cache[key] = result
+        return result
+
+    def _role_for(self, label: str) -> str:
+        for rule in self.policy.declassify:
+            if rule.label == label and rule.scope == self.scope:
+                return rule.role
+        return "?"
 
     @staticmethod
     def compatible(expected: str, actual: str) -> bool:
@@ -1273,29 +1750,44 @@ class Checker:
         return out
 
     def check_op(self, op: OpDef) -> None:
+        self.scope = op.name
+        self._type_cache.clear()
+        self._declass_cache.clear()
         env = {n: t for n, t in op.params}
         for n, t in op.params:
             self.check_type_exists(t, op.line, f"parameter {n}")
+            self.check_ref_labels(t, op.line, f"parameter {n}")
         self.check_type_exists(op.ret, op.line, "return type")
+        self.check_ref_labels(op.ret, op.line, "return type")
         for kind, target in op.effects:
             if kind not in EFFECT_KINDS:
                 self.error("E-EFF", f"unknown effect kind {kind!r}", op.line)
             if not target:
                 self.error("E-EFF", f"effect {kind} has no target", op.line)
+        self.in_contract = True
         for p in op.pres:
             t = self.type_of(p, env)
             if t not in ("Bool", "Unknown"):
                 self.error("E-TYPE", f"precondition must be Bool, got {t}", p.line)
+            if self.has_labels:
+                self.check_contract_labels(p, t, "precondition")
         for p in op.posts:
             env2 = dict(env)
             env2["result"] = op.ret
             t = self.type_of(p, env2)
             if t not in ("Bool", "Unknown"):
                 self.error("E-TYPE", f"postcondition must be Bool, got {t}", p.line)
+            if self.has_labels:
+                self.check_contract_labels(p, t, "postcondition")
+        self.in_contract = False
         if op.impl is not None:
             it = self.type_of(op.impl, env)
             if it != "Unknown" and not self.compatible(op.ret, it):
                 self.error("E-TYPE", f"impl returns {it}, expected {op.ret}", op.impl.line)
+            if self.has_labels:
+                self.check_return_labels(it, op.ret, f"operation {op.name}", op.impl.line)
+                for c in self.calls_in(op.impl):
+                    self.check_call_labels(c, env)
             inferred = self.effects_of_expr(op.impl)
             declared = set(op.effects)
             if declared != inferred:
@@ -1309,10 +1801,15 @@ class Checker:
                 self.error("E-EFF", f"operation {op.name} effects do not match impl ({'; '.join(bits)})", op.line)
 
     def check_flow(self, flow: FlowDef) -> None:
+        self.scope = flow.name
+        self._type_cache.clear()
+        self._declass_cache.clear()
         env = {n: t for n, t in flow.params}
         for n, t in flow.params:
             self.check_type_exists(t, flow.line, f"parameter {n}")
+            self.check_ref_labels(t, flow.line, f"parameter {n}")
         self.check_type_exists(flow.ret, flow.line, "return type")
+        self.check_ref_labels(flow.ret, flow.line, "return type")
         inferred: set[tuple[str, str]] = set()
         seen_return = False
         for stmt in flow.body:
@@ -1332,14 +1829,18 @@ class Checker:
                 inferred |= self.effects_of_expr(stmt.expr)
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
+                    self.check_call_labels(c, env)
             elif stmt.kind == "return":
                 seen_return = True
                 t = self.type_of(stmt.expr, env)
                 if t != "Unknown" and not self.compatible(flow.ret, t):
                     self.error("E-TYPE", f"return expects {flow.ret}, got {t}", stmt.line)
+                if self.has_labels:
+                    self.check_return_labels(t, flow.ret, f"flow {flow.name}", stmt.line)
                 inferred |= self.effects_of_expr(stmt.expr)
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
+                    self.check_call_labels(c, env)
         if not seen_return:
             self.error(
                 "E-FLOW",
@@ -1386,6 +1887,260 @@ class Checker:
                     detail="The checker could not prove this statically. It must be enforced at runtime.",
                 )
 
+    @staticmethod
+    def labels_desc(labels: frozenset[str] | set[str]) -> str:
+        if not labels:
+            return "no labels"
+        return ", ".join(sorted(labels))
+
+    @staticmethod
+    def type_with_labels(base: str, labels: frozenset[str] | set[str]) -> str:
+        return base + "".join(" @" + label for label in sorted(labels))
+
+    def check_contract_labels(self, expr: Expr, actual: TypeRef, clause: str) -> None:
+        if not actual.labels:
+            return
+        self.iflow_error(
+            "E-IFLOW-CONTRACT",
+            f"{clause} uses {self.labels_desc(actual.labels)} value",
+            expr.line,
+            fix="use a public field, or remove the label from the contract",
+            context={"clause": clause, "actual_labels": sorted(actual.labels)},
+        )
+
+    def check_return_labels(self, actual: TypeRef, declared: TypeRef, where: str, line: int) -> None:
+        expected = self.effective(declared)
+        extra = actual.labels - expected
+        if not extra:
+            return
+        self.iflow_error(
+            "E-IFLOW-RET",
+            f"{where} returns {self.labels_desc(actual.labels)}, declares {self.labels_desc(expected)}",
+            line,
+            fix=(
+                f"change the return type to {self.type_with_labels(str(declared), actual.labels)}, "
+                "or declassify the value"
+            ),
+            context={"expected_labels": sorted(expected), "actual_labels": sorted(actual.labels)},
+        )
+
+    def check_call_labels(self, c: Expr, env: dict[str, TypeRef]) -> None:
+        if not self.has_labels:
+            return
+        op = self.ops.get(c.name)
+        if not op or len(c.args) != len(op.params):
+            return
+        for (pname, pref), arg in zip(op.params, c.args):
+            actual = self.type_of(arg, env)
+            expected = self.effective(pref)
+            extra = actual.labels - expected
+            if not extra:
+                continue
+            self.iflow_error(
+                "E-IFLOW-ARG",
+                f"argument {pname!r} of {c.name} expects {self.labels_desc(expected)}, "
+                f"got {self.labels_desc(actual.labels)}",
+                arg.line or c.line,
+                fix=(
+                    f"declassify the value, or change the parameter to "
+                    f"{self.type_with_labels(str(pref), actual.labels)}"
+                ),
+                context={
+                    "argument": pname,
+                    "expected_labels": sorted(expected),
+                    "actual_labels": sorted(actual.labels),
+                },
+            )
+
+    def resolve_sink(self, effect: tuple[str, str]) -> tuple[set[str], set[str]]:
+        exact = [r for r in self.policy.sinks if (r.kind, r.target) == effect]
+        wild = [r for r in self.policy.sinks if r.kind == effect[0] and r.target == "*"]
+        exact_accepts = [r for r in exact if r.mode == "accepts"]
+        wild_accepts = [r for r in wild if r.mode == "accepts"]
+        chosen = exact_accepts if exact_accepts else wild_accepts
+        accepts: set[str] = set()
+        for rule in chosen:
+            accepts |= set(rule.labels)
+        rejects: set[str] = set()
+        for rule in exact + wild:
+            if rule.mode == "rejects":
+                rejects |= set(rule.labels)
+        return accepts, rejects
+
+    def check_sink(self, effect: tuple[str, str], labels: frozenset[str], line: int) -> None:
+        if not labels:
+            return
+        accepts, rejects = self.resolve_sink(effect)
+        rejected = set(labels) & rejects
+        if rejected:
+            self.iflow_error(
+                "E-IFLOW-SINK",
+                f"{format_effect(effect)} rejects {self.labels_desc(rejected)}",
+                line,
+                fix=f"send a declassified value, or remove the reject rule for {format_effect(effect)}",
+                context={
+                    "sink": format_effect(effect),
+                    "accepted_labels": sorted(accepts),
+                    "rejected_labels": sorted(rejects),
+                    "actual_labels": sorted(labels),
+                },
+            )
+            return
+        missing = set(labels) - accepts
+        if missing:
+            self.iflow_error(
+                "E-IFLOW-SINK",
+                f"{format_effect(effect)} does not accept {self.labels_desc(missing)}",
+                line,
+                fix=(
+                    f"send a declassified value, or allow "
+                    f"{self.labels_desc(missing)} on {format_effect(effect)}"
+                ),
+                context={
+                    "sink": format_effect(effect),
+                    "accepted_labels": sorted(accepts),
+                    "rejected_labels": sorted(rejects),
+                    "actual_labels": sorted(labels),
+                },
+            )
+
+    def check_sends(self, op: OpDef) -> None:
+        params = dict(op.params)
+        for sends in op.sends:
+            if not op.native:
+                self.iflow_error(
+                    "E-SINK",
+                    f"sends is only allowed on impl native (operation {op.name})",
+                    sends.line,
+                    fix="remove the sends clause, or change the implementation to native",
+                    context={"sends": list(sends.args), "effect": list(sends.effect), "parameter": ""},
+                )
+            if sends.effect not in op.effects:
+                self.iflow_error(
+                    "E-SINK",
+                    f"sends references undeclared effect {format_effect(sends.effect)}",
+                    sends.line,
+                    fix=f"declare eff {format_effect(sends.effect)} on the operation",
+                    context={"sends": list(sends.args), "effect": list(sends.effect), "parameter": ""},
+                )
+            elif sends.effect[0] == "read" or sends.effect[0] not in EFFECT_KINDS or not sends.effect[1]:
+                self.iflow_error(
+                    "E-SINK",
+                    f"sends must bind to a concrete non-read sink, got {format_effect(sends.effect)}",
+                    sends.line,
+                )
+            elif sends.effect[1] == "*":
+                self.iflow_error(
+                    "E-SINK",
+                    "sends cannot bind to a wildcard sink",
+                    sends.line,
+                    fix="name the concrete target, for example net(email)",
+                )
+            for name in sends.args:
+                if name not in params:
+                    self.iflow_error(
+                        "E-SINK",
+                        f"sends references unknown parameter {name!r}",
+                        sends.line,
+                        fix="use a parameter declared in the op signature",
+                        context={"sends": list(sends.args), "effect": list(sends.effect), "parameter": name},
+                    )
+
+        if not op.native:
+            return
+
+        non_read = [effect for effect in op.effects if effect[0] != "read"]
+        labeled_params = [name for name, ref in op.params if self.effective(ref)]
+        labeled_ret = bool(self.effective(op.ret))
+        has_read = any(kind == "read" for kind, _ in op.effects)
+        if non_read and (labeled_params or labeled_ret or has_read):
+            for effect in non_read:
+                if not any(sends.effect == effect for sends in op.sends):
+                    self.iflow_error(
+                        "E-SINK-UNBOUND",
+                        f"op {op.name} has labeled data but no sends for {format_effect(effect)}",
+                        op.line,
+                        fix=f"add: sends none -> {format_effect(effect)} if no labeled data reaches it",
+                        context={"effect": list(effect), "labeled_parameters": labeled_params},
+                    )
+
+        for sends in op.sends:
+            for name in sends.args:
+                if name in params:
+                    self.check_sink(sends.effect, self.effective(params[name]), sends.line)
+
+    def check_policy_rules(self) -> None:
+        flow_policies = [item for item in self.program.policies if item.kind == "flow"]
+        if len(flow_policies) > 1:
+            for extra in flow_policies[1:]:
+                self.iflow_error(
+                    "E-POLICY",
+                    "a program may contain only one policy block",
+                    extra.line,
+                )
+        for policy in flow_policies:
+            for rule in policy.sinks:
+                if rule.kind not in EFFECT_KINDS or rule.kind == "read":
+                    self.iflow_error(
+                        "E-POLICY",
+                        f"sink rule uses invalid effect kind {rule.kind!r}",
+                        rule.line,
+                        fix="use write, net, spend, or emit",
+                    )
+                if not rule.target:
+                    self.iflow_error(
+                        "E-POLICY",
+                        f"sink {rule.kind}() has no target",
+                        rule.line,
+                        fix="name a target, or use * for a wildcard",
+                    )
+                for label in rule.labels:
+                    if label == "public":
+                        self.iflow_error(
+                            "E-LABEL",
+                            "public is implicit and cannot appear in a sink rule",
+                            rule.line,
+                        )
+                    elif label not in self.labels:
+                        self.iflow_error("E-LABEL", f"unknown label {label!r} in policy", rule.line)
+
+            by_effect: dict[tuple[str, str], dict[str, set[str]]] = {}
+            for rule in policy.sinks:
+                key = (rule.kind, rule.target)
+                modes = by_effect.setdefault(key, {"accepts": set(), "rejects": set()})
+                modes[rule.mode] |= set(rule.labels)
+            for (kind, target), modes in by_effect.items():
+                both = modes["accepts"] & modes["rejects"]
+                if both:
+                    self.iflow_error(
+                        "E-POLICY",
+                        f"sink {kind}({target}) both accepts and rejects {self.labels_desc(both)}",
+                        policy.line,
+                    )
+
+            seen_declass: set[tuple[str, str]] = set()
+            for rule in policy.declassify:
+                if rule.label != "public" and rule.label not in self.labels:
+                    self.iflow_error(
+                        "E-LABEL",
+                        f"unknown label {rule.label!r} in declassify rule",
+                        rule.line,
+                    )
+                if rule.scope not in self.ops and rule.scope not in self.flows:
+                    self.iflow_error(
+                        "E-POLICY",
+                        f"declassify scope {rule.scope!r} is not a declared op or flow",
+                        rule.line,
+                    )
+                key = (rule.label, rule.scope)
+                if key in seen_declass:
+                    self.iflow_error(
+                        "E-POLICY",
+                        f"duplicate declassify rule for {rule.label} in {rule.scope}",
+                        rule.line,
+                    )
+                seen_declass.add(key)
+
     def check_policy(self, op: OpDef) -> None:
         for kind, target in op.effects:
             if kind == "net":
@@ -1423,8 +2178,9 @@ class Checker:
             if gate.name in seen_gates:
                 self.error("E-DUP", f"duplicate gate {gate.name!r}", gate.line)
             seen_gates[gate.name] = gate.line
-        if len(self.program.policies) > 1:
-            self.error("E-DUP", "duplicate policy", self.program.policies[1].line)
+        task_policies = [item for item in self.program.policies if item.kind == "task"]
+        if len(task_policies) > 1:
+            self.error("E-DUP", "duplicate policy", task_policies[1].line)
 
     def _check_effect_list(self, effects: list[tuple[str, str]], line: int, where: str) -> None:
         seen: set[tuple[str, str]] = set()
@@ -1442,6 +2198,8 @@ class Checker:
         external: set[tuple[str, str]] = set()
         contract: set[tuple[str, str]] = set()
         for policy in self.program.policies:
+            if policy.kind != "task":
+                continue
             self._check_effect_list(policy.external, policy.line, "policy external")
             self._check_effect_list(policy.payment, policy.line, "policy payment")
             self._check_effect_list(policy.contract, policy.line, "policy contract")
@@ -1867,6 +2625,9 @@ def expr_to_dict(e: Optional[Expr]) -> Optional[dict]:
     elif e.kind == "call":
         d["name"] = e.name
         d["args"] = [expr_to_dict(a) for a in e.args]
+    elif e.kind == "declassify":
+        d["name"] = "declassify"
+        d["args"] = [expr_to_dict(a) for a in e.args]
     elif e.kind == "bin":
         d["op"] = e.name
         d["left"] = expr_to_dict(e.left)
@@ -1888,51 +2649,118 @@ def _canonical_expr_list(exprs: list[Expr]) -> list[Expr]:
 
 
 def program_to_dict(p: Program) -> dict:
-    data = {
-        "types": [
-            {"name": t.name, "opaque": t.opaque, "fields": dict(sorted(t.fields.items()))}
-            for t in sorted(p.types, key=lambda x: x.name)
-        ],
-        "ops": [
-            {
-                "name": o.name,
-                "params": o.params,
-                "ret": o.ret,
-                "effects": sorted(o.effects),
-                "pre": [expr_to_dict(x) for x in _canonical_expr_list(o.pres)],
-                "post": [expr_to_dict(x) for x in _canonical_expr_list(o.posts)],
-                "impl": expr_to_dict(o.impl),
-                "native": o.native,
-                "doc": o.doc,
-            }
-            for o in sorted(p.ops, key=lambda x: x.name)
-        ],
-        "flows": [
-            {
-                "name": f.name,
-                "params": f.params,
-                "ret": f.ret,
-                "effects": sorted(f.effects),
-                "doc": f.doc,
-                "summary": f.summary,
-                "body": [
-                    {"kind": s.kind, "name": s.name, "expr": expr_to_dict(s.expr)}
-                    for s in f.body
-                ],
-            }
-            for f in sorted(p.flows, key=lambda x: x.name)
-        ],
-    }
-    # Omit empty automation lists so programs without agent/task keep their hash.
+    d: dict[str, Any] = {}
+    if p.labels:
+        d["labels"] = [
+            {"name": label.name, "doc": label.doc}
+            for label in sorted(p.labels, key=lambda x: x.name)
+        ]
+
+    types: list[dict] = []
+    for t in sorted(p.types, key=lambda x: x.name):
+        td: dict[str, Any] = {
+            "name": t.name,
+            "opaque": t.opaque,
+            "fields": {name: str(ref) for name, ref in sorted(t.fields.items())},
+        }
+        field_labels = {
+            name: sorted(ref.labels)
+            for name, ref in sorted(t.fields.items())
+            if ref.labels
+        }
+        if field_labels:
+            td["field_labels"] = field_labels
+        if t.opaque and t.labels:
+            td["labels"] = sorted(t.labels)
+        types.append(td)
+    d["types"] = types
+
+    ops: list[dict] = []
+    for o in sorted(p.ops, key=lambda x: x.name):
+        od: dict[str, Any] = {
+            "name": o.name,
+            "params": [[name, str(ref)] for name, ref in o.params],
+            "ret": str(o.ret),
+            "effects": sorted(o.effects),
+            "pre": [expr_to_dict(x) for x in _canonical_expr_list(o.pres)],
+            "post": [expr_to_dict(x) for x in _canonical_expr_list(o.posts)],
+            "impl": expr_to_dict(o.impl),
+            "native": o.native,
+            "doc": o.doc,
+        }
+        param_labels = {name: sorted(ref.labels) for name, ref in o.params if ref.labels}
+        if param_labels:
+            od["param_labels"] = param_labels
+        if o.ret.labels:
+            od["ret_labels"] = sorted(o.ret.labels)
+        if o.sends:
+            od["sends"] = [
+                {"args": sorted(set(s.args)), "effect": list(s.effect)}
+                for s in sorted(o.sends, key=lambda s: (s.effect, tuple(sorted(set(s.args)))))
+            ]
+        ops.append(od)
+    d["ops"] = ops
+
+    flows: list[dict] = []
+    for f in sorted(p.flows, key=lambda x: x.name):
+        fd: dict[str, Any] = {
+            "name": f.name,
+            "params": [[name, str(ref)] for name, ref in f.params],
+            "ret": str(f.ret),
+            "effects": sorted(f.effects),
+            "doc": f.doc,
+            "summary": f.summary,
+            "body": [
+                {"kind": s.kind, "name": s.name, "expr": expr_to_dict(s.expr)}
+                for s in f.body
+            ],
+        }
+        param_labels = {name: sorted(ref.labels) for name, ref in f.params if ref.labels}
+        if param_labels:
+            fd["param_labels"] = param_labels
+        if f.ret.labels:
+            fd["ret_labels"] = sorted(f.ret.labels)
+        flows.append(fd)
+    d["flows"] = flows
+
+    flow_policies = [item for item in p.policies if item.kind == "flow"]
+    if flow_policies:
+        policy = flow_policies[0]
+        pd: dict[str, Any] = {}
+        if policy.sinks:
+            pd["sinks"] = [
+                {
+                    "effect": [rule.kind, rule.target],
+                    "mode": rule.mode,
+                    "labels": sorted(set(rule.labels)),
+                }
+                for rule in sorted(
+                    policy.sinks,
+                    key=lambda r: (r.kind, r.target, r.mode, tuple(sorted(set(r.labels)))),
+                )
+            ]
+        if policy.declassify:
+            pd["declassify"] = [
+                {"label": rule.label, "scope": rule.scope, "role": rule.role}
+                for rule in sorted(
+                    policy.declassify,
+                    key=lambda r: (r.scope, r.label, r.role),
+                )
+            ]
+        if pd:
+            d["policy"] = pd
+
+    # Omit empty automation lists so programs without them keep their hash.
     if p.agents:
-        data["agents"] = [_agent_to_dict(agent) for agent in sorted(p.agents, key=lambda item: item.name)]
+        d["agents"] = [_agent_to_dict(agent) for agent in sorted(p.agents, key=lambda item: item.name)]
     if p.gates:
-        data["gates"] = [_gate_to_dict(gate) for gate in sorted(p.gates, key=lambda item: item.name)]
-    if p.policies:
-        data["policies"] = [_policy_to_dict(policy) for policy in p.policies]
+        d["gates"] = [_gate_to_dict(gate) for gate in sorted(p.gates, key=lambda item: item.name)]
+    task_policies = [item for item in p.policies if item.kind == "task"]
+    if task_policies:
+        d["policies"] = [_task_policy_to_dict(item) for item in task_policies]
     if p.tasks:
-        data["tasks"] = [_task_to_dict(task) for task in sorted(p.tasks, key=lambda item: item.name)]
-    return data
+        d["tasks"] = [_task_to_dict(task) for task in sorted(p.tasks, key=lambda item: item.name)]
+    return d
 
 
 def _agent_to_dict(agent: AgentDef) -> dict:
@@ -1959,8 +2787,9 @@ def _gate_to_dict(gate: GateDef) -> dict:
     }
 
 
-def _policy_to_dict(policy: PolicyDef) -> dict:
+def _task_policy_to_dict(policy: PolicyDef) -> dict:
     return {
+        "kind": "task",
         "external": sorted(policy.external),
         "payment": sorted(policy.payment),
         "contract": sorted(policy.contract),
@@ -1970,8 +2799,8 @@ def _policy_to_dict(policy: PolicyDef) -> dict:
 def _task_to_dict(task: TaskDef) -> dict:
     item: dict[str, Any] = {
         "name": task.name,
-        "params": task.params,
-        "ret": task.ret,
+        "params": [[name, str(ref)] for name, ref in task.params],
+        "ret": str(task.ret),
         "doc": task.doc,
         "agent": task.agent,
         "trigger": _trigger_to_dict(task),
@@ -1985,6 +2814,11 @@ def _task_to_dict(task: TaskDef) -> dict:
             for stmt in task.body
         ],
     }
+    param_labels = {name: sorted(ref.labels) for name, ref in task.params if getattr(ref, "labels", ())}
+    if param_labels:
+        item["param_labels"] = param_labels
+    if getattr(task.ret, "labels", ()):
+        item["ret_labels"] = sorted(task.ret.labels)
     if task.budget_run is not None and task.budget_period is not None:
         item["budget_run"] = task.budget_run
         item["budget_period"] = task.budget_period
@@ -1995,10 +2829,8 @@ def _trigger_to_dict(task: TaskDef) -> dict:
     if task.trigger_kind == "schedule":
         return {"kind": "schedule", "cron": task.trigger_value, "timezone": PERIOD_TIMEZONE}
     if task.trigger_kind == "record":
-        # New rows only. Updates do not start the task.
         return {"kind": "record", "name": task.trigger_value, "on": "insert"}
     if task.trigger_kind == "webhook":
-        # Receiver name only. Signatures are not part of this check.
         return {"kind": "webhook", "name": task.trigger_value}
     return {"kind": task.trigger_kind, "value": task.trigger_value}
 
