@@ -65,6 +65,24 @@ python3 -m venv .venv
 
 `etsah`, `etsahc`, and `etsah-mcp` are console scripts. `etsah-mcp` is the same stdio server as `python3 etsah.py mcp`. Nothing here uploads the package.
 
+## Check a pull request
+
+The composite action at the root of this repository checks `.etsah` files a pull request changes. Each diagnostic is a GitHub annotation (`::error file=...,line=...::`). An error fails the job. A warning does not. It uses the Python standard library and the checker in this repository. Tags are not published. Pin `@main`.
+
+```yaml
+on:
+  pull_request:
+
+jobs:
+  etsah:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RyujiHashimoto/prout-lang@main
+```
+
+`glob` replaces the file set. `scope` is `pull-request` (the default) or `all`. On an event other than a pull request, the default scope checks every match. `allow-net` and `deny-net` are comma-separated host names and are passed through to the checker. This repository's CI calls the action with `uses: ./` on a passing file and on a broken file.
+
 ## Renamed from prout
 
 The language is Etsah. For one minor version, the old commands `prout`, `proutc`, and `prout-mcp` still run and write `新名称は etsah` to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. `PROUT_*` environment variables are still read when the matching `ETSAH_*` variable is unset, and approval tokens that start with `prout1.` still verify. The repository URL is unchanged.
@@ -258,6 +276,8 @@ Prototype. No release tag. Not published to PyPI. `build` emits a report, a demo
 ## Repository
 
 ```
+action.yml               composite action for pull-request checks
+scripts/etsah_action.py  GitHub annotations for that action
 etsah.py                 contract parser, checker, CLI
 etsah_api.py             check_source and check_file
 etsah_import.py          MCP and OpenAI tool lists become ops

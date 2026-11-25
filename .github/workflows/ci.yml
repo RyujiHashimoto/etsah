@@ -18,6 +18,52 @@ jobs:
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
 
+      - name: Action accepts a valid contract
+        id: etsah-action-pass
+        uses: ./
+        with:
+          glob: examples/ai_tasks.etsah
+          scope: all
+
+      - name: Valid contract reported no errors
+        run: |
+          set -eu
+          test "${{ steps.etsah-action-pass.outputs.errors }}" = "0"
+          test "${{ steps.etsah-action-pass.outputs.warnings }}" = "0"
+          test "${{ steps.etsah-action-pass.outputs.checked }}" = "examples/ai_tasks.etsah"
+          test -z "${{ steps.etsah-action-pass.outputs.error-codes }}"
+
+      - name: Action rejects a broken contract
+        id: etsah-action-fail
+        continue-on-error: true
+        uses: ./
+        with:
+          glob: examples/ai_tasks_broken.etsah
+          scope: all
+
+      - name: Broken contract failed with E-POLICY
+        run: |
+          set -eu
+          if [ "${{ steps.etsah-action-fail.outcome }}" != "failure" ]; then
+            echo "broken example unexpectedly passed"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os
+          path = os.path.join(os.environ["RUNNER_TEMP"], "etsah-check.json")
+          data = json.load(open(path, encoding="utf-8"))
+          if data.get("glob") != "examples/ai_tasks_broken.etsah":
+              raise SystemExit(f"unexpected result file: {data.get('glob')!r}")
+          codes = sorted({item["code"] for item in data["diagnostics"] if item["severity"] == "error"})
+          if "E-POLICY" not in codes:
+              raise SystemExit(f"expected E-POLICY, got {codes}")
+          if data["errors"] < 1:
+              raise SystemExit("expected the broken example to fail")
+          if data["files"] != ["examples/ai_tasks_broken.etsah"]:
+              raise SystemExit(f"checked the wrong files: {data['files']}")
+          print(f"broken example failed with {data['errors']} error(s): {', '.join(codes)}")
+          PY
+
       - name: Contract language
         run: |
           python3 etsah.py check examples/refund_fixed.etsah

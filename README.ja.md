@@ -54,11 +54,29 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在365件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在386件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+## プルリクエストの検査
+
+リポジトリ直下の composite action は、プルリクエストで変わった `.etsah` ファイルを検査し、診断を GitHub の注釈（`::error file=...,line=...::`）として出します。エラーがあるとジョブは失敗します。警告では失敗しません。Python の標準ライブラリだけで動きます。タグは未公開です。`@main` を指定してください。
+
+```yaml
+on:
+  pull_request:
+
+jobs:
+  etsah:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RyujiHashimoto/prout-lang@main
+```
+
+`glob` で対象を変えられます。`scope` は `pull-request`（既定）または `all` です。プルリクエスト以外のイベントでは、既定の scope は一致したファイルをすべて検査します。`allow-net` と `deny-net` はカンマ区切りのホスト名で、チェッカーへ渡します。このリポジトリの CI は `uses: ./` で、合格する例と壊した例の両方を動かします。
 
 ## 承認前後をGUIで確かめる
 
@@ -183,6 +201,8 @@ Etsahの成長は、コードの行数ではなく、**次のAIが少ない手�
 ## リポジトリ構成
 
 ```
+action.yml               プルリクエスト検査の composite action
+scripts/etsah_action.py  その action が注釈を出すスクリプト
 etsah.py                 契約言語のパーサー・検証器・CLI
 etsah_api.py             check_source と check_file
 etsah_import.py          MCP と OpenAI のツール定義を op にする
