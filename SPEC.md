@@ -115,16 +115,17 @@ task remind_timesheet(period: Id) -> Bool
 
 期間の境界は `Asia/Tokyo` である。タスクごとに変える構文は無い。
 
-静的な規則は次である。cron は動かさない。予算の残数も、同じキーの再実行を畳むストアも持たない。
+静的な規則は次である。cron は動かさない。整数円の残数も、同じキーの再実行を畳むストアも、検査器は持たない。回数と十進金額の残数は `prout guard` がファイルに数える。
 
 1. `task` の `eff` は、呼んだ op の効果の和集合と一致する（E-EFF）。和集合は、その `agent` の `allow` の部分集合でなければならない。はみ出した効果は E-POLICY。
 2. `policy external` に入る `emit` または `net`、すべての `spend`、`policy contract` の `write` は、`before` がその効果を挙げた `gate` が無いと E-POLICY。社内への `emit`（`policy external` に無いもの）はゲート無しで通す。全社 Slack のような通知を社外にするかは、`policy external` にその宛先を書くかどうかで決める。
 3. `spend` を許す agent は、`budget run` と `budget period` が 1 以上の整数円で、1回は期間以下である。許さない agent の予算は 0 である。タスクが自分の `budget` を書くときも同じで、agent の予算を超えてはならない。
-4. `limit emit` と `limit net` は、その効果を許すとき 1 以上、許さないとき 0 である。単位は1時間である。
-5. `retry` は 0 以上 5 以下。尽きたあとは `escalate` の人のロールへ渡す。その引き渡しは agent の `allow` に入れない。エスカレーションが op や agent を指し、その効果が上のゲート対象なら E-POLICY である。
-6. `key` は引数か、引数のフィールドである。冪等の同一性は agent、task、key であり、プログラムのハッシュが変わっても外部効果をやり直す意味は持たせない。ストア自体はまだ無い。
-7. `audit ast_hash` は agent に必須である。監査の同一性は正規化 AST の SHA-256 全64桁（`ast_digest`）である。表示と既存の `ast_hash` は、その先頭12桁のままである。
-8. 承認者は人のロールである。`approver` に agent の名前は書けない。`on_approved` が外部効果の唯一の呼び出しであることまでは、この検査は見ない。
+4. `limit emit` と `limit net` は、その効果を許すとき 1 以上、許さないとき 0 である。単位は1時間である。これは静的な上限で、実行時の残数は数えない。
+5. `limit calls N period hour|day|month` と `limit spend AMOUNT CURRENCY period hour|day|month` は、`agent`、`task`、`op` に書ける。回数は正の整数、金額は正の十進数、通貨は大文字3文字である。期間の境界は `Asia/Tokyo` である。`spend` の op は `spend from 引数[.フィールド] currency CURRENCY` で、金額を読む場所を Decimal として宣言する。タスクの上限が、同じ期間・同じ通貨の agent の上限を超えると E-POLICY。`spend` を使う task に、task か agent かその op の十進金額上限が無いときは警告（W-BUDGET）であり、エラーではない。整数円の `budget` は従来どおり、無いと E-POLICY である。
+6. `retry` は 0 以上 5 以下。尽きたあとは `escalate` の人のロールへ渡す。その引き渡しは agent の `allow` に入れない。エスカレーションが op や agent を指し、その効果が上のゲート対象なら E-POLICY である。
+7. `key` は引数か、引数のフィールドである。冪等の同一性は agent、task、key であり、プログラムのハッシュが変わっても外部効果をやり直す意味は持たせない。ストア自体はまだ無い。
+8. `audit ast_hash` は agent に必須である。監査の同一性は正規化 AST の SHA-256 全64桁（`ast_digest`）である。表示と既存の `ast_hash` は、その先頭12桁のままである。
+9. 承認者は人のロールである。`approver` に agent の名前は書けない。`on_approved` が外部効果の唯一の呼び出しであることまでは、この検査は見ない。
 
 `net` の宛先が許可リスト（既定は `stripe`）に入っているかは、これまでどおり op のポリシー検査が止める。`policy external` は、その宛先にゲートが要るかである。
 

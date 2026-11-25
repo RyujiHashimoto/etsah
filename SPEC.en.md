@@ -113,16 +113,17 @@ Triggers:
 
 The period boundary is `Asia/Tokyo`. There is no syntax to change it per task.
 
-The checker does not run cron, does not store remaining budget, and does not store an idempotency key. The static rules are:
+The checker does not run cron, does not store the remaining integer-yen budget, and does not store an idempotency key. `prout guard` does store call counts and decimal spend. The static rules are:
 
 1. A task's `eff` equals the union of the effects of the ops it calls (`E-EFF`). That union must be a subset of the agent's `allow`. An effect outside the allow list is `E-POLICY`.
 2. An `emit` or `net` listed in `policy external`, every `spend`, and a `write` listed in `policy contract` need a `gate` whose `before` names that effect. Otherwise `E-POLICY`. An internal `emit` (one not listed as external) needs no gate. Whether a company-wide Slack notice is external is decided by whether that target is written in `policy external`.
 3. An agent allowed to `spend` has `budget run` and `budget period` as integers of at least 1 yen, and the per-run budget is at most the period budget. An agent that may not `spend` has budget 0. A task's own `budget` follows the same rule and may not exceed the agent's budget.
-4. `limit emit` and `limit net` are at least 1 when that effect is allowed, and 0 when it is not. The unit is one hour.
-5. `retry` is from 0 through 5. After that, the task escalates to the human role in `escalate`. That handoff is not part of the agent's `allow`. If escalation points at an op or an agent whose effect needs a gate, that is `E-POLICY`.
-6. `key` is a parameter or a field of a parameter. Idempotency identity is agent, task, and key. Changing the program hash is not a reason to repeat an external effect. The store itself does not exist yet.
-7. `audit ast_hash` is required on an agent. The audit identity is the full 64-hex SHA-256 of the normalized AST (`ast_digest`). The displayed `ast_hash` remains the first 12 hex digits.
-8. An approver is a human role. An agent's name cannot be an `approver`. The check does not yet prove that `on_approved` is the only call that performs the external effect.
+4. `limit emit` and `limit net` are at least 1 when that effect is allowed, and 0 when it is not. The unit is one hour. These are static caps. The checker does not count them down.
+5. `limit calls N period hour|day|month` and `limit spend AMOUNT CURRENCY period hour|day|month` may be written on an `agent`, a `task`, or an `op`. The count is a positive integer. The amount is a positive decimal. The currency is three uppercase letters. Period boundaries use `Asia/Tokyo`. A `spend` op names the amount with `spend from argument[.field] currency CURRENCY`, and that type must be `Decimal`. A task limit above the agent's limit for the same period and currency is `E-POLICY`. A task that `spend`s without a decimal cap on the task, the agent, or that op is a warning (`W-BUDGET`), not an error. A missing integer-yen `budget` is still `E-POLICY`.
+6. `retry` is from 0 through 5. After that, the task escalates to the human role in `escalate`. That handoff is not part of the agent's `allow`. If escalation points at an op or an agent whose effect needs a gate, that is `E-POLICY`.
+7. `key` is a parameter or a field of a parameter. Idempotency identity is agent, task, and key. Changing the program hash is not a reason to repeat an external effect. The store itself does not exist yet.
+8. `audit ast_hash` is required on an agent. The audit identity is the full 64-hex SHA-256 of the normalized AST (`ast_digest`). The displayed `ast_hash` remains the first 12 hex digits.
+9. An approver is a human role. An agent's name cannot be an `approver`. The check does not yet prove that `on_approved` is the only call that performs the external effect.
 
 Whether a `net` target is on the allow list (default `stripe`) is still the op policy check. `policy external` decides whether that target also needs a gate.
 

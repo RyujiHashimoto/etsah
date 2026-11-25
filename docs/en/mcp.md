@@ -93,7 +93,9 @@ Each decision is one JSON object on stderr. A signature that verifies records `a
 
 The previous rule, "any non-empty string forwards `ASK`", is not the default. It remains only with `--allow-legacy-approval-token` or `PROUT_ALLOW_LEGACY_APPROVAL_TOKEN=1`. That flag is deprecated. With it set, the guard does not check a signature or the arguments: a non-empty string forwards every `ASK` for that process, and no nonce is recorded. `BLOCK` is still not forwarded.
 
-The proxy does not count hourly limits or spend budgets, and it does not prove that `on_approved` is the only call that performs the effect. If no single named gate covers every gated effect of a tool, a signature cannot forward that `ASK`.
+`limit calls` and `limit spend` are counted down in a file, `--ledger-file` or `PROUT_LEDGER_FILE`. The write replaces the file while a lock is held. A call past a cap is `BLOCK`, and a signed approval does not override that. The spend amount is the decimal named by the op's `spend from`. A missing amount, an amount that is not positive, or a missing ledger when a cap applies is `BLOCK`. The audit line records `remaining_calls`, `remaining_spend`, and `spend_currency`. The integer-yen `budget` and the hourly `limit net` / `limit emit` caps are still not counted down.
+
+The proxy does not prove that `on_approved` is the only call that performs the effect. If no single named gate covers every gated effect of a tool, a signature cannot forward that `ASK`.
 
 ## Claude Desktop
 
@@ -183,6 +185,6 @@ The wire format is JSON-RPC 2.0, one JSON object per line. `initialize`, `tools/
 
 ## What this does not do
 
-It does not run cron, store upstream idempotency keys, or decrement a budget. Those checks stay in the contract text. The guard decides once per call and logs the contract hash. A forwarded ASK also logs the approver id and the approval id. The nonce file records used approvals so they cannot be replayed. It does not remember the upstream result.
+It does not run cron, store upstream idempotency keys, or decrement the integer-yen `budget`. It does decrement call counts and decimal spend in the ledger file. The guard decides once per call and logs the contract hash, the approver id and approval id when a signature was used, and the remaining count and remaining amount. The nonce file records used approvals so they cannot be replayed. It does not remember the upstream result.
 
 日本語の手順は [docs/mcp.ja.md](../mcp.ja.md) です。

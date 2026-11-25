@@ -12,7 +12,7 @@ Repository: https://github.com/RyujiHashimoto/prout-lang
 
 A rename to Etsah is planned in a separate change; this tree uses `python3 prout.py`, the `.prout` extension, and the `prout-mcp` console script.
 
-Commands below were checked on `main` at `c1c6166`. `python3 -m unittest discover -s tests` reported 341 tests, all passing, on Python 3.12.
+`python3 -m unittest discover -s tests` reports 353 tests, all passing, on Python 3.12.
 
 ## Build, test, and run
 
@@ -59,6 +59,11 @@ approval for an `ASK` tool call. The HMAC key comes from the
 environment (`PROUT_APPROVAL_KEY`) or from `--approval-key-file`. Do
 not put a key on the command line, and do not commit a key. Details
 are in `docs/en/mcp.md`.
+
+`prout guard` counts `limit calls` and `limit spend` in
+`PROUT_LEDGER_FILE` or `--ledger-file`. A call past the cap is blocked
+even when a signed approval is present. The integer-yen `budget` is
+still only a static ceiling.
 
 `python3 render.py` rewrites `human-view.html`. Do not edit that file
 by hand. CI fails if the committed file drifts.

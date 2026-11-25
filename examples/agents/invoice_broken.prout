@@ -1,9 +1,12 @@
 # Same invoice as invoice.prout, with the payment gate left off the task.
+# The decimal JPY cap is still declared. The missing gate is the error.
 # Expected: E-POLICY, spend has no approval gate.
 #   python3 prout.py check examples/agents/invoice_broken.prout
 
 type Id
-type Invoice
+type Invoice {
+  amount: Decimal
+}
 
 op ledger.draft(account_id: Id) -> Invoice
   doc "Write a draft invoice for account A-19"
@@ -13,6 +16,9 @@ op ledger.draft(account_id: Id) -> Invoice
 op payments.charge(invoice: Invoice) -> Bool
   doc "Collect the invoice amount with no approval"
   eff spend(payments)
+  spend from invoice.amount currency JPY
+  limit calls 40 period day
+  limit spend 20000.00 JPY period day
   impl native
 
 policy
@@ -24,6 +30,8 @@ agent invoice_clerk
   budget run 5000 period 20000
   limit net 0 hour
   limit emit 0 hour
+  limit calls 200 period day
+  limit spend 80000.00 JPY period month
   audit ast_hash
 
 gate approve_charge
@@ -38,6 +46,8 @@ task issue_invoice(account_id: Id) -> Invoice
   trigger schedule "0 6 1 * *"
   eff read(accounts), write(invoices), spend(payments)
   budget run 5000 period 20000
+  limit calls 20 period day
+  limit spend 5000.00 JPY period day
   key account_id
   retry 1 escalate billing_lead
   let draft = ledger.draft(account_id)
