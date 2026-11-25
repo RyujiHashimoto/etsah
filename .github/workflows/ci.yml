@@ -157,6 +157,13 @@ jobs:
           fi
           grep -q "E-IFLOW-ARG" /tmp/injection-leak.txt
           grep -q "mail.forward" /tmp/injection-leak.txt
+          python3 etsah.py check examples/combined_policy_safe.etsah --allow-net email
+          if python3 etsah.py check examples/combined_policy_broken.etsah --allow-net email > /tmp/combined-policy.txt 2>&1; then
+            echo "combined policy example unexpectedly passed"
+            exit 1
+          fi
+          grep -q "E-POLICY" /tmp/combined-policy.txt
+          grep -q "has no approval gate" /tmp/combined-policy.txt
 
       - name: Pattern registry
         working-directory: patterns

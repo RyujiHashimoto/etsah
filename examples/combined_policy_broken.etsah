@@ -1,0 +1,57 @@
+# Lantern Yard Desk, fictional, broken twin of combined_policy_safe.etsah.
+# Both policies are still declared. The task leaves off the gate, so the
+# external mail is rejected.
+#
+#   python3 etsah.py check examples/combined_policy_broken.etsah --allow-net email
+#
+# Expected: exit 1, E-POLICY.
+
+label pii
+
+type Id
+type Customer {
+  id: Id
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+
+policy
+  external net(email)
+
+op customers.get(id: Id) -> Customer
+  doc "Read fictional customer C-17 at Lantern Yard"
+  eff read(customers)
+  impl native
+
+op send_receipt(to: String @pii) -> Bool
+  doc "Send a receipt to the customer's own address"
+  eff net(email)
+  sends to -> net(email)
+  impl native
+
+agent lantern_mail
+  doc "Sends a receipt and nothing else"
+  allow read(customers), net(email)
+  budget run 0 period 0
+  limit net 5 hour
+  limit emit 0 hour
+  audit ast_hash
+
+gate approve_receipt
+  doc "A desk lead would approve the receipt"
+  approver desk_lead
+  before net(email)
+  on_approved send_receipt
+
+task send_receipt_task(customer_id: Id) -> Bool
+  agent lantern_mail
+  doc "Send the C-17 receipt with the gate left off"
+  trigger schedule "0 9 * * 1"
+  eff read(customers), net(email)
+  key customer_id
+  retry 1 escalate desk_lead
+  let customer = customers.get(customer_id)
+  let sent = send_receipt(customer.email)
+  return sent
