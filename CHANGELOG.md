@@ -4,6 +4,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 
 ## [Unreleased]
 
+### Fixed
+
+- `pip install .` can run `etsahc`. The compiler imports `staffing_rules` from the installed package, and still imports it as a neighbor when `python3 etsahc.py` is run from `patterns/`.
+
 ### Added
 
 - The language name is Etsah. Commands are `etsah`, `etsahc`, and `etsah-mcp`, and source files use `.etsah`. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and warn on stderr, `.prout` files still check, and the old module names re-export the new ones. The repository URL is unchanged.

@@ -96,11 +96,10 @@ python3 -m venv .venv
 ```
 
 `pyproject.toml` also declares `etsahc` and `etsah-mcp`. `etsah-mcp` is
-the stdio server and returns when stdin closes. The installed `etsahc`
-script does not start on this tree: `patterns/etsahc.py` imports
-`staffing_rules` from the `patterns/` directory, and that module is not
-part of the installed package. Run `python3 etsahc.py` from `patterns/`
-instead.
+the stdio server and returns when stdin closes. Installed `etsahc`
+imports `staffing_rules` from the package. `python3 etsahc.py` from
+`patterns/` still imports that module as a neighbor. `proutc` remains
+for one minor version and warns.
 
 How to add a pattern, the review bar, and versioning are in
 [CONTRIBUTING.md](CONTRIBUTING.md). Vulnerability reports follow

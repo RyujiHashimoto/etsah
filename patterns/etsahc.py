@@ -26,7 +26,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Union
 
-import staffing_rules
+try:
+    from . import staffing_rules
+except ImportError:
+    # `python3 etsahc.py` from this directory has no package parent.
+    import staffing_rules
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_REGISTRY = ROOT / "registry"
