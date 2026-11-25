@@ -492,6 +492,12 @@ def load_registry(path: Path) -> dict[str, PatternManifest]:
         errors = validate_manifest(m)
         if errors:
             raise ValueError(f"invalid manifest {p.name}: {'; '.join(errors)}")
+        if m.name in registry:
+            raise ValueError(f"duplicate manifest name {m.name!r} in {p.name}")
+        if p.stem != m.name:
+            raise ValueError(
+                f"manifest filename {p.name!r} does not match declared name {m.name!r}"
+            )
         registry[m.name] = m
     missing: list[str] = []
     for manifest in registry.values():
