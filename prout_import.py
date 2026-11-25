@@ -212,9 +212,7 @@ def _param_type(op_name: str, name: str, schema: Any) -> tuple[str, Optional[str
     notes: list[str] = []
     if not isinstance(schema, dict):
         return "String", None, [f"review: parameter {name} has no JSON schema; used String"]
-    raw = schema.get("type")
-    if isinstance(raw, list) and "null" in raw:
-        notes.append(f"review: parameter {name} allows null; PROUT has no null so the declared type stays non-null")
+    notes.extend(_schema_type_notes(schema, f"parameter {name}"))
     kind = _json_type(schema)
     if kind in _SCALARS:
         return _SCALARS[kind], None, notes
@@ -232,15 +230,32 @@ def _return_type(op_name: str, schema: Any) -> tuple[str, Optional[str], list[st
         return "String", None, ["review: return type String is a placeholder; the tool JSON has no output schema"]
     if not isinstance(schema, dict):
         raise ToolImportError(f"{op_name}: outputSchema must be an object")
+    notes = _schema_type_notes(schema, "outputSchema")
     kind = _json_type(schema)
     if kind in _SCALARS:
-        return _SCALARS[kind], None, []
+        return _SCALARS[kind], None, notes
     if kind in {"object", "array"} or "properties" in schema:
         type_name = _opaque_name(op_name, "result")
         shown = kind or "object"
         note = f"review: outputSchema is {shown}; imported as opaque type {type_name}"
-        return type_name, type_name, [note]
-    return "String", None, ["review: return type String is a placeholder; outputSchema has no type"]
+        return type_name, type_name, [*notes, note]
+    return "String", None, [*notes, "review: return type String is a placeholder; outputSchema has no type"]
+
+
+def _schema_type_notes(schema: dict[str, Any], label: str) -> list[str]:
+    raw = schema.get("type")
+    if not isinstance(raw, list):
+        return []
+    notes: list[str] = []
+    if "null" in raw:
+        notes.append(f"review: {label} allows null; PROUT has no null so the declared type stays non-null")
+    types = list(dict.fromkeys(item for item in raw if isinstance(item, str) and item != "null"))
+    if len(types) > 1:
+        notes.append(
+            f"review: {label} allows multiple JSON types ({', '.join(types)}); PROUT has no union types, "
+            f"so the declaration uses the first non-null type ({types[0]})"
+        )
+    return notes
 
 
 def _json_type(schema: dict[str, Any]) -> str:

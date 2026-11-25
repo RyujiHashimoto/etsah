@@ -183,6 +183,32 @@ class MarkedEffectsTests(unittest.TestCase):
         self.assertIn("type CountTicketsMeta", text)
         self.assertNotIn("placeholder", body)
 
+    def test_union_schemas_are_marked_for_inputs_and_outputs(self) -> None:
+        text = import_mcp({
+            "name": "lookup_value",
+            "description": "Look up a value",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"value": {"type": ["string", "integer", "null"]}},
+                "required": ["value"],
+            },
+            "outputSchema": {"type": ["boolean", "integer", "null"]},
+        })
+        body = "\n".join(_ops(text)[0])
+        self.assertTrue(body.startswith("op lookup_value(value: String) -> Bool"))
+        self.assertIn("parameter value allows null", body)
+        self.assertIn(
+            "parameter value allows multiple JSON types (string, integer); PROUT has no union types, "
+            "so the declaration uses the first non-null type (string)",
+            body,
+        )
+        self.assertIn("outputSchema allows null", body)
+        self.assertIn(
+            "outputSchema allows multiple JSON types (boolean, integer); PROUT has no union types, "
+            "so the declaration uses the first non-null type (boolean)",
+            body,
+        )
+
     def test_flat_openai_and_wrapper_annotations(self) -> None:
         text = import_openai({
             "tools": [
