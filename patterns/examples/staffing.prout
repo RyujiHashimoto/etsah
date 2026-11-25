@@ -1,5 +1,6 @@
 # 人材派遣会社の基幹。スタッフ、案件、個別契約、勤怠の派遣先承認、請求と給与。
-# 抵触日・時間単価・36協定の上限は設定値。法令の数値は埋め込まない。
+# 36協定の上限はスロット。既定は一般則で、それを超える値はエラー。社労士の確認が要る。
+# 抵触日は開始日の3年後（この契約は 2026-04-01 → 2029-04-01）と通知日が一致する。
 # 根拠と未実装は docs/staffing.md。
 
 app staffing
@@ -45,6 +46,11 @@ app staffing
     work_date: Date
     hours: Duration
     overtime_hours: Duration
+    holiday_hours: Duration
+    status: String
+
+  entity OvertimeAgreement
+    id: Id
     status: String
 
   entity Invoice
@@ -102,6 +108,20 @@ app staffing
     period: monthly
     overtime_cap_hours: 45
 
+  pattern overtime_agreement
+    entity: OvertimeAgreement
+    timesheet: Timesheet
+    monthly_overtime_hours: 45
+    yearly_overtime_hours: 360
+    special_clause: enabled
+    special_yearly_overtime_hours: 720
+    month_with_holiday_hours: 99
+    average_hours: 80
+    months_over_limit: 6
+    warn_at_hours: 40
+    on_warning: notify
+    on_limit: reject
+
   pattern staffing_billing
     entity: Invoice
     timesheet: Timesheet
@@ -123,5 +143,5 @@ app staffing
     lines 80
 
   custom record_conflict_notice
-    why "抵触日は派遣先からの通知を記録する。開始日に3年を足さない。クーリングと例外の判定は人が確認する"
+    why "通知された抵触日を残す。仕様上の計算値と違えば警告し、上書きしない。クーリングを避けるための空白は指針に反し得るので、人の確認を残す"
     lines 25

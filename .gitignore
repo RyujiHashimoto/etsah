@@ -3,3 +3,7 @@ __pycache__/
 .DS_Store
 patterns/build/
 human-view-full.png
+*.egg-info/
+dist/
+build/
+.venv/

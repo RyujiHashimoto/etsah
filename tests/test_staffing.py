@@ -74,12 +74,13 @@ class TestStaffingPatterns(unittest.TestCase):
 
         broken = parse_app((PATTERNS / "examples" / "staffing_broken.prout").read_text(encoding="utf-8"))
         diags = validate(broken, self.registry)
-        self.assertEqual(_codes(diags), ["E-POLICY", "E-SLOT", "E-POLICY"])
+        self.assertEqual(_codes(diags), ["E-POLICY", "E-SLOT", "E-POLICY", "E-POLICY"])
         text = " ".join(item.message for item in diags)
         self.assertIn("抵触日", text)
         self.assertIn("2029-04-02 <= 2029-04-01", text)
         self.assertIn("approver", text)
         self.assertIn("1500 >= 1800.50", text)
+        self.assertIn("36協定", text)
 
     def test_existing_apps_still_validate(self) -> None:
         for path in (
@@ -120,10 +121,19 @@ class TestStaffingPatterns(unittest.TestCase):
                 end_date: Date
                 conflict_date: Date
                 status: String
+              entity OvertimeAgreement
+                id: Id
+                status: String
               pattern timesheet
                 entity: Timesheet
                 approver: client_approver
                 overtime_cap_hours: 7h30m
+              pattern overtime_agreement
+                entity: OvertimeAgreement
+                timesheet: Timesheet
+                warn_at_hours: 4
+                on_warning: notify
+                on_limit: reject
               pattern staffing_billing
                 entity: Invoice
                 timesheet: Timesheet

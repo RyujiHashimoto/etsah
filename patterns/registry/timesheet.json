@@ -1,6 +1,6 @@
 {
   "name": "timesheet",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "intent": "スタッフの勤怠を提出し、派遣先の承認を経てから請求と給与に回す",
   "tags": [
     "timesheet",
@@ -63,7 +63,7 @@
       "right": "0",
       "kind": "duration",
       "message": "overtime cap must be zero or a positive number of hours",
-      "note": "上限は会社の36協定の設定値。45時間や360時間は含意しない。実労働時間との比較は契約層に Duration が来るまで実行時。"
+      "note": "このスロットは会社の36協定の設定値。法定の45時間は overtime_agreement の既定と上限であり、このスロットには埋め込まない。月次で45を超える値は、有効な特別条項が無いとエラー。実労働時間との比較は実行時。"
     }
   ],
   "effects": ["read(timesheets)", "write(timesheets)", "notify(approver)", "emit(audit)"],
@@ -79,7 +79,8 @@
   "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
   "notes": [
     "派遣先承認は approver スロットを必須にすることで、承認のない勤怠パターンをコンパイルエラーにする。",
-    "時間外の法定上限は埋め込まない。overtime_cap_hours は協定書の値。",
+    "時間外のある勤怠（overtime_hours フィールド、または正の overtime_cap_hours）には overtime_agreement が要る。法定の45時間・360時間はそのパターンの既定と上限。",
+    "overtime_cap_hours は協定書の値。日次の cap は月45時間とは比べない。",
     "承認そのものの画面遷移は approval パターンと同じ形だが、対象が勤怠で承認者が派遣先である点が違う。"
   ],
   "provenance": {

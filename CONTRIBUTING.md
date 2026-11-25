@@ -1,22 +1,29 @@
-# PROUTへの貢献
+# Contributing to PROUT
 
-PROUTは「AIが書き、AIが検証し、人間が読む」ための言語の試作です。貢献の中心は、**新しいパターンをレジストリに追加すること**と、**既存パターンをより小さく一般的にすること**です。
+PROUT is a prototype of a language in which an AI writes, an AI verifies, and a human reads. The useful contributions are a **new pattern in the registry** and a **smaller, more general form of a pattern that already exists**.
 
-## 開発の流れ
+Questions go to [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues). Vulnerability reports follow [SECURITY.md](SECURITY.md). Conduct reports follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+`oss@j-prout.co.jp` is a placeholder for the owner to confirm. It is not a monitored contact until the owner says so. Use GitHub Issues until then.
+
+The contract spec's original is [SPEC.md](SPEC.md) (Japanese). [SPEC.en.md](SPEC.en.md) is a translation. If they disagree, `SPEC.md` wins. Update `SPEC.md` in the same pull request when a change alters syntax, types, effects, or preconditions, and update the translation in the same pull request.
+
+## Coordination
+
+`Date`, `Decimal`, `agent` / `task`, information-flow labels, the MCP server, and the browser playground are on `main`. Change the checker in a pull request that also updates `SPEC.md` and `SPEC.en.md`. Do not restyle `prout.py` in a docs-only pull request.
+
+## Development
 
 ```bash
 git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang
 
-# 契約言語の検証
 python3 prout.py check examples/refund_fixed.prout
 python3 prout.py check examples/ai_tasks.prout
 python3 render.py
 
-# 単体テスト（標準ライブラリの unittest。追加の依存はない）
 python3 -m unittest discover -s tests -v
 
-# パターン層の検証
 cd patterns
 python3 proutc.py index
 python3 proutc.py build examples/shop.prout
@@ -30,67 +37,88 @@ python3 proutc.py bench
 python3 growth_report.py
 ```
 
-CIは上記と同じコマンドを実行します。ローカルで通れば、ほぼCIも通ります。
+CI runs these commands. A green local run is usually a green CI run. Python 3.12, standard library only.
 
-## パターンの提案
+`pip install .` exposes the `prout`, `proutc`, and `prout-mcp` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
 
-パターンはコードではなくJSONマニフェストです。`patterns/registry/<name>.json` を追加し、`index.json` を再生成してPull Requestを出してください。
+Optional local install, from the repository root:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install .
+```
+
+## Proposing a pattern
+
+A pattern is a JSON manifest, not code. Add `patterns/registry/<name>.json`, regenerate `index.json`, and open a pull request.
 
 ```bash
 cd patterns
-# 既存マニフェストを雛形にする
 cp registry/approval.json registry/my_pattern.json
-# name, intent, tags, slots, artifacts を書き換える
+# Rewrite name, intent, tags, slots, and artifacts.
 python3 proutc.py index
-python3 proutc.py find "やりたいこと"
+python3 proutc.py find "what you want"
 python3 proutc.py build examples/your_app.prout
 ```
 
-マニフェストに必要な項目は次のとおりです。
+Use fictional names in sample specs. Do not include personal contact details, customer data, or material from inside a company.
 
-| 項目 | 内容 |
+| Field | What it holds |
 |---|---|
-| `name` | パターン名。英小文字とアンダースコア |
-| `version` | セマンティックバージョン |
-| `intent` | 「何をしたいときに使うか」を一文で。検索の主キーになる |
-| `tags` | 英語と日本語の両方。AIの検索語彙を広げる |
-| `slots` | 必須・任意のスロット。`desc` はAIが読む |
-| `effects` | `read`, `write`, `net`, `spend`, `emit`, `notify` のいずれか |
-| `artifacts` | 生成物のパス、種類、概算行数、説明 |
-| `examples` | 実際にビルドが通る仕様ファイル |
-| `provenance` | 誰が、いつ、どのアプリから抽出したか |
+| `name` | Pattern name. Lowercase English and underscores |
+| `version` | Semantic version |
+| `intent` | One sentence: when to use it. This is the search key |
+| `tags` | Both English and Japanese, so an agent's query can hit |
+| `slots` | Required and optional slots. `desc` is what the agent reads |
+| `effects` | One of `read`, `write`, `net`, `spend`, `emit`, `notify` |
+| `artifacts` | Path, kind, estimated lines, description |
+| `examples` | Spec files that actually build |
+| `provenance` | Who extracted it, when, and from which app |
 
-### レビューの基準
+### Review bar
 
-パターンは「同じ形が二度以上現れた」ときにだけ追加します。一度きりの実装は `custom` に置きます。レビューでは次を確認します。
+Add a pattern only when the same shape has appeared more than once. A one-off stays in `custom`. Review checks:
 
-1. `intent` が一つの文で書かれ、アプリ固有の名前を含まない。
-2. 必須スロットが最小限で、アプリ固有の値を要求しない。
-3. `effects` が実際の生成物と一致している。
-4. 生成物が決定論的で、同じ入力から同じ出力になる。
-5. 二つ以上の利用例（実アプリ一つと、合成した仕様一つでよい）がある。
-6. `python3 proutc.py bench` の数値が悪化していない。
-7. 状態遷移を持つパターンは `states` と `transitions` を定義し、`on_approved` の参照先が custom か適用済みパターンになっている。パターンを指すフックは、引数が参照先のスロットと `auth.roles` に合っている。
+1. `intent` is one sentence and contains no app-specific name.
+2. Required slots are minimal and do not demand an app-specific value.
+3. `effects` match the artifacts that are actually produced.
+4. Expansion is deterministic: the same input yields the same output.
+5. At least two examples exist (one real app and one synthetic spec is enough).
+6. `python3 proutc.py bench` does not get worse.
+7. A pattern with state transitions defines `states` and `transitions`. `on_approved` points at a `custom` block or at a pattern applied in the same spec. A hook that points at a pattern has arguments that match that pattern's slots and `auth.roles`.
 
-### バージョンの上げ方
+### Versions
 
-- `patch` — 説明文の修正、生成物の行数更新。
-- `minor` — 任意スロットや生成物の追加。既存の仕様はそのまま動く。
-- `major` — 必須スロットの追加、`effects` の変更。既存の仕様が動かなくなる。
+- `patch` — wording, or an updated line estimate.
+- `minor` — an optional slot or an added artifact. Existing specs still build.
+- `major` — a new required slot, or a change to `effects`. Existing specs break.
 
-## AIが生成したPull Request
+## Pull requests written by an AI
 
-AIが提案する場合も、人間のレビューを必須にします。PRの説明には次を含めてください。
+Human review is required when an AI wrote the patch. The description includes:
 
-- 使用したモデルと、生成した日時。
-- `proutc.py build` と `bench` の実行結果（貼り付け）。
-- パターンを抽出した元のアプリと、共通部分だと判断した理由。
-- 一般化できず `custom` に残した部分。
+- The model, and when the patch was generated.
+- Pasted output of `proutc.py build` and `bench`.
+- The apps the pattern was extracted from, and why the shared part is shared.
+- What could not be generalized and stayed in `custom`.
 
-## 契約言語への変更
+## Changes to the contract language
 
-`prout.py` の構文・型・効果・事前条件の意味を変える場合は、`SPEC.md` を同じPRで更新してください。既存の `.prout` ファイルが通らなくなる変更は、`major` として扱います。
+If a change alters the meaning of syntax, types, effects, or preconditions in `prout.py`, update `SPEC.md` and `SPEC.en.md` in the same pull request. A change that makes existing `.prout` files fail is a `major` change.
 
-## ライセンス
+## 日本語
 
-貢献はMITライセンスの下で受け入れます。著作権は橋元 龍二（Ryuji Hashimoto）に帰属します。
+手順、レビュー基準、版の上げ方は英語の本文が正です。
+
+- テストは `python3 -m unittest discover -s tests -v`。依存パッケージはありません。
+- 新しいパターンは `patterns/registry/<name>.json` を足し、`python3 proutc.py index` で索引を更新して Pull Request にします。同じ形が二度以上出てから追加します。
+- AI が書いた Pull Request も、人間のレビューが必須です。
+- 質問は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
+- `oss@j-prout.co.jp` はオーナー確認前の仮アドレスです。確認されるまでは Issues を使ってください。
+- 検査器の意味を変えるときは `SPEC.md` と `SPEC.en.md` を同じ Pull Request で更新してください。ドキュメントだけの変更で `prout.py` を整形し直さないでください。
+
+## License
+
+Contributions are accepted under the MIT License in [LICENSE](LICENSE). By submitting a contribution, you agree that it is licensed under MIT.
+
+Project copyright line for new documents: Ryuji Hashimoto (J-PROUT Inc.). The `LICENSE` file keeps its existing copyright line.
