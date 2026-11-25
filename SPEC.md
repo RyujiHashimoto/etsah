@@ -131,7 +131,7 @@ task remind_timesheet(period: Id) -> Bool
 
 情報フローの `policy`（`sink` と `declassify`）と、このタスク用の `policy`（`external`、`payment`、`contract`）は同じ宣言名で、中の行で区別する。一つのブロックに両方は書けない。プログラムには、情報フローの `policy` を一つと、タスク用の `policy` を一つまで置ける。
 
-`check` は、タスクがあるとき、起動、効果、ゲート、再試行、キー、予算を文章で出す。
+`check` は、タスクがあるとき、起動、効果、ゲート、再試行、キー、予算を文章で出す。`check --json` は、これまでの `hash`、`diagnostics`、タスクがあるときの `audit_id` と `plan` に加え、`manifest` を出す。`manifest` は `hash`、タスクがあるときの `audit_id`、各 agent の `allow`、整数円の `budget_run` と `budget_period`、`limit_net` と `limit_emit`、宣言があれば `call_limit` と `spend_limit`、その agent の task が名指しした gate 名である。agent は名前順、`allow` と gate 名も名前順で、同じソースは同じバイト列になる。`signature` は常に `null` である。このフィールドは署名しない。鍵も読まない。
 
 ### 式
 
