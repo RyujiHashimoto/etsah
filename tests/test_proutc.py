@@ -10,7 +10,9 @@ discovery, and the enforced `field_types` manifest key.
 """
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -131,6 +133,36 @@ class Discovery(unittest.TestCase):
 
     def test_english_stopwords_do_not_drown_the_match(self):
         self.assertEqual("refund", self.top("I want a refund flow"))
+
+
+class RegistryValidation(unittest.TestCase):
+    MANIFEST = {
+        "name": "same",
+        "version": "0.1.0",
+        "intent": "A small registry test pattern",
+        "artifacts": [{"path": "lib/test.ts", "kind": "TS", "lines": 1, "desc": "test"}],
+    }
+
+    def write_manifest(self, path: Path, name: str) -> None:
+        manifest = {**self.MANIFEST, "name": name}
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    def test_duplicate_manifest_names_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp)
+            self.write_manifest(registry / "same.json", "same")
+            self.write_manifest(registry / "z_duplicate.json", "same")
+
+            with self.assertRaisesRegex(ValueError, "duplicate manifest name 'same'"):
+                load_registry(registry)
+
+    def test_manifest_filename_must_match_declared_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp)
+            self.write_manifest(registry / "actual.json", "same")
+
+            with self.assertRaisesRegex(ValueError, "actual.json.*does not match declared name 'same'"):
+                load_registry(registry)
 
 
 class FieldTypes(unittest.TestCase):
