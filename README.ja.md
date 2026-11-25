@@ -1,16 +1,14 @@
 [English](README.md)
 
-英語版は [README.md](README.md) です。先頭は「AIエージェントが実行前に許される効果と承認を静的に検査する」という説明で、人材派遣は産業の一例として後ろに置いています。以下は従来の日本語READMEです。
+英語版は [README.md](README.md) です。エージェントの効果と承認、MCP、ブラウザの playground を先頭に置いています。以下は日本語の README です。
 
 # PROUT（プラウト）
 
 **AIが書き、AIが検証し、人間は自然言語とGUIで読む。**
 
-[![ci](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml)
-
 PROUTは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
 
-作者: 橋元 龍二（Ryuji Hashimoto） / [@RyujiHashimoto](https://github.com/RyujiHashimoto)
+Ryuji Hashimoto (J-PROUT Inc.)
 
 ## 出発点
 
@@ -52,7 +50,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在133件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在294件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -182,15 +180,21 @@ PROUTの成長は、コードの行数ではなく、**次のAIが少ない手�
 
 ```
 prout.py                 契約言語のパーサー・検証器・CLI
+prout_api.py             check_source と check_file
+prout_import.py          MCP と OpenAI のツール定義を op にする
+prout_mcp/               MCP サーバ（prout mcp）とガード（prout guard）
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
-examples/                壊れた初稿と修正版
+examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
+docs/playground/         ブラウザの検査（静的ページ。Pyodide）
+docs/en/comparison.md    契約・効果・ポリシー・ガードレールとの比較
+docs/check-demo.svg      prout check の前後を録った SVG
 tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
-  registry/              24個のパターンマニフェストと index.json
-  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣の仕様
+  registry/              26個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣、AIタスクの仕様
   bench/                 パターン追加前後の比較（PC貸出を含む）
   build/                 生成物（report.html、demo.html、story.html）
   growth_report.py       成長ループのHTMLレポート
@@ -231,6 +235,71 @@ python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
 python3 proutc.py find "勤怠"
 ```
 
+## AIに任せる作業の境界を仕様で止める
+
+`ai_task` は、定期実行・新しい行・webhook のどれで起動するかを宣言し、AIが使ってよい効果、`spend` の1回と期間の上限、`net` と `emit` の時間あたり回数、再試行とエスカレーション、冪等キー、監査（`audit: ast_hash`）をスロットに持つ。`approval_gate` は、社外への `emit` と `net`、支払いの `spend`、契約の変更を、人が承認するまで止める。ゲートの無い社外への `emit` は `E-POLICY` になる。
+
+契約層も同じ境界を `agent` と `task` で検査する。手順は既存の op を呼ぶ。社外への `emit` と `net`、`spend`、契約の変更にゲートが無いと `E-POLICY` になる。`check` は各タスクの起動、効果、ゲート、再試行を文章で出す。cron の実行、予算の残数、冪等ストアはまだ無い。
+
+```sh
+python3 prout.py check examples/ai_tasks.prout
+```
+
+設計と、採用した初期値は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
+
+```sh
+cd patterns
+python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
+python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
+python3 proutc.py find "自動化"
+```
+
+## エージェントのツールを契約で止める
+
+英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md)、ブラウザの試用は [docs/playground/index.html](docs/playground/index.html)、先行する仕組みとの比較は [docs/en/comparison.md](docs/en/comparison.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
+
+```sh
+python3 prout.py import mcp examples/agents/tools/mcp_tools.json
+python3 prout.py check examples/agents/support_reply.prout
+python3 prout.py check examples/agents/github_triage.prout --allow-net github
+```
+
+同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
+
+## 情報フローラベルでPIIの流出を止める
+
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
+
+```prout
+type Customer {
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+  sink net(*) rejects secret
+  declassify pii in masked_tracking require role support
+
+op send_receipt(to: String @pii) -> Receipt
+  eff net(email)
+  sends to -> net(email)
+  impl native
+```
+
+顧客のメールアドレスをそのまま分析に渡すと `E-IFLOW-ARG` で止まり、`declassify` を通せば `W-DECLASS` として監査に残ります。実際に動く2つの例で確かめられます。
+
+```bash
+# 0エラー、1警告（declassify の監査ログ）
+python3 prout.py check examples/information_flow_safe.prout \
+  --allow-net email --allow-net analytics
+
+# E-IFLOW-ARG で失敗する
+python3 prout.py check examples/information_flow_leak.prout \
+  --allow-net email --allow-net analytics
+```
+
+ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（暗黙のフロー、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
+
 ## 参加する
 
 新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
@@ -239,4 +308,6 @@ python3 proutc.py find "勤怠"
 
 ## ライセンス
 
-MIT。Copyright (c) 2026 橋元 龍二（Ryuji Hashimoto）。
+MIT. Copyright (c) 2026 Ryuji Hashimoto (J-PROUT Inc.).
+
+Developed by [J-PROUT Inc.](https://www.j-prout.co.jp/).

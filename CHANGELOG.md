@@ -7,7 +7,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 ### Added
 
 - English README. The previous Japanese README is preserved in full as `README.ja.md`.
-- The English README leads with contracts for AI agents: declare effects and approvals, and catch an unsafe automation before it runs. Spend budgets, external approval gates, and `agent` / `task` syntax are described as in progress ([pull request #10](https://github.com/RyujiHashimoto/prout-lang/pull/10) for the pattern layer; a contract-layer pull request is still to come).
+- The English README leads with contracts for AI agents: declare effects and approvals, and catch an unsafe automation before it runs. After merging main through #16, that page also covers `agent` / `task`, MCP, and the browser playground.
 - `SPEC.en.md`, an English translation of `SPEC.md`. The Japanese spec remains the original.
 - An English summary at the top of `docs/staffing.md`. The Japanese note is unchanged.
 - `CONTRIBUTING.md` in English, with a short Japanese section.

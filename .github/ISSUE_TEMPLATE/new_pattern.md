@@ -7,7 +7,7 @@ labels: enhancement
 
 Patterns are JSON manifests. Add one when the same shape has already appeared twice. Read CONTRIBUTING.md before a large patch.
 
-`ai_task` and `approval_gate` are in pull request #10. Do not open a second agent-envelope pattern while that pull request is open.
+`ai_task` and `approval_gate` are already in the registry. Extend them in place instead of adding a second agent envelope.
 
 ## Intent
 

@@ -1,0 +1,79 @@
+{
+  "name": "approval_gate",
+  "version": "0.1.0",
+  "intent": "外部への送信、支払い、契約変更の前に人の承認を必須にし、承認後の処理へつなぐ",
+  "tags": [
+    "approval",
+    "gate",
+    "human",
+    "emit",
+    "spend",
+    "承認",
+    "承認ゲート",
+    "人の確認",
+    "送信",
+    "支払い"
+  ],
+  "slots": {
+    "entity": {
+      "type": "entity",
+      "required": true,
+      "desc": "承認対象のエンティティ"
+    },
+    "approver": {
+      "type": "role",
+      "required": true,
+      "desc": "承認する人のロール"
+    },
+    "action": {
+      "type": "enum",
+      "values": ["emit", "net", "spend", "contract"],
+      "required": true,
+      "desc": "人が許可する作用。emit、net、spend、contract"
+    },
+    "audience": {
+      "type": "enum",
+      "values": ["internal", "external"],
+      "required": true,
+      "desc": "作用の相手。タスクの audience と一致させる"
+    },
+    "on_approved": {
+      "type": "hook",
+      "required": false,
+      "desc": "承認後に呼ぶ処理。custom か適用済みパターン"
+    }
+  },
+  "states": ["pending", "approved", "rejected"],
+  "transitions": [
+    {"from": "pending", "on": "approve", "to": "approved", "effect": "emit(audit)"},
+    {"from": "pending", "on": "reject", "to": "rejected", "effect": "notify(applicant)"}
+  ],
+  "hooks": {
+    "on_approved": {"kind": "custom_or_pattern", "required": false}
+  },
+  "requires_fields": {"status": "String"},
+  "requires_target": true,
+  "bound_roles": ["approver"],
+  "effects": ["write(approvals)", "emit(audit)"],
+  "artifacts": [
+    {"path": "db/schema.sql#gate_{target_lower}", "kind": "SQL", "lines": 14, "desc": "{Entity}の承認待ち"},
+    {"path": "api/gates/{target_lower}/route.ts", "kind": "API", "lines": 55, "desc": "承認と却下"},
+    {"path": "app/(admin)/gates/{target_lower}/page.tsx", "kind": "UI", "lines": 70, "desc": "人が確認する画面"},
+    {"path": "lib/gates/{target_lower}.ts", "kind": "TS", "lines": 40, "desc": "承認後フック"},
+    {"path": "tests/gates/{target_lower}.test.ts", "kind": "TEST", "lines": 35, "desc": "未承認では作用しないテスト"}
+  ],
+  "examples": ["examples/ai_automation.prout", "examples/ai_desk.prout"],
+  "notes": [
+    "パターン名のうしろに名前が要る。タスクの approval スロットはその名前を指す。",
+    "action が emit または net で audience が external のとき、対応する ai_task はここを指さないと E-POLICY になる。",
+    "spend と contract は audience が internal でもゲートが要る。",
+    "既存の approval は申請の状態遷移である。こちらは AI の外部効果を止めるためのゲートで、別のパターンである。",
+    "demo.html のボタン操作は approval のままである。このパターンの画面遷移はまだ生成していない。"
+  ],
+  "provenance": {
+    "author": "PROUT automation proposal",
+    "date": "2026-11-22",
+    "extracted_from": ["staffing", "pc_rental", "inquiry_triage"],
+    "note": "メール、請求、支払い、契約変更を人が許可してから動かす。"
+  }
+}

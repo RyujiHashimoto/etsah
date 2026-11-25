@@ -29,4 +29,4 @@ Paste the checker output. For a security-sensitive failure, read SECURITY.md and
 
 ## Branch
 
-`main`, or a pull request number. `prout.py` and `patterns/proutc.py` have open pull requests (#9, #10). Say if you are on one of those branches.
+`main`, or a pull request number.

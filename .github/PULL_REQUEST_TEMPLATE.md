@@ -16,7 +16,7 @@ python3 prout.py check examples/refund_fixed.prout
 - [ ] No change to `prout.py`
 - [ ] `SPEC.md` and `SPEC.en.md` updated in this pull request
 
-`prout.py` is edited by open pull request #9. Contract-layer `agent` / `task` syntax is reserved for a pull request that has not been opened yet.
+If this pull request changes checker meaning, update `SPEC.md` and `SPEC.en.md` here. Do not restyle `prout.py` in a docs-only change.
 
 ## Patterns
 
@@ -24,7 +24,7 @@ python3 prout.py check examples/refund_fixed.prout
 - [ ] Manifest, `index.json`, and at least two example specs
 - [ ] `python3 proutc.py bench` output pasted below
 
-`patterns/proutc.py` is edited by open pull request #10 (`ai_task`, `approval_gate`).
+`ai_task` and `approval_gate` are already registered.
 
 ## If an AI wrote this patch
 

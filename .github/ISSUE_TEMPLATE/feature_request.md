@@ -19,8 +19,8 @@ Point at a spec, a pattern, or a section of SPEC.md / SPEC.en.md.
 
 ## Scope
 
-- [ ] Contract layer (`prout.py`). Open pull request #9 is already editing this file. A contract-layer `agent` / `task` syntax pull request is still to come. Please do not start a parallel one.
-- [ ] Pattern layer (`patterns/proutc.py`). Open pull request #10 covers `ai_task` and `approval_gate`.
+- [ ] Contract layer (`prout.py`). Update SPEC.md and SPEC.en.md in the same pull request.
+- [ ] Pattern layer (`patterns/proutc.py`). `ai_task` and `approval_gate` are already in the registry.
 - [ ] Docs or examples only
 
 ## Sample

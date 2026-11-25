@@ -1,6 +1,6 @@
-# PROUT v0.1 — a contract language for AI (prototype)
+# PROUT v0.6 — a contract language for AI
 
-This is an English translation of [SPEC.md](SPEC.md). The Japanese text is the original. If the two disagree, `SPEC.md` wins. This translation tracks `SPEC.md` on main. Open pull requests may extend the Japanese spec later.
+This is an English translation of [SPEC.md](SPEC.md). The Japanese text is the original. If the two disagree, `SPEC.md` wins.
 
 ## Why a new language
 
@@ -70,27 +70,99 @@ A flow's effects must equal the union of the effects of the ops it calls. That i
 
 A flow must end with `return`. A flow with no `return` is an error (`E-FLOW`). Statements written after `return` are unreachable and are also an error.
 
+### Agents and tasks
+
+Work given to an AI is two layers: an `agent` (the envelope of effects it may use) and a `task` (one job inside that envelope). A `gate` holds an external effect until a person allows it. `policy` names which effects are external, a payment, or a contract change. Indentation is two spaces, as for every other declaration. Budget numbers are integer yen.
+
+```
+agent staffing_mail
+  doc "承認済みの文面だけを社外へ送る"
+  allow read(timesheets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+policy
+  external emit(mail), net(stripe)
+  payment spend(payroll)
+  contract write(contracts)
+
+gate remind_client
+  doc "督促メールはコーディネーターの承認後だけ送る"
+  approver coordinator
+  before emit(mail)
+  on_approved mail.send
+
+task remind_timesheet(period: Id) -> Bool
+  agent staffing_mail
+  eff read(timesheets), emit(mail)
+  gate remind_client
+  key period
+  retry 2 escalate coordinator
+  let sheet = timesheets.open(period)
+  let sent = mail.send(sheet)
+  return sent
+```
+
+Triggers:
+
+- `trigger schedule "0 9 * * 1"` is five cron fields: minute, hour, day, month, weekday. `*`, `a-b`, `*/n`, and comma lists are accepted. Names such as `MON` are not.
+- `trigger record Invoice` fires only for a new row of that type, not for an update.
+- `trigger webhook "inbound/inquiry"` records the endpoint name. Signatures are not checked.
+
+The period boundary is `Asia/Tokyo`. There is no syntax to change it per task.
+
+The checker does not run cron, does not store remaining budget, and does not store an idempotency key. The static rules are:
+
+1. A task's `eff` equals the union of the effects of the ops it calls (`E-EFF`). That union must be a subset of the agent's `allow`. An effect outside the allow list is `E-POLICY`.
+2. An `emit` or `net` listed in `policy external`, every `spend`, and a `write` listed in `policy contract` need a `gate` whose `before` names that effect. Otherwise `E-POLICY`. An internal `emit` (one not listed as external) needs no gate. Whether a company-wide Slack notice is external is decided by whether that target is written in `policy external`.
+3. An agent allowed to `spend` has `budget run` and `budget period` as integers of at least 1 yen, and the per-run budget is at most the period budget. An agent that may not `spend` has budget 0. A task's own `budget` follows the same rule and may not exceed the agent's budget.
+4. `limit emit` and `limit net` are at least 1 when that effect is allowed, and 0 when it is not. The unit is one hour.
+5. `retry` is from 0 through 5. After that, the task escalates to the human role in `escalate`. That handoff is not part of the agent's `allow`. If escalation points at an op or an agent whose effect needs a gate, that is `E-POLICY`.
+6. `key` is a parameter or a field of a parameter. Idempotency identity is agent, task, and key. Changing the program hash is not a reason to repeat an external effect. The store itself does not exist yet.
+7. `audit ast_hash` is required on an agent. The audit identity is the full 64-hex SHA-256 of the normalized AST (`ast_digest`). The displayed `ast_hash` remains the first 12 hex digits.
+8. An approver is a human role. An agent's name cannot be an `approver`. The check does not yet prove that `on_approved` is the only call that performs the external effect.
+
+Whether a `net` target is on the allow list (default `stripe`) is still the op policy check. `policy external` decides whether that target also needs a gate.
+
+The information-flow `policy` (`sink` and `declassify`) and the task `policy` (`external`, `payment`, `contract`) share a declaration name and are distinguished by the lines inside. One block cannot hold both. A program may contain one information-flow `policy` and one task `policy`.
+
+When a program has a task, `check` prints the trigger, effects, gate, retry, key, and budget in prose.
+
 ### Expressions
 
 - Variables, field access (`order.total`), and calls (`refund(order, amount)`).
-- Literals: integers, strings, and booleans.
+- Literals: integers, decimals, dates, strings, and booleans.
 - Binary operators: `+`, `-`, `*`, `/`, `==`, `<=`, `<`, `>`, `>=`, `&&`, `||`.
 - Unary `!`. In the AST this is a unary node, separate from binary operators.
 
+Built-in types are `Int`, `Decimal`, `Date`, `String`, and `Bool`. `Money` stays an opaque type, handled by the user's declarations and by the rules for mixing it with `Int`.
+
+Literal forms:
+
+- A decimal has digits on both sides of the point, as in `1800.50`. The meaning is `decimal.Decimal`, not a binary float. `1800.50` and `1800.5` are equal. `1.`, `.5`, and `1e2` are not literals.
+- A date is `2026-11-23` with no spaces (zero-padded Gregorian). An impossible day such as `2026-02-31` is a syntax error. `2026 - 11 - 23` with spaces is still integer subtraction.
+- `Int` and `Decimal` may be mixed. If either side is `Decimal`, the result is `Decimal`. `+`, `-`, `*`, and `/` of two `Int`s stay `Int`. `1 / 2` is not constant-folded. Decimal division is not linear either, so in a precondition it is a runtime guard.
+- `Date + Int` and `Int + Date` add days and produce a `Date`. `Date - Int` is a `Date`. `Date - Date` is an `Int` number of days. Arithmetic or comparison of `Date` with `Decimal` is a type error. Adding two `Date`s is a type error.
+
 Type rules for comparisons:
 
-- `==` / `!=` apply only to compatible types (for example `Status` and a string literal). Comparing `Money` with `String` is a type error (`E-TYPE`).
-- `<`, `<=`, `>`, `>=` apply only to types that have an order (`Int`, `Money`, and `String` of the same type). Mixing `Int` and `Money` is allowed.
+- `==` / `!=` apply only to compatible types (for example `Status` and a string literal, or `Int` and `Decimal`). Comparing `Money` with `String` is a type error (`E-TYPE`).
+- `<`, `<=`, `>`, `>=` apply only to types that have an order (`Int`, `Decimal`, `Money`, `Date`, and `String` of the same type). Mixing `Int` with `Decimal`, and `Int` with `Money`, is allowed. A `Date` compares only with a `Date`.
 - The operand of `!` must be `Bool`.
+
+Contract checking rewrites integer, decimal, and date-difference expressions into linear (affine) form and compares constants. A date is a Gregorian day count internally. The origin cancels in a difference or a comparison. An expression that still contains a variable, or that contains division, is not proved. It is reported as a runtime guard. It is not silently accepted.
 
 ## Verification pipeline
 
 1. **Parse.** A line-oriented grammar. Indentation is exactly two spaces.
 2. **Type check.** Arguments, return values, fields, and operators.
-3. **Effect check.** Compare an op's declared effects with the effects its implementation performs. For a flow, compare the declaration with the union of the calls.
+3. **Effect check.** Compare an op's declared effects with the effects its implementation performs. For a flow or a task, compare the declaration with the union of the calls.
 4. **Contract check.** At each call site, substitute the actual arguments into the precondition and judge it by linear arithmetic and equality. True passes. False is an error. Unknown becomes a runtime guard.
-5. **Policy check.** Only allowed network targets and effect kinds pass.
-6. **Normalize.** Convert the AST to sorted JSON and attach a SHA-256 hash. Types, ops, flows, fields, and effects are sorted, and so are the conjunctions of `pre` and `post`, by an expression normalization key. Argument order and statement order are meaningful, so they are not sorted.
+5. **Information-flow check.** Only when the program declares labels, annotations, or an information-flow `policy`: arguments, return values, contracts, sinks, `sends`, and `declassify`. A task `policy` alone does not start this check.
+6. **Policy check.** Only allowed network targets and effect kinds pass. AI tasks are also stopped here for the envelope, gates, integer-yen budgets, hourly limits, and retries.
+7. **Normalize.** Convert the AST to sorted JSON and attach a SHA-256 hash. Types, ops, flows, fields, and effects are sorted, and so are the conjunctions of `pre` and `post`, by an expression normalization key. Labels, an information-flow `policy`, agents, tasks, gates, and task policies enter the hash only when present. A program without them keeps its previous hash. Argument order and statement order are meaningful, so they are not sorted.
 
 ## Human view
 
@@ -107,10 +179,11 @@ The view can always be regenerated from the AST. Editing the view alone is not p
 
 ## Scope of the prototype
 
-- Parser, type checker, effect checker, precondition checker, policy checker, and HTML renderer.
-- Preconditions in linear arithmetic only. Contracts over strings or collections are runtime guards.
+- Parser, type checker, effect checker, precondition checker, policy checker, and HTML renderer. Static checks for AI tasks: envelope, gates, integer-yen budgets, rate limits, retries, and the shape of an idempotency key.
+- Information flow checks a static set of labels only. Implicit flow, labels on collection elements, label polymorphism, and runtime enforcement are out of scope.
+- Preconditions in linear arithmetic only. Contracts over strings or collections are runtime guards. Decimal values and calendar-day differences are proved only when they reduce to constants.
 - The meaning of an implementation is not verified. `impl` is treated as a declaration.
-- Proofs of concurrency, time, and resource consumption are out of scope.
+- Proofs of concurrency, time of day, and resource consumption are out of scope. A calendar `Date` is in scope. A clock time is not. Running cron, storing remaining budget, and an idempotency store are out of scope.
 
 This is not a complete implementation of the language. It is a prototype of whether the loop "an AI generates, an AI verifies, a human sees a GUI" can hold.
 
@@ -142,3 +215,85 @@ A contract layer like PROUT can turn reverse engineering from "recover the meani
 - A self-asserted contract can be a lie. A contract is trustworthy only after it has been checked. That cuts both ways, for defenders and for attackers.
 
 Reverse engineering becomes easier only when a contract exists and has been checked. A binary with no contract remains a matter of craft and tools.
+
+## Information-flow control
+
+Attach `pii` or `secret` to a type and reject a flow into a sink that does not allow that label. The design note, including what is not implemented, is [docs/information-flow.md](docs/information-flow.md). This section is the rules that are implemented.
+
+### Declaring and annotating labels
+
+```
+label pii
+label secret
+
+type Customer {
+  id: Id
+  email: String @pii
+  internal_note: String @secret
+}
+```
+
+`public` is implicit. It cannot be declared or annotated. A label name matches `[a-z][a-z0-9_]*` and must not collide with an effect kind (`read`, `write`, `net`, `spend`, `emit`). Annotations go on opaque types and on field types. They cannot go on a record type itself or inside a type argument (`Box<String @pii>`). Those are `E-LABEL`.
+
+A label set is part of the type. `String @pii` and `String` are different types, but assigning `String` to `String @pii` is allowed (public data may flow into a secret). The other direction is `E-IFLOW-ARG` or `E-IFLOW-RET`.
+
+### Inferring labels on expressions
+
+| Expression | Label |
+|---|---|
+| Literal, or a variable with no label | empty (public) |
+| Field access `c.email` | that field's label only |
+| Record value `Customer { ... }` | union of every field's labels |
+| Binary `a + b` | union of both sides |
+| Comparison `a == b` | union of both sides (the `Bool` result still carries the label) |
+| Call | the declared return label |
+| `declassify(e, l, reason)` | `e`'s labels with `l` removed |
+
+A variable that holds a whole record carries every field's labels. Reading one field keeps only that field's label. A customer record can contain PII while `id` stays public.
+
+### Sinks and `sends`
+
+An operation that touches the outside declares which argument flows to which effect.
+
+```
+policy
+  sink net(email) accepts pii
+  sink net(analytics) accepts pii
+  sink net(*) rejects secret
+
+op send_receipt(to: String @pii) -> Bool
+  eff net(email)
+  sends to -> net(email)
+  impl native
+```
+
+A `sink` names, per effect target, labels it `accepts` and labels it `rejects`. `net(*)` is a wildcard. A more specific `net(email)` replaces `accepts`. `rejects` is the union of the specific rule and the wildcard, and cannot be overwritten. `read` cannot be a sink (`E-POLICY`).
+
+`sends` may be written only on an `impl native` op. A native op with a labeled argument or return, or with a `read` effect, must have a `sends` for every effect other than `read`. A missing one is `E-SINK-UNBOUND`. An unknown argument or effect is `E-SINK`. `sends none -> net(health)` says that effect receives no labeled data.
+
+### `declassify`
+
+A label may be removed only where policy allows the place and the role.
+
+```
+policy
+  declassify pii in masked_tracking require role support
+
+flow masked_tracking(id: Id) -> Bool
+  eff read(customers), net(analytics)
+  let c = customers.get(id)
+  let masked = declassify(c.email, pii, "分析用にドメインだけ残す")
+  return track_event(masked)
+```
+
+The reason is 1 to 200 characters and contains no newline. An allowed `declassify` stays in the audit log as `W-DECLASS`. A place, role, or label outside policy is `E-DECLASS`. Declassifying a whole record, or using `declassify` inside `pre` or `post`, is rejected.
+
+### Checks and diagnostics
+
+The order is arguments (`E-IFLOW-ARG`), return values (`E-IFLOW-RET`), contract expressions (`E-IFLOW-CONTRACT`), sinks (`E-IFLOW-SINK`), `sends` (`E-SINK`, `E-SINK-UNBOUND`), policy (`E-POLICY`), and `declassify` (`E-DECLASS`, `W-DECLASS`). Diagnostics carry a line and a suggested fix. `--json` puts "which value flowed into which argument" in `context`.
+
+A program with no label declaration, no annotation, and no information-flow policy skips the information-flow check entirely. Existing ASTs and hashes stay the same. `examples/refund_fixed.prout` remains `bae8501e8b3f`.
+
+### Limits
+
+Implicit flow (a branch on a secret affecting a public value) is not tracked. Labeled collections, label polymorphism, runtime enforcement, and authenticating the caller of `declassify` are not implemented. The body of `impl native` is trusted. The check stops a flow that crosses a declared boundary. It does not prove noninterference.

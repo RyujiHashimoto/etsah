@@ -10,13 +10,7 @@ The contract spec's original is [SPEC.md](SPEC.md) (Japanese). [SPEC.en.md](SPEC
 
 ## Coordination
 
-Two language pull requests are open, and a contract-layer pull request for `agent` / `task` is still to come.
-
-- [#9](https://github.com/RyujiHashimoto/prout-lang/pull/9) edits `prout.py` for `Date` and `Decimal`.
-- [#10](https://github.com/RyujiHashimoto/prout-lang/pull/10) edits `patterns/proutc.py` for the agent-task pattern layer (`ai_task`, `approval_gate`).
-- Contract-layer `agent` / `task` syntax is reserved for the owner's upcoming pull request. `prout.py` on main does not parse it.
-
-A docs or pattern pull request should leave `prout.py` and `patterns/proutc.py` alone unless the change is the point of that pull request and it is rebased onto the open work. Parallel edits to those files will conflict.
+`Date`, `Decimal`, `agent` / `task`, information-flow labels, the MCP server, and the browser playground are on `main`. Change the checker in a pull request that also updates `SPEC.md` and `SPEC.en.md`. Do not restyle `prout.py` in a docs-only pull request.
 
 ## Development
 
@@ -25,6 +19,7 @@ git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang
 
 python3 prout.py check examples/refund_fixed.prout
+python3 prout.py check examples/ai_tasks.prout
 python3 render.py
 
 python3 -m unittest discover -s tests -v
@@ -36,13 +31,15 @@ python3 proutc.py build examples/expense.prout
 python3 proutc.py build bench/pc_lending.prout
 python3 proutc.py build examples/staffing.prout
 python3 proutc.py build examples/staffing_desk.prout
+python3 proutc.py build examples/ai_automation.prout
+python3 proutc.py build examples/ai_desk.prout
 python3 proutc.py bench
 python3 growth_report.py
 ```
 
 CI runs these commands. A green local run is usually a green CI run. Python 3.12, standard library only.
 
-`pip install .` exposes `prout` and `proutc` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
+`pip install .` exposes the `prout`, `proutc`, and `prout-mcp` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
 
 Optional local install, from the repository root:
 
@@ -118,7 +115,7 @@ If a change alters the meaning of syntax, types, effects, or preconditions in `p
 - AI が書いた Pull Request も、人間のレビューが必須です。
 - 質問は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
 - `oss@j-prout.co.jp` はオーナー確認前の仮アドレスです。確認されるまでは Issues を使ってください。
-- `prout.py` と `patterns/proutc.py` は、進行中の Pull Request（#9、#10）と、これから来る契約層の `agent` / `task` と衝突しやすいです。ドキュメントだけの変更では触らないでください。
+- 検査器の意味を変えるときは `SPEC.md` と `SPEC.en.md` を同じ Pull Request で更新してください。ドキュメントだけの変更で `prout.py` を整形し直さないでください。
 
 ## License
 

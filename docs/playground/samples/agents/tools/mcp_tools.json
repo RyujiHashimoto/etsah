@@ -1,0 +1,91 @@
+{
+  "tools": [
+    {
+      "name": "list_tickets",
+      "description": "List open tickets for one queue at Harbor Lane Support.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queue": {"type": "string"}
+        },
+        "required": ["queue"]
+      },
+      "outputSchema": {"type": "string"},
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "close_ticket",
+      "description": "Close a ticket and record the resolution.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"}
+        },
+        "required": ["ticket_id"]
+      },
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "send_email",
+      "description": "Email a drafted reply to the customer.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {"type": "string"},
+          "body": {"type": "string"},
+          "attachments": {"type": "array"}
+        },
+        "required": ["to", "body"]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "charge_card",
+      "description": "Charge the saved card for one invoice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"},
+          "amount": {"type": "integer"}
+        },
+        "required": ["invoice_id", "amount"]
+      }
+    },
+    {
+      "name": "post_status",
+      "description": "Post a status line to the internal board.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string"}
+        },
+        "required": ["text"]
+      },
+      "effects": ["emit(board)"]
+    },
+    {
+      "name": "get_forecast",
+      "description": "Return a stored forecast for one sku.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {"type": "string"},
+          "refresh": {"type": "boolean"},
+          "weight": {"type": "number"}
+        },
+        "required": ["sku"]
+      }
+    }
+  ]
+}

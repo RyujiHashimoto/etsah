@@ -6,7 +6,7 @@
 
 > Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.
 
-今日 main で動くのは、効果の宣言と一致、ネットワークの許可リスト、事前条件、AST ハッシュ、パターン層の人間の承認デモです。支出の上限、外部メール・支払い・契約変更の必須ゲート、`agent` / `task` 構文は進行中です。パターン層は [Pull Request #10](https://github.com/RyujiHashimoto/prout-lang/pull/10)。契約層の Pull Request はまだありません。告知文も、完成した機能として書かないでください。人材派遣は産業の一例です。
+#13 から #16 が main に入ったあと、このブランチへ取り込みました。効果の一致、通信先の許可リスト、事前条件、AST ハッシュ、`agent` / `task` の人間ゲート、整数円の予算、MCP、ブラウザの playground はツリーにあります。cron の実行、予算の残数、冪等ストアはありません。人材派遣は産業の一例です。告知は、動く検査と、まだ実行しないものとを分けて書いてください。
 
 サンプルや告知に、個人の電話番号・住所・顧客情報・社内情報は入れないでください。作者名が要る箇所は `Ryuji Hashimoto (J-PROUT Inc.)` に揃えています。`LICENSE` の既存の著作権表示は変えていません。
 
@@ -88,7 +88,7 @@ What you can run today, with Python 3.12 and no dependencies:
 
 The third command writes demo.html. Open it and approve or reject. The approved step runs only after approval.
 
-Spend and rate budgets, and a mandatory human gate before an external email, a payment, or a contract change, are in progress on the pattern layer (pull request #10). agent/task syntax in the contract language is a later pull request. The checker does not accept those keywords on main yet.
+Spend budgets and a human gate before an external email, a payment, or a contract change are static checks on agent/task. The checker does not run cron, store remaining budget, or store idempotency keys. A browser playground lives under docs/playground/ and goes live when GitHub Pages is enabled. MCP is `python3 prout.py mcp`.
 
 PROUT does not replace Python, Rust, or SQL. impl can be any of them. The contract only records what that code may do. It also does not emit real API or database source yet. Line counts from the pattern compiler are estimates.
 
@@ -158,7 +158,7 @@ main で今日動くのは次です。
 - 同じ構造なら同じ AST ハッシュ
 - パターン層の承認デモ。承認のあとだけ、次の処理が動く
 
-支出の上限、外部へのメール・支払い・契約変更を人の承認なしでは通さないゲート、agent / task という構文は、まだ main にはありません。パターン層は公開中の Pull Request #10、契約層の構文はこれからの Pull Request です。
+支出の上限と、外部へのメール・支払い・契約変更の人間ゲートは、agent / task の静的検査として入っています。cron は動かさず、予算の残数も冪等ストアもありません。ブラウザの playground は docs/playground/ にあり、GitHub Pages を有効にすると公開されます。MCP は `python3 prout.py mcp` です。
 
 Python 3.12 だけで動きます。
 
@@ -200,7 +200,7 @@ PROUT は、AIエージェントが実行前にやってよいことを契約と
 
 3番目は28行の経費仕様から demo.html を作ります。`patterns/build/expense/demo.html` をブラウザで開くと、申請、承認、差し戻し、却下が押せます。承認のあとだけ、次の処理が動きます。
 
-まだ main に無いもの。支出額や回数の上限、外部メール・支払い・契約変更に対する必須の人の承認、`agent` / `task` という構文は進行中です。パターン層は Pull Request #10、契約層は未提出です。クイックスタートは、それらがマージされる前でも動きます。
+まだ実行しないもの。支出額や回数は宣言として検査します。残数のカウンタ、cron の実行、冪等ストアはありません。外部メール・支払い・契約変更の人の承認は、agent / task の静的検査です。
 
 読み方。英語 README が入口です。日本語の全文は README.ja.md に残してあります。契約の仕様は SPEC.md（日本語が原文）と SPEC.en.md（訳）です。人材派遣の例は docs/staffing.md にまとめました。言語の中心ではなく、一つの産業例です。
 
@@ -228,7 +228,7 @@ PROUT は、AIエージェントが実行前に許される効果と承認を宣
 
 今日動くのは、効果の一致、通信先の許可リスト、事前条件、ASTハッシュ、承認デモです。
 
-支出の上限と、外部メール・支払い・契約変更の必須ゲートは、まだ進行中です。
+支出の上限と、外部メール・支払い・契約変更のゲートは、静的検査です。cron と残数のカウンタはまだ動きません。
 
 MIT。Python の標準ライブラリだけ。
 https://github.com/RyujiHashimoto/prout-lang

@@ -1,0 +1,100 @@
+# PCレンタルの返却督促と在庫確認、DX問い合わせの仕分け。
+# 顧客へのメールは承認ゲートを通す。在庫と仕分けは社内の書き込みだけ。
+
+app jprout_desk
+  stack nextjs, postgres
+  freedom guided
+
+  entity Rental
+    id: Id
+    period_key: String
+    status: String
+
+  entity Machine
+    id: Id
+    period_key: String
+    status: String
+
+  entity Inquiry
+    id: Id
+    period_key: String
+    status: String
+
+  pattern auth
+    provider: clerk
+    roles: ops, support
+
+  pattern ai_task RemindReturn
+    entity: Rental
+    trigger: schedule
+    schedule: 0 9 * * *
+    steps: draft_return_mail
+    effects: read, emit
+    audience: external
+    approval: RemindReturnMail
+    spend_per_run: 0
+    spend_per_period: 0
+    period: daily
+    net_per_hour: 0
+    emit_per_hour: 30
+    retries: 1
+    escalate_to: ops
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern approval_gate RemindReturnMail
+    entity: Rental
+    approver: ops
+    action: emit
+    audience: external
+    on_approved: send_return_mail
+
+  pattern ai_task CheckInventory
+    entity: Machine
+    trigger: schedule
+    schedule: 0 7 * * 1
+    steps: count_ready_stock
+    effects: read, write
+    audience: internal
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 2
+    escalate_to: ops
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task TriageInquiry
+    entity: Inquiry
+    trigger: record
+    on_record: Inquiry
+    steps: classify_inquiry
+    effects: read, write
+    audience: internal
+    spend_per_run: 0
+    spend_per_period: 0
+    period: daily
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 1
+    escalate_to: support
+    idempotency_key: period_key
+    audit: ast_hash
+
+  custom draft_return_mail
+    why "返却日が近いレンタルの文面を作る。顧客へはまだ送らない"
+    lines 20
+
+  custom send_return_mail
+    why "運用担当が承認した返却リマインドだけを顧客へ送る"
+    lines 15
+
+  custom count_ready_stock
+    why "出荷できる再生PCの台数を社内の在庫表に書く"
+    lines 25
+
+  custom classify_inquiry
+    why "新しい問い合わせをレンタル、クラウド運用、DXの社内キューへ分ける。顧客へは返信しない"
+    lines 30

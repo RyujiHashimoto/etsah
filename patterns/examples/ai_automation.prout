@@ -1,0 +1,190 @@
+# 人材派遣の定型作業を AI に渡す仕様。
+# 外部へのメール、支払い、契約期間の変更は承認ゲートを指す。
+# 下書きと社内のフラグは internal で、ゲートは付けない。
+# 契約層の task 構文は docs/ai_automation.md の提案。このファイルはパターン層で検査する。
+
+app staffing_automation
+  stack nextjs, postgres
+  freedom guided
+
+  entity Timesheet
+    id: Id
+    period_key: String
+    status: String
+
+  entity DispatchContract
+    id: Id
+    period_key: String
+    status: String
+
+  entity Invoice
+    id: Id
+    period_key: String
+    status: String
+
+  pattern auth
+    provider: clerk
+    roles: coordinator, payroll
+
+  pattern ai_task CollectTimesheets
+    entity: Timesheet
+    trigger: schedule
+    schedule: 0 9 * * 1
+    steps: collect_open_timesheets
+    effects: read, write
+    audience: internal
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 2
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task FlagConflictWindow
+    entity: DispatchContract
+    trigger: schedule
+    schedule: 0 8 * * *
+    steps: flag_conflict_window
+    effects: read, write
+    audience: internal
+    spend_per_run: 0
+    spend_per_period: 0
+    period: daily
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 1
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task RemindTimesheet
+    entity: Timesheet
+    trigger: schedule
+    schedule: 0 9 * * 1
+    steps: draft_reminder
+    effects: read, emit
+    audience: external
+    approval: RemindClient
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 20
+    retries: 2
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern approval_gate RemindClient
+    entity: Timesheet
+    approver: coordinator
+    action: emit
+    audience: external
+    on_approved: send_reminder
+
+  pattern ai_task DraftInvoice
+    entity: Invoice
+    trigger: schedule
+    schedule: 0 9 1 * *
+    steps: draft_invoice
+    effects: read, write
+    audience: internal
+    spend_per_run: 0
+    spend_per_period: 0
+    period: monthly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 1
+    escalate_to: payroll
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern ai_task PayApprovedHours
+    entity: Invoice
+    trigger: schedule
+    schedule: 0 10 1 * *
+    steps: pay_approved_hours
+    effects: read, spend
+    audience: external
+    approval: PayStaff
+    spend_per_run: 200000
+    spend_per_period: 2000000
+    period: monthly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 0
+    escalate_to: payroll
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern approval_gate PayStaff
+    entity: Invoice
+    approver: payroll
+    action: spend
+    audience: external
+    on_approved: send_payment
+
+  pattern ai_task ExtendContract
+    entity: DispatchContract
+    trigger: schedule
+    schedule: 0 11 * * 1
+    steps: propose_extension
+    effects: read, write
+    audience: internal
+    changes: contract
+    approval: ExtendTerm
+    spend_per_run: 0
+    spend_per_period: 0
+    period: weekly
+    net_per_hour: 0
+    emit_per_hour: 0
+    retries: 0
+    escalate_to: coordinator
+    idempotency_key: period_key
+    audit: ast_hash
+
+  pattern approval_gate ExtendTerm
+    entity: DispatchContract
+    approver: coordinator
+    action: contract
+    audience: internal
+    on_approved: record_extension
+
+  custom collect_open_timesheets
+    why "未提出の勤怠を集計し、社内の下書きに書く。派遣先へは送らない"
+    lines 40
+
+  custom flag_conflict_window
+    why "抵触日が近い契約を社内キューに載せる。日付の加算と法令判断はしない"
+    lines 25
+
+  custom draft_reminder
+    why "督促文面を作る。送信そのものは承認後の send_reminder に残す"
+    lines 20
+
+  custom send_reminder
+    why "コーディネーターが承認した督促だけを派遣先へ送る"
+    lines 15
+
+  custom draft_invoice
+    why "承認済み勤怠から請求の下書きを作る。送付と入金は別のゲートに残す"
+    lines 35
+
+  custom pay_approved_hours
+    why "支払い額の計算を作る。振込は承認後の send_payment に残す"
+    lines 30
+
+  custom send_payment
+    why "給与担当が承認した金額だけを支払う"
+    lines 20
+
+  custom propose_extension
+    why "延長案を作る。契約の終了日を書き換えるのは承認後だけ"
+    lines 20
+
+  custom record_extension
+    why "承認された延長を契約へ記録する。抵触日の再計算は人が確認する"
+    lines 15
