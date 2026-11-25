@@ -2863,7 +2863,17 @@ def main() -> None:
     c.add_argument("--json", action="store_true")
     a = sub.add_parser("ast", help="print the canonical AST")
     a.add_argument("file")
+    imported = sub.add_parser("import", help="convert a tool list into PROUT op declarations")
+    imported_kind = imported.add_subparsers(dest="kind", required=True)
+    mcp = imported_kind.add_parser("mcp", help="convert an MCP tools/list JSON document")
+    mcp.add_argument("file")
+    openai = imported_kind.add_parser("openai", help="convert OpenAI function-calling tool JSON")
+    openai.add_argument("file")
     args = ap.parse_args()
+
+    if args.cmd == "import":
+        _import_tools(args.kind, args.file)
+        return
 
     text = open(args.file, encoding="utf-8").read()
     try:
@@ -2903,6 +2913,17 @@ def main() -> None:
         warnings = sum(1 for d in diags if d.severity == "warning")
         print(f"\n{errors} error(s), {warnings} warning(s)")
     sys.exit(1 if any(d.severity == "error" for d in diags) else 0)
+
+
+def _import_tools(kind: str, path: str) -> None:
+    """Print converted op declarations. The checker is not involved."""
+    from prout_import import ToolImportError, render_file
+
+    try:
+        sys.stdout.write(render_file(kind, path))
+    except (ToolImportError, OSError) as ex:
+        print(f"[ERROR] {ex}", file=sys.stderr)
+        sys.exit(2)
 
 
 def task_plan(program: Program) -> list[str]:

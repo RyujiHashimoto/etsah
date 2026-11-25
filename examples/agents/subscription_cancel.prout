@@ -1,0 +1,46 @@
+# SaaS subscription cancellation for fictional plan_basic on account A-19.
+# The cancellation writes the contract record, so it needs a contract gate.
+# Nothing here changes a live subscription.
+#   python3 prout.py check examples/agents/subscription_cancel.prout
+
+type Id
+type Subscription
+
+op subscriptions.lookup(account_id: Id) -> Subscription
+  doc "Read the current subscription"
+  eff read(subscriptions)
+  impl native
+
+op subscriptions.cancel(subscription: Subscription) -> Bool
+  doc "Write the cancellation onto the contract record"
+  eff write(subscriptions)
+  impl native
+
+policy
+  contract write(subscriptions)
+
+agent subscription_desk
+  doc "Cancels a subscription only after a person approves the contract change"
+  allow read(subscriptions), write(subscriptions)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+gate approve_cancel
+  doc "The account owner approves the cancellation"
+  approver account_owner
+  before write(subscriptions)
+  on_approved subscriptions.cancel
+
+task cancel_subscription(account_id: Id) -> Bool
+  agent subscription_desk
+  doc "Cancel plan_basic through the contract gate"
+  trigger webhook "cancel-subscription"
+  eff read(subscriptions), write(subscriptions)
+  gate approve_cancel
+  key account_id
+  retry 0 escalate account_owner
+  let subscription = subscriptions.lookup(account_id)
+  let cancelled = subscriptions.cancel(subscription)
+  return cancelled

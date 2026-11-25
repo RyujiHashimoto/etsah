@@ -178,9 +178,11 @@ PROUTの成長は、コードの行数ではなく、**次のAIが少ない手�
 
 ```
 prout.py                 契約言語のパーサー・検証器・CLI
+prout_api.py             check_source と check_file
+prout_import.py          MCP と OpenAI のツール定義を op にする
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
-examples/                壊れた初稿と修正版、情報フローの安全例・漏洩例
+examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
 tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
@@ -244,6 +246,16 @@ cd patterns
 python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
 python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
 python3 proutc.py find "自動化"
+```
+
+## エージェントのツールを契約で止める
+
+英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
+
+```sh
+python3 prout.py import mcp examples/agents/tools/mcp_tools.json
+python3 prout.py check examples/agents/support_reply.prout
+python3 prout.py check examples/agents/github_triage.prout --allow-net github
 ```
 
 ## 情報フローラベルでPIIの流出を止める
