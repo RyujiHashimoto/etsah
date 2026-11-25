@@ -1,0 +1,41 @@
+# PROUT
+
+> PROUT is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
+
+Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (341 tests, all passing, on `main` at `c1c6166`).
+
+Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `prout.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
+
+## Docs
+
+- [AGENTS.md](AGENTS.md): How an AI agent should build, test (`python3 -m unittest discover -s tests`), and contribute. Includes the AI contribution rules that would otherwise live in a separate contributing guide.
+- [README.md](README.md): Project overview, how to run the checker, the MCP server, and the pattern layer.
+- [README.ja.md](README.ja.md): Japanese overview. The English README is the entry point for the agent, MCP, and playground sections.
+- [SPEC.md](SPEC.md): Contract-language design (Japanese, the original). Syntax includes `type`, `op`, `flow`, `agent`, `task`, `gate`, and `policy`. If this file and the translation disagree, this file wins.
+- [SPEC.en.md](SPEC.en.md): English translation of `SPEC.md`.
+- [CONTRIBUTING.md](CONTRIBUTING.md): How to add a pattern manifest, review criteria, and versioning.
+- [docs/information-flow.md](docs/information-flow.md): Information-flow labels, sinks, and `declassify`.
+- [docs/ai_automation.md](docs/ai_automation.md): Design notes for `agent` / `task` / `gate` / `policy`. Checking is static. Cron, budget counters, and an idempotency store are not implemented.
+- [docs/staffing.md](docs/staffing.md): Staffing-domain contracts (timesheets, assignment limits, billing rates). Sample data is fictional.
+- [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md): Five-minute agent check.
+- [docs/en/comparison.md](docs/en/comparison.md): How this differs from a Cedar or OPA policy plus a wrapper.
+- [docs/en/mcp.md](docs/en/mcp.md): MCP stdio server (`python3 prout.py mcp`), guard (`python3 prout.py guard`), and signed one-time approvals (`python3 prout.py approve`).
+- [docs/mcp.ja.md](docs/mcp.ja.md): Japanese version of the MCP guide.
+- [docs/playground/index.html](docs/playground/index.html): Static browser checker. The repository does not enable GitHub Pages by itself.
+- [SECURITY.md](SECURITY.md): How to report a vulnerability.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant 2.1.
+
+## Examples
+
+- [examples/agents/support_reply.prout](examples/agents/support_reply.prout): Passing support-reply contract (fictional ticket). The broken twin is [examples/agents/support_reply_broken.prout](examples/agents/support_reply_broken.prout) and fails with `E-POLICY`.
+- [examples/ai_tasks.prout](examples/ai_tasks.prout): Passing `agent` / `task` contracts. The broken twin is [examples/ai_tasks_broken.prout](examples/ai_tasks_broken.prout).
+- [examples/refund_fixed.prout](examples/refund_fixed.prout): Passing refund contract. The broken twin is [examples/refund_broken.prout](examples/refund_broken.prout).
+- [examples/information_flow_safe.prout](examples/information_flow_safe.prout): Passing information-flow example (`--allow-net email --allow-net analytics`). The leaking twin is [examples/information_flow_leak.prout](examples/information_flow_leak.prout).
+- [examples/staffing.prout](examples/staffing.prout) and [examples/staffing_dates.prout](examples/staffing_dates.prout): Staffing contracts. Broken twins sit beside them.
+
+## Optional
+
+- [patterns/PATTERNS.md](patterns/PATTERNS.md): Pattern-language design (Japanese).
+- [patterns/registry/README.md](patterns/registry/README.md): Registry layout. 27 JSON manifests plus `index.json`.
+- [LICENSE](LICENSE): MIT license text.
+- [.github/workflows/ci.yml](.github/workflows/ci.yml): Exact CI commands (unit tests, contract checks, broken-example assertions, pattern index, bench).
