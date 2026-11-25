@@ -70,7 +70,7 @@ app staffing_limits_broken
     approver: client_approver
     period: monthly
 
-  pattern dispatch_contract
+  pattern dispatch_contract ContinuedOver
     entity: DispatchContract
     staff: Staff
     client: Client
@@ -82,7 +82,7 @@ app staffing_limits_broken
     person: staff-a
     office_history: 2024-04-01/2026-03-31
 
-  pattern dispatch_contract
+  pattern dispatch_contract LeapOver
     entity: DispatchContract
     staff: Staff
     client: Client

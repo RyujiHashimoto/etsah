@@ -1,17 +1,68 @@
+# Staffing desk — English summary
+
+This is a summary of the Japanese design note below. The Japanese text is the original and is unchanged. If the summary and the Japanese text disagree, the Japanese text wins.
+
+This note is an industry example, not the center of the language. The language's broader aim is to check what an AI agent is allowed to do before it runs. A staffing desk is one place that shape shows up.
+
+The repeating core is staff, client sites and openings, matching, individual dispatch contracts and working conditions, timesheets with client approval, invoices and payroll, and gross margin. A 36-agreement's limits are slots. Omitted values default to the general statutory ceilings (45 hours a month, 360 a year; with a special clause, 720 a year, overtime plus holiday work under 100 hours a month, an 80-hour average over two to six months, and at most six months over 45). A higher configured cap is an error. A conflict date is calculated from the earliest dispatch start at the same client office and for the same person and organizational unit: the day three years after that start. These ceilings and the date rule are not a legal opinion. A labor consultant has to confirm them. Judgments that are disputed stay in the Japanese note.
+
+The contract layer has `Date` and `Decimal`. A date literal is `YYYY-MM-DD` with no spaces. A decimal looks like `1800.50`. The pattern layer still checks conflict dates and rates. The Japanese note below describes the current tree.
+
+### What the contract layer already expresses
+
+`examples/staffing_dates.prout` uses calendar dates and decimal yen:
+
+- Bill rate ≥ pay rate as `Decimal`. `1500.5 >= 1800.50` is `E-PRE`. `2800.50 >= 1800` passes. An `Int` may be passed where a `Decimal` is expected.
+- End date ≤ conflict date. `2029-04-02 <= 2029-04-01` is `E-PRE`. `Date - Date` is a number of days (`Int`). `Date + Int` shifts the date.
+- `examples/staffing.prout` keeps the older integer-yen and day-count encoding. `1500 >= 1800` and day count `21641 <= 21640` are still `E-PRE`.
+- Client approval: `Bool` `client_approved == true`. `false` is `E-PRE`.
+- Invoice amount: `Money * Int` is `Money`.
+- A monthly close must match `read(contracts)`, `write(invoices)`, `write(payroll)`, `emit(audit)`.
+- A flow that reads a stored contract cannot prove field comparisons. It finishes with 3 `W-PRE` runtime guards and 0 errors.
+
+The network allow list (default `stripe`) and missing or extra effects work as elsewhere.
+
+### What the pattern layer adds
+
+Existing patterns cover login and roles, lists, search, résumé upload, a margin dashboard, notification, and a generic approval transition. They do not know that a timesheet must be approved by the client site before billing, or that a bill rate must stay at or above the pay rate.
+
+Five patterns were added. `patterns/examples/staffing.prout` (the desk), `patterns/examples/staffing_desk.prout` (a short synthetic desk), and `patterns/examples/staffing_limits.prout` (leap day, cooling-off, and a continued term) build with no errors.
+
+- `timesheet` — submit, then client approval. `approver` is required. States run `draft → submitted → client_approved`, with `returned` for a send-back. `overtime_cap_hours` is a `Duration`. A timesheet that declares overtime needs an `overtime_agreement`. Comparing hours worked with the cap is a generated runtime check. The compiler does not read live hours.
+- `overtime_agreement` — the agreement's caps are slots. `warn_at_hours`, `on_warning: notify`, and `on_limit: reject` are required. `notify` does not stop submission. `reject` does. A cap above the general ceiling is an error.
+- `dispatch_contract` — staff, client, start, end, and the notified conflict date are required. The checker also calculates the conflict date from declared spans. A notified date that differs is `W-POLICY` and is kept. `end_date <= conflict_date` still allows the conflict date itself. `exempt` of `indefinite`, `age60`, `day_limited`, or `leave_substitute` past the date is `W-POLICY` with the words "not a legal opinion", not an error. The last two flags do not check the day count or the leave. `none` past the date is `E-POLICY`.
+- `staffing_billing` — `bill_rate` and `pay_rate` are non-negative decimals (`Rate`). `bill_rate >= pay_rate` is checked in the spec. Equal rates pass. `1800.50` and `1800.5` are the same value. A spec with no `timesheet` is `E-POLICY`. Social insurance, employment insurance, premiums, and commuting are not subtracted. A non-negative gap can still lose money after those. This check is not a determination of equal pay for equal work.
+- `matching` — the staff skill field and the opening's required-skill field exist. It does not prove that the person's skills satisfy the opening.
+
+`patterns/examples/staffing_broken.prout` fails four pattern checks: an end date after the conflict date, a timesheet with no approver, a bill rate of `1500` under a pay rate of `1800.50`, and overtime with no agreement. `patterns/examples/staffing_limits_broken.prout` fails the ceiling checks and a calculated conflict date. `examples/staffing_broken.prout` fails three `E-PRE` checks: `1500 >= 1800`, day count `21641 <= 21640`, and `false == true`.
+
+A local build of the current tree matches the measurements recorded in the Japanese section. Run `python3 -m unittest discover -s tests -v` for the current test count. The compiler's output separates `[static]` checks, which it evaluated, from `[runtime]` checks, which it only described.
+
+### Left out of the language on purpose
+
+The Japanese section lists what is not a legal opinion: the three-year conflict-date formula (including 29 February and a three-month-plus-one-day cooling-off), whether the conflict date itself may be the contract's last day, optional exception flags that do not check the facts, and the Article 36 ceilings used as defaults. Equal pay against a comparator payroll, social-insurance rates, premium wages, industry exceptions to the overtime cap, and the full text of a working-conditions notice are not checked.
+
+### Owner questions
+
+The Japanese section ends with questions for the owner. Date literals and `Decimal` are already in the contract layer. Still open: the conflict-date formula, cooling-off, whether the conflict date itself is a legal last day, the optional exception flags, and whether the Article 36 ceilings should stay the general rule only.
+
+---
+
 # 人材派遣の基幹を PROUT で書く
 
 対象は、人材派遣会社の基幹で繰り返す部分である。スタッフ、派遣先と案件、マッチング、個別契約と就業条件、勤怠と派遣先承認、請求と給与、粗利。抵触日は仕様に書いた派遣期間から計算し、36協定の上限はスロットである。一般則の天井（月45時間、年360時間、特別条項は年720時間、時間外+休日は月100時間未満、2〜6か月平均80時間、月45時間超は年6回）を超える設定はエラーにする。この天井は法令意見ではなく、社労士の確認が要る。判断が分かれるところはこの文書に残す。
 
-`prout.py` は変更していない。契約層の検証器は別途編集されているため、日付と小数単価の検査はパターン層に置いた。
+契約層は `Date` と `Decimal` を持つ。日付リテラルは空白なしの `YYYY-MM-DD`、小数は `1800.50` のような十進数である。パターン層の抵触日・単価検査はそのまま残る。
 
 ## 今の言語で既に書けること
 
 ### 契約層
 
-`examples/staffing.prout` は、今の検証器だけで次を表現する。
+`examples/staffing_dates.prout` は、暦日と小数円で次を表現する。
 
-- 請求単価 >= 支払単価。両方を `Int`（整数円）にすると、`1500 >= 1800` は `E-PRE` で落ち、`2800 >= 1800` は静的に通る。
-- 終了日 <= 抵触日。両方を `Int`（1970-01-01 からの通算日）にすると、同じ線形算術で判定できる。2026-04-01 は 20544、2029-04-01 は 21640。
+- 請求単価 >= 支払単価。`Decimal` で、`1500.5 >= 1800.50` は `E-PRE`、`2800.50 >= 1800` は静的に通る。整数は `Decimal` の引数に渡せる。
+- 終了日 <= 抵触日。`2029-04-02 <= 2029-04-01` は `E-PRE`。`Date - Date` は日数の `Int`、`Date + Int` は日をずらした `Date`。
+- `examples/staffing.prout` は、以前の整数円と通算日の書き方を残している。`1500 >= 1800` と通算日 `21641 <= 21640` も引き続き `E-PRE` になる。
 - 派遣先承認。`Bool` の `client_approved == true`。`false` は `E-PRE`。
 - 請求額の式。`Money * Int` は `Money` になる。`invoice_amount` の `impl rate * hours` は型が付く。
 - 効果。月次締めは `read(contracts)`、`write(invoices)`、`write(payroll)`、`emit(audit)` と一致しなければならない。
@@ -37,12 +88,12 @@
 
 ## ギャップ
 
-契約層には次が無い。試作範囲にも「時間は対象外」「線形算術の事前条件のみ」と書いてある。
+契約層に残っている穴は次である。試作範囲の「時刻は対象外」「線形算術の事前条件のみ」は維持している。
 
-1. **日付。** `2026-04-01` は字句の上では `2026 - 4 - 1` になる。`Date` 型も日付リテラルも無い。文字列の `<=` は型検査は通るが、値は実行時ガードのままである。
-2. **小数の時間単価。** 字句は整数だけを数値にする。`1.2` は `tests/test_lexer.py` が拒否する。`SPEC.md` は `1/2` の意味が言語ごとに衝突する、という理由で一つの除算の意味を決めていない。
-3. **金額リテラル。** `Money` は不透明型で、整数との比較と `Money * Int` はできる。しかし `Money` の引数に `2800` を渡すと `E-TYPE` になる。整数から `Money` を作るには `yen(amount: Int) -> Money` のような op を自分で宣言する。
-4. **期間。** 時刻の差、時間と分、月の営業日は無い。
+1. **日付。** 空白なしの `2026-04-01` は `Date` である。空白を入れた `2026 - 04 - 01` は従来どおり整数の減算である。変数同士の `end <= conflict` は実行時ガードのままである。
+2. **小数の時間単価。** `1800.50` は `Decimal`（`decimal.Decimal`）である。`1 / 2` と十進数の除算は定数畳み込みしない。`SPEC.md` が除算の意味を一つに決めない、という方針は整数除算については残している。
+3. **金額リテラル。** `Money` は不透明型のままである。`Decimal` とは混ぜない。`Money` の引数に `2800` を渡すと `E-TYPE` になる。
+4. **時刻。** 暦日の差はある。時刻、時間と分、月の営業日は無い。
 5. **コレクション。** スキルの包含は実行時ガードに落ちる。マッチングの中身は証明できない。
 6. **パターン層の型。** `requires_fields` はフィールド名だけを見る。`refund` は `status: String` と書くが、ショップの仕様は `OrderStatus` のまま通る。
 
@@ -160,9 +211,11 @@
 
 ローカルで次を確認した。数値は実行結果である。
 
-- `python3 -m unittest discover -s tests -v` が通る。`tests/test_spec_contracts.py` を含め、149件すべて成功する。追加は16件（`tests/test_staffing_limits.py`）。
-- `python3 prout.py check examples/staffing.prout` はエラー 0、警告 3（保存値に対する実行時ガード）。
+- `python3 -m unittest discover -s tests` が通る。`tests/test_spec_contracts.py` の回帰を含めて 310 件成功する。
+- `python3 prout.py check examples/staffing.prout` はエラー 0、警告 3（整数エンコードの実行時ガード）。
+- `python3 prout.py check examples/staffing_dates.prout` はエラー 0、警告 4（保存した単価・日付・日数・承認）。
 - `python3 prout.py check examples/staffing_broken.prout` は `E-PRE` が 3。
+- `python3 prout.py check examples/staffing_dates_broken.prout` は `E-PRE` が 3（`1500.5 >= 1800.50`、`2029-04-02 <= 2029-04-01`、`false == true`）。
 - `patterns/examples/staffing.prout` はエラー 0。仕様 121 行、生成見積もり 3,732 行、展開 30.8 倍。
 - `patterns/examples/staffing_desk.prout` はエラー 0。仕様 75 行、生成見積もり 1,870 行、展開 24.9 倍。
 - `patterns/examples/staffing_limits.prout` はエラー 0。仕様 76 行、生成見積もり 1,943 行、展開 25.6 倍。出力に `[static]` と `[runtime]` の両方がある。
@@ -174,16 +227,15 @@ CI は通る仕様のビルドと、壊した仕様が落ちることの両方�
 
 ## 提案したが実装していないこと
 
-契約層の変更案である。`prout.py` には入れていない。
+契約層の `Date` と `Decimal` は入っている。ここはまだ入れてない。
 
-1. **`Date` と比較。** リテラルは引用符付きの `d"2026-04-01"` のように、減算と衝突しない形が要る。暦日の `<=` は整数の通算日に落として、今の線形算術を再利用できる。タイムゾーンは日付だけなら不要。
-2. **`Duration`。** 日数の差 `end - start` を `Int` で返す。時間の小数は、除算の意味が未決なので、分単位の整数にしてから契約層に載せる方が衝突が少ない。
-3. **小数の `Rate`。** 字句に `1.2` を足すと `tests/test_lexer.py` と `SPEC.md` の「一つの除算の意味を決めない」に触れる。パターン層は十進数として比較している。契約層へ移すなら、円の小数2桁を整数の銭として持ち、リテラルだけを十進数に見せる固定小数が、線形算術を壊さない。
-4. **`Money` の整数リテラル。** `2800` を `Money` として渡せるようにするか、`yen` を組み込み op にする。今は仕様側の op で代用している。
-5. **実労働時間 <= 協定上限** を契約の `pre` にする。パターン層は実行時検査の文章を生成するだけで、実績時間は判定しない。45 や 360 を契約層の検証器は知らない。
-6. **スキル包含。** 集合の契約は、仕様が実行時ガードと明記している。マッチングの中身はそこに残す。
-7. **`requires_fields` の型検査。** 今やると `status: String` と `OrderStatus` の既存仕様が落ちる。新しい `field_types` だけを厳密にした。
-8. **勤怠の操作デモ。** `demo.html` は `approval` 専用のままである。`timesheet` の状態遷移も同じ機構で出せるが、今回は生成していない。
+1. **時刻と `Duration`。** 日数の差は `Date - Date` で `Int` になる。時間と分、営業日、タイムゾーンは無い。
+2. **除算の定数畳み込み。** `1 / 2` も `1.0 / 2` も実行時ガードのままである。整数除算の意味は変えていない。
+3. **`Money` の整数リテラル、および `Money` と `Decimal` の混合。** 混ぜると型エラーになる。`yen(amount: Int) -> Money` のような op は仕様側に残る。
+4. **実労働時間 <= 協定上限** を契約の `pre` にする。パターン層は実行時検査の文章を生成するだけで、実績時間は判定しない。45 や 360 を契約層の検証器は知らない。
+5. **スキル包含。** 集合の契約は、仕様が実行時ガードと明記している。マッチングの中身はそこに残す。
+6. **`requires_fields` の型検査。** 今やると `status: String` と `OrderStatus` の既存仕様が落ちる。新しい `field_types` だけを厳密にした。
+7. **勤怠の操作デモ。** `demo.html` は `approval` 専用のままである。`timesheet` の状態遷移も同じ機構で出せるが、今回は生成していない。
 
 ## 法令として扱っていることと、扱っていないこと
 
@@ -206,8 +258,8 @@ CI は通る仕様のビルドと、壊した仕様が落ちることの両方�
 
 ## オーナーへの質問
 
-1. 契約層の `Date` は、通算日への落とし込みでよいか。リテラルの形は `d"2026-04-01"` で減算と分ける想定でよいか。
-2. 小数単価は、契約層では銭の整数、パターン層では十進数、の二段のままでよいか。字句に小数を足す変更は、今の `1.2` を拒否するテストと衝突する。
+1. 日付リテラルは空白なしの `YYYY-MM-DD` にした。`d"..."` は採っていない。空白付きは減算のままである。この形でよいか。
+2. 小数は銭への固定ではなく `decimal.Decimal` にした。`Money` とは混ぜていない。この二段でよいか。
 3. 抵触日の例外は `indefinite` と `age60` に、任意フラグの `day_limited` と `leave_substitute` を足した。警告のまま人が見る形でよいか。有期プロジェクトはまだフラグにしていない。
 4. 36協定は、会社の協定値をスロットにし、一般則を既定かつ天井にした。以前の「既定値にしない」は撤回している。変形労働時間制や適用除外を天井から外したままでよいか。
 5. 同一労働同一賃金を、次のパターン（比較対象の賃金を持つエンティティ）にするか、`custom` のままにするか。

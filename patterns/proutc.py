@@ -270,6 +270,12 @@ class PatternManifest:
     requires_patterns: list[str] = field(default_factory=list)
     requires_reason: str = ""
     notes: list[str] = field(default_factory=list)
+    # Role slots that must be members of `auth.roles` when auth declares roles.
+    bound_roles: list[str] = field(default_factory=list)
+    # The pattern header must carry a name (`pattern approval_gate SendMail`).
+    requires_target: bool = False
+    # Cross-slot rules for an automated task. Empty on every other pattern.
+    automation: dict = field(default_factory=dict)
 
     def to_index(self) -> dict:
         data = {
@@ -294,6 +300,16 @@ class PatternManifest:
             ]
         if self.requires_patterns:
             data["requires_patterns"] = self.requires_patterns
+        if self.requires_target:
+            data["requires_target"] = True
+        if self.automation:
+            data["automation"] = {
+                "gates": [
+                    {"action": gate.get("action", ""), "message": gate.get("message", "")}
+                    for gate in self.automation.get("gates", [])
+                ],
+                "change_message": self.automation.get("change_message", ""),
+            }
         return data
 
 
@@ -317,6 +333,9 @@ def manifest_from_dict(data: dict) -> PatternManifest:
         requires_patterns=data.get("requires_patterns", []),
         requires_reason=data.get("requires_reason", ""),
         notes=data.get("notes", []),
+        bound_roles=data.get("bound_roles", []),
+        requires_target=bool(data.get("requires_target", False)),
+        automation=data.get("automation") or {},
     )
 
 
@@ -365,6 +384,101 @@ def validate_manifest(m: PatternManifest) -> list[str]:
     for name in m.requires_patterns:
         if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             errors.append(f"requires_patterns entry {name!r} is not a pattern name")
+    for role_slot in m.bound_roles:
+        if role_slot not in m.slots:
+            errors.append(f"bound role slot {role_slot!r} is not a slot")
+    if m.automation:
+        errors.extend(_validate_automation(m))
+    return errors
+
+
+_AUTOMATION_STRINGS = (
+    "effects_slot",
+    "audience_slot",
+    "steps_slot",
+    "trigger_slot",
+    "entity_slot",
+    "gate_slot",
+    "gate_pattern",
+    "gate_action_slot",
+    "gate_audience_slot",
+    "gate_entity_slot",
+    "change_slot",
+    "change_value",
+    "change_action",
+    "change_message",
+    "spend_run_slot",
+    "spend_period_slot",
+    "net_limit_slot",
+    "emit_limit_slot",
+    "retries_slot",
+    "escalate_slot",
+    "idempotency_slot",
+    "audit_slot",
+    "audit_value",
+)
+# Slots that live on the task pattern. Gate action/audience/entity live on the gate.
+_AUTOMATION_TASK_SLOTS = (
+    "effects_slot",
+    "audience_slot",
+    "steps_slot",
+    "trigger_slot",
+    "entity_slot",
+    "gate_slot",
+    "change_slot",
+    "spend_run_slot",
+    "spend_period_slot",
+    "net_limit_slot",
+    "emit_limit_slot",
+    "retries_slot",
+    "escalate_slot",
+    "idempotency_slot",
+    "audit_slot",
+)
+
+
+def _validate_automation(m: PatternManifest) -> list[str]:
+    auto = m.automation
+    errors: list[str] = []
+    for key in _AUTOMATION_STRINGS:
+        if not isinstance(auto.get(key), str) or not auto.get(key):
+            errors.append(f"automation.{key} must be a non-empty string")
+    triggers = auto.get("trigger_slots")
+    if not isinstance(triggers, dict) or not triggers:
+        errors.append("automation.trigger_slots must be a non-empty object")
+    elif any(not isinstance(name, str) or not isinstance(slot, str) or not slot for name, slot in triggers.items()):
+        errors.append("automation.trigger_slots values must be slot names")
+    gates = auto.get("gates")
+    if not isinstance(gates, list) or not gates:
+        errors.append("automation.gates must be a non-empty list")
+    else:
+        for gate in gates:
+            if not isinstance(gate, dict):
+                errors.append("automation gate must be an object")
+                continue
+            if gate.get("kind") not in _EFFECT_KINDS:
+                errors.append(f"automation gate kind {gate.get('kind')!r} is not an effect")
+            audiences = gate.get("audiences")
+            if not isinstance(audiences, list) or not audiences or any(not isinstance(item, str) for item in audiences):
+                errors.append("automation gate audiences must be a list of strings")
+            if not gate.get("action") or not gate.get("message"):
+                errors.append("automation gate needs an action and a message")
+            if not isinstance(gate.get("match_audience"), bool):
+                errors.append("automation gate match_audience must be a boolean")
+    retries_max = auto.get("retries_max")
+    if not isinstance(retries_max, int) or isinstance(retries_max, bool) or retries_max < 0:
+        errors.append("automation.retries_max must be a non-negative integer")
+    for key in _AUTOMATION_TASK_SLOTS:
+        slot = auto.get(key)
+        if isinstance(slot, str) and slot and slot not in m.slots:
+            errors.append(f"automation.{key} {slot!r} is not a slot")
+    if isinstance(triggers, dict):
+        for slot in triggers.values():
+            if isinstance(slot, str) and slot and slot not in m.slots:
+                errors.append(f"automation trigger slot {slot!r} is not a slot")
+    gate_pattern = auto.get("gate_pattern")
+    if isinstance(gate_pattern, str) and gate_pattern and not re.fullmatch(r"[a-z][a-z0-9_]*", gate_pattern):
+        errors.append(f"automation.gate_pattern {gate_pattern!r} is not a pattern name")
     return errors
 
 
@@ -384,6 +498,9 @@ def load_registry(path: Path) -> dict[str, PatternManifest]:
         for name in manifest.requires_patterns:
             if name not in registry:
                 missing.append(f"{manifest.name} requires unknown pattern {name}")
+        gate = manifest.automation.get("gate_pattern") if manifest.automation else ""
+        if gate and gate not in registry:
+            missing.append(f"{manifest.name} automation gate pattern {gate!r} is not registered")
     if missing:
         raise ValueError("registry references: " + "; ".join(missing))
     return registry
@@ -408,6 +525,12 @@ Measure = Union[date, Decimal]
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 _DECIMAL = re.compile(r"\d+(\.\d+)?\Z")
 _CLOCK = re.compile(r"(\d+)h(\d{1,2})m\Z")
+_COUNT = re.compile(r"0|[1-9]\d*\Z")
+_IDENT = re.compile(r"[A-Za-z_]\w*\Z")
+_WEBHOOK = re.compile(r"[A-Za-z_][\w./-]*\Z")
+# Same five kinds as the contract layer. This module does not import prout.py.
+_EFFECT_KINDS = {"read", "write", "net", "spend", "emit"}
+_CRON_RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 _COMPARISONS = {
     ">=": lambda left, right: left >= right,
     ">": lambda left, right: left > right,
@@ -449,6 +572,69 @@ def parse_duration(value: str) -> Optional[Decimal]:
     if not _DECIMAL.fullmatch(value):
         return None
     return Decimal(value)
+
+
+def parse_count(value: str) -> Optional[int]:
+    """Non-negative integer. `0` is allowed; leading zeros are not."""
+    value = value.strip()
+    if not _COUNT.fullmatch(value):
+        return None
+    return int(value)
+
+
+def _cron_atom(part: str, lo: int, hi: int) -> bool:
+    step = None
+    if "/" in part:
+        base, step_text = part.split("/", 1)
+        if not _COUNT.fullmatch(step_text) or int(step_text) == 0:
+            return False
+        step = int(step_text)
+        part = base
+    if part == "*":
+        return step is None or step <= (hi - lo + 1)
+    if "-" in part:
+        start_text, end_text = part.split("-", 1)
+        if not (start_text.isdigit() and end_text.isdigit()):
+            return False
+        start, end = int(start_text), int(end_text)
+        if start > end or start < lo or end > hi:
+            return False
+        return step is None or step <= (end - start + 1)
+    if part.isdigit() and lo <= int(part) <= hi:
+        return step is None
+    return False
+
+
+def parse_cron(value: str) -> bool:
+    """Five numeric cron fields: minute hour day-of-month month day-of-week.
+
+    Names (`MON`) are rejected. `*` , `a-b`, `*/n`, and comma lists are accepted.
+    """
+    fields = value.strip().split()
+    if len(fields) != 5:
+        return False
+    for field_text, (lo, hi) in zip(fields, _CRON_RANGES):
+        if not field_text or any(not _cron_atom(part, lo, hi) for part in field_text.split(",")):
+            return False
+    return True
+
+
+def split_csv(raw: str) -> list[str]:
+    return [part.strip().strip('"') for part in slot_value(raw).split(",") if part.strip()]
+
+
+def parse_name_list(raw: str) -> Optional[list[str]]:
+    parts = split_csv(raw)
+    if not parts or any(_IDENT.fullmatch(part) is None for part in parts):
+        return None
+    return parts
+
+
+def parse_effect_list(raw: str) -> Optional[list[str]]:
+    parts = split_csv(raw)
+    if not parts or any(part not in _EFFECT_KINDS for part in parts) or len(parts) != len(set(parts)):
+        return None
+    return parts
 
 
 def parse_measure(kind: str, value: str) -> Optional[Measure]:
@@ -519,6 +705,36 @@ def check_pattern_policy(
                 f"slot {slot_name} must be one of {allowed}; got {raw!r}",
                 pattern.line,
             )
+        elif kind == "count" and parse_count(slot_value(raw)) is None:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a non-negative integer, got {slot_value(raw)!r}",
+                pattern.line,
+            )
+        elif kind == "cron" and not parse_cron(slot_value(raw)):
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a 5-field numeric cron, got {slot_value(raw)!r}",
+                pattern.line,
+            )
+        elif kind == "effects" and parse_effect_list(raw) is None:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a list of read, write, net, spend, emit; got {slot_value(raw)!r}",
+                pattern.line,
+            )
+        elif kind == "names" and parse_name_list(raw) is None:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a comma-separated list of names, got {slot_value(raw)!r}",
+                pattern.line,
+            )
+        elif kind == "name" and _WEBHOOK.fullmatch(slot_value(raw)) is None:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} must be a name, got {slot_value(raw)!r}",
+                pattern.line,
+            )
         elif kind == "field":
             owner_name = pattern.slots.get(spec.get("of", ""), "")
             owner = next((item for item in app.entities if item.name == owner_name), None)
@@ -550,6 +766,9 @@ def check_pattern_policy(
                 f"{pattern.name} requires pattern {needed!r}{reason}",
                 pattern.line,
             )
+    _check_bound_roles(pattern, manifest, _auth_roles(app), err)
+    if manifest.automation:
+        _check_automation(app, pattern, manifest, err)
 
 
 def _check_constraint(pattern: PatternUse, manifest: PatternManifest, constraint: dict, err, warn) -> None:
@@ -586,6 +805,234 @@ def _check_constraint(pattern: PatternUse, manifest: PatternManifest, constraint
         warn("W-POLICY", message + " (exempt slot is set; this is not a legal opinion)", pattern.line)
         return
     err("E-POLICY", message, pattern.line)
+
+
+def _auth_roles(app: App) -> set[str]:
+    roles: set[str] = set()
+    for item in app.patterns:
+        if item.name == "auth" and "roles" in item.slots:
+            roles |= role_names(item.slots["roles"])
+    return roles
+
+
+def _check_bound_roles(pattern: PatternUse, manifest: PatternManifest, auth_roles: set[str], err) -> None:
+    if not auth_roles:
+        return
+    for slot_name in manifest.bound_roles:
+        if slot_name not in pattern.slots:
+            continue
+        value = slot_value(pattern.slots[slot_name])
+        if value not in auth_roles:
+            err(
+                "E-SLOT",
+                f"slot {slot_name} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
+                pattern.line,
+            )
+
+
+def _count_slot(slots: dict[str, str], name: str) -> Optional[int]:
+    if name not in slots:
+        return None
+    return parse_count(slot_value(slots[name]))
+
+
+def _check_automation(app: App, pattern: PatternUse, manifest: PatternManifest, err) -> None:
+    """Trigger shape, step names, budgets, and approval gates for one task."""
+    auto = manifest.automation
+    slots = pattern.slots
+    effects = parse_effect_list(slots[auto["effects_slot"]]) if auto["effects_slot"] in slots else None
+    audience = slot_value(slots[auto["audience_slot"]]) if auto["audience_slot"] in slots else ""
+
+    if auto["trigger_slot"] in slots:
+        trigger = slot_value(slots[auto["trigger_slot"]])
+        mapping = auto.get("trigger_slots") or {}
+        needed = mapping.get(trigger)
+        if isinstance(needed, str) and needed not in slots:
+            err("E-SLOT", f"trigger {trigger} requires slot {needed!r}", pattern.line)
+        for name, slot_name in mapping.items():
+            if name != trigger and slot_name in slots:
+                err(
+                    "E-SLOT",
+                    f"slot {slot_name!r} is only valid when trigger is {name}",
+                    pattern.line,
+                )
+
+    if auto["steps_slot"] in slots and parse_name_list(slots[auto["steps_slot"]]) is not None:
+        customs = {item.name for item in app.customs}
+        applied = {item.name for item in app.patterns}
+        for step in parse_name_list(slots[auto["steps_slot"]]) or []:
+            if step not in customs and step not in applied:
+                err(
+                    "E-HOOK",
+                    f"step {step!r} is not a custom block or an applied pattern",
+                    pattern.line,
+                )
+
+    _check_task_budgets(pattern, auto, effects, err)
+    _check_task_retries(pattern, auto, err)
+    _check_task_gates(app, pattern, auto, effects, audience, err)
+
+
+def _check_task_budgets(pattern: PatternUse, auto: dict, effects: Optional[list[str]], err) -> None:
+    if effects is None:
+        return
+    slots = pattern.slots
+    run = _count_slot(slots, auto["spend_run_slot"])
+    period = _count_slot(slots, auto["spend_period_slot"])
+    if run is not None and period is not None:
+        if "spend" in effects and (run == 0 or period == 0):
+            err(
+                "E-POLICY",
+                f"{pattern.name}: spend effect needs a positive per-run and per-period budget",
+                pattern.line,
+            )
+        elif "spend" in effects and run > period:
+            err(
+                "E-POLICY",
+                f"{pattern.name}: per-run spend exceeds the period budget ({run} <= {period} is false)",
+                pattern.line,
+            )
+        elif "spend" not in effects and (run != 0 or period != 0):
+            err(
+                "E-POLICY",
+                f"{pattern.name}: spend budget is set but spend is not an allowed effect",
+                pattern.line,
+            )
+    _check_rate_limit(
+        pattern,
+        effects,
+        _count_slot(slots, auto["net_limit_slot"]),
+        "net",
+        "net effect needs a positive hourly rate limit",
+        "net rate limit is set but net is not an allowed effect",
+        err,
+    )
+    _check_rate_limit(
+        pattern,
+        effects,
+        _count_slot(slots, auto["emit_limit_slot"]),
+        "emit",
+        "emit effect needs a positive hourly rate limit",
+        "emit rate limit is set but emit is not an allowed effect",
+        err,
+    )
+
+
+def _check_rate_limit(pattern, effects, limit, kind, present_message, absent_message, err) -> None:
+    if limit is None:
+        return
+    if kind in effects and limit == 0:
+        err("E-POLICY", f"{pattern.name}: {present_message}", pattern.line)
+    elif kind not in effects and limit != 0:
+        err("E-POLICY", f"{pattern.name}: {absent_message}", pattern.line)
+
+
+def _check_task_retries(pattern: PatternUse, auto: dict, err) -> None:
+    value = _count_slot(pattern.slots, auto["retries_slot"])
+    if value is None:
+        return
+    limit = auto.get("retries_max")
+    if isinstance(limit, int) and not isinstance(limit, bool) and value > limit:
+        err(
+            "E-POLICY",
+            f"{pattern.name}: retries must be from 0 through {limit}, got {value}",
+            pattern.line,
+        )
+
+
+def _gates_by_target(app: App, gate_pattern: str) -> tuple[dict[str, PatternUse], set[str]]:
+    found: dict[str, PatternUse] = {}
+    ambiguous: set[str] = set()
+    for other in app.patterns:
+        if other.name != gate_pattern or not other.target:
+            continue
+        if other.target in found:
+            ambiguous.add(other.target)
+        found[other.target] = other
+    return found, ambiguous
+
+
+def _check_task_gates(
+    app: App,
+    pattern: PatternUse,
+    auto: dict,
+    effects: Optional[list[str]],
+    audience: str,
+    err,
+) -> None:
+    if effects is None or not audience:
+        return
+    slots = pattern.slots
+    required: list[tuple[str, str, bool]] = []
+    for rule in auto.get("gates") or []:
+        if rule.get("kind") in effects and audience in (rule.get("audiences") or []):
+            required.append((str(rule.get("action")), str(rule.get("message")), bool(rule.get("match_audience"))))
+    change_slot = auto["change_slot"]
+    change = slot_value(slots[change_slot]) if change_slot in slots else "none"
+    if change == auto["change_value"]:
+        required.append((str(auto["change_action"]), str(auto["change_message"]), True))
+
+    named: list[str] = []
+    gate_slot = auto["gate_slot"]
+    if gate_slot in slots:
+        parsed = parse_name_list(slots[gate_slot])
+        if parsed is None:
+            return
+        named = parsed
+    if not required:
+        if named:
+            err("E-POLICY", f"{pattern.name}: approval is set but this task has no gated effect", pattern.line)
+        return
+    if not named:
+        for _action, message, _match in required:
+            err("E-POLICY", f"{pattern.name}: {message}", pattern.line)
+        return
+
+    found, ambiguous = _gates_by_target(app, str(auto["gate_pattern"]))
+    task_entity = slot_value(slots.get(auto["entity_slot"], "")) or pattern.target
+    wanted: dict[str, tuple[str, bool]] = {}
+    for action, message, match_audience in required:
+        wanted.setdefault(action, (message, match_audience))
+    covered: dict[str, str] = {}
+    for name in named:
+        gate = found.get(name)
+        if name in ambiguous or gate is None:
+            if name in ambiguous:
+                err("E-POLICY", f"{pattern.name}: approval gate {name!r} is ambiguous", pattern.line)
+            else:
+                err("E-POLICY", f"{pattern.name}: approval gate {name!r} is not applied", pattern.line)
+            continue
+        action = slot_value(gate.slots.get(auto["gate_action_slot"], ""))
+        gate_entity = slot_value(gate.slots.get(auto["gate_entity_slot"], ""))
+        if task_entity and gate_entity != task_entity:
+            err(
+                "E-POLICY",
+                f"{pattern.name}: approval gate {name!r} is for entity {gate_entity!r}, not {task_entity!r}",
+                pattern.line,
+            )
+        if action not in wanted:
+            err(
+                "E-POLICY",
+                f"{pattern.name}: approval gate {name!r} action {action!r} is not one of the gated effects",
+                pattern.line,
+            )
+            continue
+        if action in covered:
+            err("E-POLICY", f"{pattern.name}: approval gate action {action!r} is named more than once", pattern.line)
+            continue
+        _action, match_audience = wanted[action]
+        if match_audience:
+            gate_audience = slot_value(gate.slots.get(auto["gate_audience_slot"], ""))
+            if gate_audience != audience:
+                err(
+                    "E-POLICY",
+                    f"{pattern.name}: approval gate {name!r} audience is {gate_audience!r}, not {audience!r}",
+                    pattern.line,
+                )
+        covered[action] = name
+    for action, (message, _match) in wanted.items():
+        if action not in covered:
+            err("E-POLICY", f"{pattern.name}: {message}", pattern.line)
 
 
 # ---------------------------------------------------------------------------
@@ -626,7 +1073,8 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
         if not e.fields:
             err("E-ENTITY", f"entity {e.name!r} has no fields", e.line)
 
-    seen_patterns: set[tuple[str, str]] = set()
+    seen_patterns: set[tuple[str, str, str]] = set()
+    seen_targets: set[tuple[str, str]] = set()
     custom_names = {c.name for c in app.customs}
     applied_patterns = {p.name for p in app.patterns}
     auth_count = 0
@@ -679,6 +1127,20 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
             for fname in m.requires_fields:
                 if fname not in entity.fields:
                     err("E-ENTITY", f"{entity.name} needs a `{fname}` field for {p.name}", p.line)
+        # Applying the same pattern twice to the same target expands the
+        # same artifacts twice. Patterns without a target (notify, scene)
+        # may legitimately appear more than once, and auth has its own
+        # singleton check below, so only target-bearing uses are keyed
+        # here. Named uses (pattern ai_task RemindTimesheet) are distinct
+        # instances by design — several tasks may serve one entity — so
+        # the instance name is part of the key when it differs from the
+        # resolved entity target.
+        if p.name != "auth" and target:
+            instance = p.target if p.target and p.target != target else ""
+            key = (p.name, target, instance)
+            if key in seen_patterns:
+                err("E-CONFLICT", f"{p.name} is already applied to {target}", p.line)
+            seen_patterns.add(key)
         check_pattern_policy(app, p, m, entity, err, warn)
         hook_spec = m.hooks.get("on_approved")
         hook_raw = p.slots.get("on_approved")
@@ -730,15 +1192,18 @@ def validate(app: App, registry: dict[str, PatternManifest]) -> list[Diagnostic]
                                 f"on_approved {hook}.{arg} role {value!r} is not in auth.roles ({', '.join(sorted(auth_roles))})",
                                 use.line,
                             )
+        if m.requires_target:
+            if not p.target:
+                err("E-SLOT", f"pattern {p.name} requires a name after the pattern keyword", p.line)
+            else:
+                key = (p.name, p.target)
+                if key in seen_targets:
+                    err("E-DUP", f"duplicate {p.name} name {p.target!r}", p.line)
+                seen_targets.add(key)
         if p.name == "auth":
             auth_count += 1
             if auth_count > 1:
                 err("E-CONFLICT", "auth can only be applied once", p.line)
-        if p.name in ("checkout", "refund") and target:
-            key = (p.name, target)
-            if key in seen_patterns:
-                err("E-CONFLICT", f"{p.name} is already applied to {target}", p.line)
-            seen_patterns.add(key)
 
     seen_custom: set[str] = set()
     for c in app.customs:
@@ -800,8 +1265,9 @@ def entity_for(app: App, p: PatternUse) -> Optional[Entity]:
     return next((e for e in app.entities if e.name == target), None)
 
 
-def template_context(entity: Optional[Entity]) -> dict:
+def template_context(entity: Optional[Entity], target: str = "") -> dict:
     name = entity.name if entity else ""
+    label = target or name
     return {
         "entity": name,
         "Entity": name,
@@ -809,6 +1275,8 @@ def template_context(entity: Optional[Entity]) -> dict:
         "plural": plural(name).lower() if name else "",
         "Plural": plural(name) if name else "",
         "fields": len(entity.fields) if entity else 0,
+        "target": label,
+        "target_lower": label.lower(),
     }
 
 
@@ -837,7 +1305,7 @@ def expand(app: App, registry: dict[str, PatternManifest]) -> list[Artifact]:
         if not m:
             continue
         entity = entity_for(app, p)
-        ctx = template_context(entity)
+        ctx = template_context(entity, p.target)
         if p.name == "scene":
             ctx["Entity"] = p.target
         for t in m.artifacts:
@@ -894,6 +1362,8 @@ def render_report(app: App, diags: list[Diagnostic], arts: list[Artifact]) -> st
         "dispatch_contract": "派遣契約",
         "staffing_billing": "請求と給与",
         "matching": "マッチング",
+        "ai_task": "AIタスク",
+        "approval_gate": "承認ゲート",
         "custom": "カスタム",
     }
     pattern_labels["overtime_agreement"] = "36協定"
@@ -1488,19 +1958,34 @@ def find_patterns(query: str, registry: dict[str, PatternManifest]) -> list[tupl
         slots = [s.lower() for s in m.slots]
         descriptions = [str(v.get("desc", "")).lower() for v in m.slots.values()]
         for token in tokens:
-            if token in name:
+            # Match in both directions for short registry terms (names,
+            # tags, slots): a natural request like 「申請を承認したい」
+            # arrives as one token, and the tags 申請 / 承認 appear inside
+            # it. Sentences (intent, descriptions) only match token-in-text,
+            # so a long token cannot swallow a whole description.
+            # Very short ASCII tokens ("a", "I", "to") are stopwords, not
+            # search terms: they only count on an exact term match.
+            short_ascii = len(token) <= 2 and token.isascii()
+
+            def hit(term: str) -> bool:
+                if short_ascii:
+                    return token == term
+                return token in term or (len(term) >= 2 and term in token)
+
+            if hit(name):
                 score += 5
-            if token in intent:
+            if not short_ascii and token in intent:
                 score += 3
             for tag in tags:
-                if token in tag:
+                if hit(tag):
                     score += 3
             for slot in slots:
-                if token in slot:
+                if hit(slot):
                     score += 1
-            for description in descriptions:
-                if token in description:
-                    score += 1
+            if not short_ascii:
+                for description in descriptions:
+                    if token in description:
+                        score += 1
         if score:
             results.append((score, m))
     return sorted(results, key=lambda x: (-x[0], x[1].name))

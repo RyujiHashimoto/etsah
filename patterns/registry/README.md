@@ -34,6 +34,9 @@ python3 proutc.py build examples/expense.prout
 | `field_types` | 型まで見るフィールド。`Date`、`Duration`、`Rate` など。指定したときだけ厳密一致 |
 | `constraints` | スロット値の比較。`date` / `rate` / `duration` と `<=` など。失敗は `E-POLICY` |
 | `requires_patterns` | 同じ仕様に無いとエラーになるパターン名 |
+| `automation` | AIタスクの横断規則。外部効果に承認ゲートが要ること、予算と回数、トリガー別のスロット |
+| `requires_target` | パターン名のうしろにインスタンス名が要る（`approval_gate SendMail`） |
+| `bound_roles` | `auth.roles` に含まれていなければならないロールスロット |
 | `notes` | 検査しないこと、法令として埋め込まないこと |
 | `states` / `transitions` | 承認などの状態遷移。遷移元・遷移先は `states` に含める |
 | `hooks` | `on_approved` など、承認後に呼ぶ処理の参照先と引数（`notify` の `channel` / `recipient`） |

@@ -171,6 +171,23 @@ class TestSlots(unittest.TestCase):
                 "on_warning",
                 "on_limit",
             },
+            "ai_task": {
+                "entity",
+                "trigger",
+                "steps",
+                "effects",
+                "audience",
+                "spend_per_run",
+                "spend_per_period",
+                "period",
+                "net_per_hour",
+                "emit_per_hour",
+                "retries",
+                "escalate_to",
+                "idempotency_key",
+                "audit",
+            },
+            "approval_gate": {"entity", "approver", "action", "audience"},
         }
         self.assertEqual(set(self.registry), set(expected))
         for name, slots in expected.items():

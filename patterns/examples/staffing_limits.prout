@@ -41,7 +41,7 @@ app staffing_limits
     id: Id
     status: String
 
-  pattern dispatch_contract
+  pattern dispatch_contract LeapTerm
     entity: DispatchContract
     staff: Staff
     client: Client
@@ -52,7 +52,7 @@ app staffing_limits
     org_unit: accounting
     person: leap-person
 
-  pattern dispatch_contract
+  pattern dispatch_contract CooledTerm
     entity: DispatchContract
     staff: Staff
     client: Client
@@ -64,7 +64,7 @@ app staffing_limits
     person: cooled-person
     office_history: 2020-04-01/2021-03-31
 
-  pattern dispatch_contract
+  pattern dispatch_contract ContinuedTerm
     entity: DispatchContract
     staff: Staff
     client: Client

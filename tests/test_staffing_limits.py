@@ -412,7 +412,7 @@ class TestOvertimeAndConflictPolicy(unittest.TestCase):
                 end_date: Date
                 conflict_date: Date
                 status: String
-              pattern dispatch_contract
+              pattern dispatch_contract FirstTerm
                 entity: DispatchContract
                 staff: Staff
                 client: Client
@@ -422,7 +422,7 @@ class TestOvertimeAndConflictPolicy(unittest.TestCase):
                 office: hq
                 org_unit: sales
                 person: a
-              pattern dispatch_contract
+              pattern dispatch_contract SecondTerm
                 entity: DispatchContract
                 staff: Staff
                 client: Client

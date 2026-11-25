@@ -1,0 +1,172 @@
+# 壊した契約。ほかのスロットを揃えたうえで、次の E-POLICY だけを出す。
+# 社外 emit、社外 net、spend、契約の write、1回の予算が期間を超える、
+# retry が 5 を超える、エスカレーションが社外効果を持つ。
+
+type Id
+type Timesheet
+
+op timesheets.open(period: Id) -> Timesheet
+  doc "未提出の勤怠を読む"
+  eff read(timesheets)
+  impl native
+
+op mail.send(sheet: Timesheet) -> Bool
+  doc "督促を送る"
+  eff emit(mail)
+  impl native
+
+op billing.post(period: Id) -> Bool
+  doc "外部の請求 API を呼ぶ"
+  eff read(invoices), net(stripe)
+  impl native
+
+op invoices.approved(period: Id) -> Bool
+  doc "承認済みの時間を読む"
+  eff read(invoices)
+  impl native
+
+op payroll.transfer(period: Id) -> Bool
+  doc "給与を支払う"
+  eff spend(payroll)
+  impl native
+
+op contracts.extend(period: Id) -> Bool
+  doc "個別契約の終了日を書く"
+  eff read(contracts), write(contracts)
+  impl native
+
+op queues.flag(period: Id) -> Int
+  doc "社内キューに件数を書く"
+  eff read(contracts), write(queues)
+  impl native
+
+op ping_customer(period: Id) -> Bool
+  doc "顧客へメールする。エスカレーションから呼んではならない"
+  eff emit(mail)
+  impl native
+
+policy
+  external emit(mail), net(stripe)
+  payment spend(payroll)
+  contract write(contracts)
+
+agent staffing_mail
+  doc "督促を送れる封筒"
+  allow read(timesheets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+agent billing_net
+  doc "請求 API を呼べる封筒"
+  allow read(invoices), net(stripe)
+  budget run 0 period 0
+  limit net 5 hour
+  limit emit 0 hour
+  audit ast_hash
+
+agent payroll_clerk
+  doc "支払いを持てる封筒。1回 200000 円、期間 2000000 円"
+  allow read(invoices), spend(payroll)
+  budget run 200000 period 2000000
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+agent contract_clerk
+  doc "個別契約を更新できる封筒"
+  allow read(contracts), write(contracts)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+agent staffing_clerk
+  doc "社内キューだけを書く封筒"
+  allow read(contracts), write(queues)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 0 hour
+  audit ast_hash
+
+gate pay_staff
+  doc "給与の支払いは給与担当の承認後だけ行う"
+  approver payroll
+  before spend(payroll)
+  on_approved payroll.transfer
+
+task remind_timesheet(period: Id) -> Bool
+  agent staffing_mail
+  doc "ゲートの無い督促"
+  trigger schedule "0 9 * * 1"
+  eff read(timesheets), emit(mail)
+  key period
+  retry 2 escalate coordinator
+  let sheet = timesheets.open(period)
+  let sent = mail.send(sheet)
+  return sent
+
+task post_billing(period: Id) -> Bool
+  agent billing_net
+  doc "ゲートの無い外部 API"
+  trigger schedule "0 10 * * 1"
+  eff read(invoices), net(stripe)
+  key period
+  retry 1 escalate coordinator
+  let posted = billing.post(period)
+  return posted
+
+task pay_hours(period: Id) -> Bool
+  agent payroll_clerk
+  doc "ゲートの無い支払い"
+  trigger schedule "0 10 1 * *"
+  eff read(invoices), spend(payroll)
+  key period
+  retry 0 escalate payroll
+  let approved = invoices.approved(period)
+  let paid = payroll.transfer(period)
+  return paid
+
+task extend_contract(period: Id) -> Bool
+  agent contract_clerk
+  doc "ゲートの無い契約変更"
+  trigger schedule "0 11 * * 1"
+  eff read(contracts), write(contracts)
+  key period
+  retry 0 escalate coordinator
+  let extended = contracts.extend(period)
+  return extended
+
+task pay_too_much(period: Id) -> Bool
+  agent payroll_clerk
+  doc "1回の上限が期間の上限を超える支払い"
+  trigger schedule "0 10 1 * *"
+  eff read(invoices), spend(payroll)
+  gate pay_staff
+  budget run 5000 period 1000
+  key period
+  retry 0 escalate payroll
+  let approved = invoices.approved(period)
+  let paid = payroll.transfer(period)
+  return paid
+
+task retry_forever(period: Id) -> Int
+  agent staffing_clerk
+  doc "再試行が範囲外"
+  trigger schedule "0 8 * * *"
+  eff read(contracts), write(queues)
+  key period
+  retry 6 escalate coordinator
+  let count = queues.flag(period)
+  return count
+
+task escalate_out(period: Id) -> Int
+  agent staffing_clerk
+  doc "エスカレーションが顧客への送信を指す"
+  trigger schedule "0 8 * * *"
+  eff read(contracts), write(queues)
+  key period
+  retry 1 escalate ping_customer
+  let count = queues.flag(period)
+  return count
