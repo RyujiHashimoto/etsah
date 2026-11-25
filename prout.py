@@ -2869,7 +2869,37 @@ def main() -> None:
     mcp.add_argument("file")
     openai = imported_kind.add_parser("openai", help="convert OpenAI function-calling tool JSON")
     openai.add_argument("file")
+    sub.add_parser("mcp", help="serve PROUT checks over MCP stdio")
+    guard_cmd = sub.add_parser("guard", help="proxy an MCP server and check each tools/call")
+    guard_cmd.add_argument("--contract", required=True)
+    guard_cmd.add_argument("--agent", default="")
+    guard_cmd.add_argument("--allow-net", action="append", default=None)
+    guard_cmd.add_argument("--deny-net", action="append", default=None)
+    guard_cmd.add_argument("--approval-token", default=None)
+    guard_cmd.add_argument("upstream", nargs=argparse.REMAINDER)
     args = ap.parse_args()
+
+    if args.cmd == "mcp":
+        from prout_mcp.server import serve
+
+        serve()
+        return
+    if args.cmd == "guard":
+        from prout_mcp.guard import run_guard
+
+        upstream = list(args.upstream)
+        if upstream and upstream[0] == "--":
+            upstream = upstream[1:]
+        sys.exit(
+            run_guard(
+                contract=args.contract,
+                upstream=upstream,
+                agent=args.agent,
+                allow_net=args.allow_net,
+                deny_net=args.deny_net,
+                approval_token=args.approval_token,
+            )
+        )
 
     if args.cmd == "import":
         _import_tools(args.kind, args.file)

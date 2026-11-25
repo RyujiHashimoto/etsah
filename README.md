@@ -180,6 +180,7 @@ PROUTの成長は、コードの行数ではなく、**次のAIが少ない手�
 prout.py                 契約言語のパーサー・検証器・CLI
 prout_api.py             check_source と check_file
 prout_import.py          MCP と OpenAI のツール定義を op にする
+prout_mcp/               MCP サーバ（prout mcp）とガード（prout guard）
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
 examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
@@ -257,6 +258,8 @@ python3 prout.py import mcp examples/agents/tools/mcp_tools.json
 python3 prout.py check examples/agents/support_reply.prout
 python3 prout.py check examples/agents/github_triage.prout --allow-net github
 ```
+
+同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
 
 ## 情報フローラベルでPIIの流出を止める
 
