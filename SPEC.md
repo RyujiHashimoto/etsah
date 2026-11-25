@@ -1,4 +1,4 @@
-# PROUT v0.1 — AIのための契約言語（試作）
+# PROUT v0.6 — AIのための契約言語
 
 ## なぜ新しい言語か
 
@@ -126,6 +126,8 @@ task remind_timesheet(period: Id) -> Bool
 
 `net` の宛先が許可リスト（既定は `stripe`）に入っているかは、これまでどおり op のポリシー検査が止める。`policy external` は、その宛先にゲートが要るかである。
 
+情報フローの `policy`（`sink` と `declassify`）と、このタスク用の `policy`（`external`、`payment`、`contract`）は同じ宣言名で、中の行で区別する。一つのブロックに両方は書けない。プログラムには、情報フローの `policy` を一つと、タスク用の `policy` を一つまで置ける。
+
 `check` は、タスクがあるとき、起動、効果、ゲート、再試行、キー、予算を文章で出す。
 
 ### 式
@@ -158,8 +160,9 @@ task remind_timesheet(period: Id) -> Bool
 2. **型検査** — 引数、戻り値、フィールド、演算の型を検査。
 3. **効果検査** — opの宣言効果と実装が行う効果を比較。フローとタスクは呼び出しの和集合と宣言を比較する。
 4. **契約検査** — 呼び出し地点で事前条件を実引数に代入し、線形算術と等価性で判定。真なら通過、偽ならエラー、不明なら実行時ガード。
-5. **ポリシー検査** — 許可されたネットワーク先・効果種別のみを許可する。AIタスクは、封筒、ゲート、整数円の予算、時間あたり回数、再試行もここで止める。
-6. **正規化** — ASTをソート済みJSONに変換し、SHA-256ハッシュを付与。型・op・flow・フィールド・効果に加え、pre/postの連言も式の正規化キーでソートする。agent、task、gate、policy があるときだけ、その節もハッシュに入る。無いプログラムのハッシュは変えない。引数や文の順序は意味を持つためソートしない。
+5. **情報フロー検査** — ラベルの宣言・注釈・情報フローの `policy` がある場合だけ、引数・戻り値・契約・sink・`sends`・`declassify` を検査する。タスク用の `policy` だけではこの検査は始まらない。
+6. **ポリシー検査** — 許可されたネットワーク先・効果種別のみを許可する。AIタスクは、封筒、ゲート、整数円の予算、時間あたり回数、再試行もここで止める。
+7. **正規化** — ASTをソート済みJSONに変換し、SHA-256ハッシュを付与。型・op・flow・フィールド・効果に加え、pre/postの連言も式の正規化キーでソートする。ラベル、情報フローの `policy`、agent、task、gate、タスク用の `policies` は、あるときだけハッシュに入る。無いプログラムのハッシュは変えない。引数や文の順序は意味を持つためソートしない。
 
 ## 人間向けビュー
 
@@ -177,6 +180,7 @@ task remind_timesheet(period: Id) -> Bool
 ## 試作の範囲
 
 - パーサー、型検査、効果検査、事前条件検査、ポリシー検査、HTMLレンダラー。AIタスクの静的検査（封筒、ゲート、整数円の予算、回数、再試行、冪等キーの形）。
+- 情報フローは静的なラベル集合の検査だけを行い、暗黙のフロー、コレクションの要素ラベル、ラベル多相、実行時の強制は対象外。
 - 線形算術の事前条件のみ。文字列やコレクションの契約は実行時ガード扱い。十進数と暦日の差も、定数まで落ちるものだけを証明する。
 - 実装の意味論は検証しない。`impl` は宣言として扱う。
 - 並行性、時刻、リソース消費の証明は対象外。暦日（`Date`）は対象であり、時刻ではない。cron の実行、予算の残数、冪等ストアは対象外である。
@@ -212,6 +216,86 @@ PROUTのような契約層は、リバースエンジニアリングを「意味
 
 つまり、リバースエンジニアリングが楽になるのは「契約が存在し、検証されている場合」に限られる。契約のないバイナリの解析は、依然として職人芸とツールの世界に残る。
 
-## 情報フロー制御（設計）
+## 情報フロー制御
 
-`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出する設計を [docs/information-flow.md](docs/information-flow.md) にまとめている。`String @pii`、`sends`、`policy`、`declassify` の構文、式のラベル推論規則、sink の解決アルゴリズム、診断コード、AST ハッシュへの影響、パターン層の `data_policy` を含む。実装は v0.1 から段階的に進める。
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出する。設計の全体像と未実装部分は [docs/information-flow.md](docs/information-flow.md) にあり、ここでは実装済みの規則をまとめる。
+
+### ラベルの宣言と注釈
+
+```
+label pii
+label secret
+
+type Customer {
+  id: Id
+  email: String @pii
+  internal_note: String @secret
+}
+```
+
+`public` は暗黙のラベルで、宣言も注釈もできない。ラベル名は `[a-z][a-z0-9_]*` で、効果種別（`read`、`write`、`net`、`spend`、`emit`）と衝突してはならない。注釈を付けられるのは不透明型とフィールドの型で、レコード型そのものや型引数の内側（`Box<String @pii>`）には付けられない。これらは `E-LABEL` になる。
+
+ラベルの集合は型の一部として扱う。`String @pii` と `String` は異なる型だが、`String` から `String @pii` への代入は許す（公開データは秘密に流せる）。逆向きは `E-IFLOW-ARG` または `E-IFLOW-RET` になる。
+
+### 式のラベル推論
+
+式のラベルは次のように決まる。
+
+| 式 | ラベル |
+|---|---|
+| リテラル、ラベルなし変数 | 空（public） |
+| フィールドアクセス `c.email` | そのフィールドのラベルだけ |
+| レコード値 `Customer { ... }` | 全フィールドのラベルの和集合 |
+| 二項演算 `a + b` | 両辺のラベルの和集合 |
+| 比較 `a == b` | 両辺の和集合（結果は `Bool` でもラベルを持つ） |
+| 関数呼び出し | 宣言された戻り値のラベル |
+| `declassify(e, l, reason)` | `e` のラベルから `l` を除いたもの |
+
+レコード全体を変数に持つと全フィールドのラベルを帯びるが、フィールドを取り出せばそのフィールドのラベルだけになる。これにより「顧客レコードは PII を含むが、`id` は公開」という扱いができる。
+
+### sink と `sends`
+
+外部に触る操作は、どの引数がどの効果へ流れるかを `sends` で宣言する。
+
+```
+policy
+  sink net(email) accepts pii
+  sink net(analytics) accepts pii
+  sink net(*) rejects secret
+
+op send_receipt(to: String @pii) -> Bool
+  eff net(email)
+  sends to -> net(email)
+  impl native
+```
+
+`sink` は効果の対象ごとに、受け入れるラベル（`accepts`）と決して受け入れないラベル（`rejects`）を宣言する。`net(*)` はワイルドカードで、より具体的な `net(email)` があれば `accepts` は具体的な規則で置き換わり、`rejects` は具体・ワイルドカードの和集合になり、上書きできない。`read` は sink になれない（`E-POLICY`）。
+
+`sends` は `impl native` の op にだけ書ける。ラベル付きの引数・戻り値、または `read` 効果を持つ native op は、`read` 以外の各効果に対して `sends` を持たなければならない。抜けは `E-SINK-UNBOUND`、未知の引数名や効果は `E-SINK` になる。`sends none -> net(health)` は「この効果にラベル付きデータを流さない」と明示する。
+
+### `declassify`
+
+ラベルを落とす操作は、ポリシーで許可された場所と役割の中でだけ行える。
+
+```
+policy
+  declassify pii in masked_tracking require role support
+
+flow masked_tracking(id: Id) -> Bool
+  eff read(customers), net(analytics)
+  let c = customers.get(id)
+  let masked = declassify(c.email, pii, "分析用にドメインだけ残す")
+  return track_event(masked)
+```
+
+理由は 1〜200 文字で改行を含まない。許可された `declassify` は `W-DECLASS` として監査ログに残り、ポリシーにない場所・役割・ラベルは `E-DECLASS` になる。レコード全体の `declassify` と契約式（`pre` / `post`）内の `declassify` は拒否する。
+
+### 検査と診断
+
+検査は、引数（`E-IFLOW-ARG`）、戻り値（`E-IFLOW-RET`）、契約式（`E-IFLOW-CONTRACT`）、sink（`E-IFLOW-SINK`）、`sends`（`E-SINK`、`E-SINK-UNBOUND`）、ポリシー（`E-POLICY`）、`declassify`（`E-DECLASS`、`W-DECLASS`）の順に走る。診断には行番号と修正案を付け、`--json` では `context` に「どの値がどの引数へ流れたか」を入れる。
+
+ラベル宣言も注釈もポリシーもないプログラムでは、情報フロー検査を丸ごと省略する。この高速パスにより、既存プログラムの AST とハッシュは変わらない（`examples/refund_fixed.prout` は `bae8501e8b3f` のまま）。
+
+### 現時点の限界
+
+暗黙のフロー（`if secret then ...` の分岐結果が公開値に影響する場合）は追わない。ラベル付きのコレクション、ラベル多相、実行時の強制、`declassify` の呼び出し元認証も未実装である。`impl native` の内部は信頼する。つまり、この検査は「宣言された境界を越えた流れ」を止めるものであり、情報の非干渉性を証明するものではない。
