@@ -1,3 +1,52 @@
+# Staffing desk — English summary
+
+This is a summary of the Japanese design note below. The Japanese text is the original and is unchanged. If the summary and the Japanese text disagree, the Japanese text wins.
+
+This note is an industry example, not the center of the language. The language's broader aim is to check what an AI agent is allowed to do before it runs. A staffing desk is one place that shape shows up.
+
+The repeating core is staff, client sites and openings, matching, individual dispatch contracts and working conditions, timesheets with client approval, invoices and payroll, and gross margin. Rules that come from Japan's dispatch statute (the conflict date, overtime, wages) are checked as configured values. The language does not embed statutory numbers. Judgments that are disputed stay in the Japanese note.
+
+The contract layer has `Date` and `Decimal`. A date literal is `YYYY-MM-DD` with no spaces. A decimal looks like `1800.50`. The pattern layer still checks conflict dates and rates. The Japanese note below describes the current tree.
+
+### What the contract layer already expresses
+
+`examples/staffing_dates.prout` uses calendar dates and decimal yen:
+
+- Bill rate ≥ pay rate as `Decimal`. `1500.5 >= 1800.50` is `E-PRE`. `2800.50 >= 1800` passes. An `Int` may be passed where a `Decimal` is expected.
+- End date ≤ conflict date. `2029-04-02 <= 2029-04-01` is `E-PRE`. `Date - Date` is a number of days (`Int`). `Date + Int` shifts the date.
+- `examples/staffing.prout` keeps the older integer-yen and day-count encoding. `1500 >= 1800` and day count `21641 <= 21640` are still `E-PRE`.
+- Client approval: `Bool` `client_approved == true`. `false` is `E-PRE`.
+- Invoice amount: `Money * Int` is `Money`.
+- A monthly close must match `read(contracts)`, `write(invoices)`, `write(payroll)`, `emit(audit)`.
+- A flow that reads a stored contract cannot prove field comparisons. It finishes with 3 `W-PRE` runtime guards and 0 errors.
+
+The network allow list (default `stripe`) and missing or extra effects work as elsewhere.
+
+### What the pattern layer adds
+
+Existing patterns cover login and roles, lists, search, résumé upload, a margin dashboard, notification, and a generic approval transition. They do not know that a timesheet must be approved by the client site before billing, or that a bill rate must stay at or above the pay rate.
+
+Four patterns were added. Both `patterns/examples/staffing.prout` (the desk) and `patterns/examples/staffing_desk.prout` (a short synthetic desk) build.
+
+- `timesheet` — submit, then client approval. `approver` is required. States run `draft → submitted → client_approved`, with `returned` for a send-back. `overtime_cap_hours` is a `Duration`. Comparing hours worked with the cap stays a runtime check, because the contract layer has no time-of-day.
+- `dispatch_contract` — staff, client, start, end, and conflict date are required. The only comparisons are `start_date <= end_date` and `end_date <= conflict_date`. The checker does not add three years to the start date. `exempt` of `indefinite` or `age60` past the conflict date is `W-POLICY` with the words "not a legal opinion", not an error. `none` past the date is `E-POLICY`.
+- `staffing_billing` — `bill_rate` and `pay_rate` are non-negative decimals (`Rate`). `bill_rate >= pay_rate` is checked in the spec. Equal rates pass. `1800.50` and `1800.5` are the same value. A spec with no `timesheet` is `E-POLICY`. Social insurance, employment insurance, premiums, and commuting are not subtracted. A non-negative gap can still lose money after those. This check is not a determination of equal pay for equal work.
+- `matching` — the staff skill field and the opening's required-skill field exist. It does not prove that the person's skills satisfy the opening.
+
+`patterns/examples/staffing_broken.prout` fails three pattern checks: an end date after the conflict date, a timesheet with no approver, and a bill rate of `1500` under a pay rate of `1800.50`. `examples/staffing_broken.prout` fails three `E-PRE` checks: `1500 >= 1800`, day count `21641 <= 21640`, and `false == true`.
+
+A local build of the current tree matches the measurements recorded in the Japanese section: the desk spec is 104 lines, about 3,383 generated lines, 32.5×; the short desk is 65 lines, about 1,525 generated lines, 23.5×. Run `python3 -m unittest discover -s tests -v` for the current test count.
+
+### Left out of the language on purpose
+
+The Japanese section lists what is not encoded as law: organization-level period limits and cooling-off, the full exception list, Article 36 caps and special clauses, equal pay against a comparator payroll, social-insurance rates, premium wages, and the full text of a working-conditions notice. `overtime_cap_hours` is a field for the agreement's own number. It is not a default inside the pattern.
+
+### Owner questions
+
+The Japanese section ends with questions for the owner: the shape of a `Date` literal, whether decimal rates stay split between the two layers, whether two conflict-date exceptions are enough, whether an Article 36 cap must not be a pattern default, whether equal pay becomes its own pattern, whether insurance rates become a slot, whether these four patterns satisfy the "seen twice" rule, and whether `requires_fields` should check types.
+
+---
+
 # 人材派遣の基幹を PROUT で書く
 
 対象は、人材派遣会社の基幹で繰り返す部分である。スタッフ、派遣先と案件、マッチング、個別契約と就業条件、勤怠と派遣先承認、請求と給与、粗利。労働者派遣法まわり（抵触日、時間外、賃金）は、法令の数値を言語に埋め込まず、設定された規則として検査する。判断が分かれるところはこの文書に残す。

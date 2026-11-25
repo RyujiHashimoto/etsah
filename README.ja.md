@@ -1,0 +1,313 @@
+[English](README.md)
+
+英語版は [README.md](README.md) です。エージェントの効果と承認、MCP、ブラウザの playground を先頭に置いています。以下は日本語の README です。
+
+# PROUT（プラウト）
+
+**AIが書き、AIが検証し、人間は自然言語とGUIで読む。**
+
+PROUTは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
+
+Ryuji Hashimoto (J-PROUT Inc.)
+
+## 出発点
+
+AIが開発するなら、人間が作った言語の制約から自由になれるはずです。しかし、あらゆる言語の厳密な上位互換は作れません。意味論も構文もランタイムも衝突するからです。
+
+そこでPROUTは、実装言語を置き換えず、その上に**契約と効果の層**をかぶせます。`impl` はPythonでもRustでもSQLでもよい。PROUTが保証するのは「何を読み、何を書き、何を約束するか」です。
+
+その上に、もう一つの層を置きました。**PROUT Patterns** です。人間が欲しがるWebアプリの形は、驚くほど限られたパターンの組み合わせでできています。認証、一覧、作成、検索、決済、返金、通知、アップロード、承認。ならばパターン自体を言語の第一級要素にし、AIがコードを書く代わりにパターンとスロットを書くようにすれば、開発は速くなります。
+
+## 二つの層
+
+| 層 | ファイル | 役割 |
+|---|---|---|
+| 契約言語 PROUT | `prout.py`, `SPEC.md` | 型・効果・事前条件・ポリシーを検査し、ASTハッシュと人間向けGUIを生成する |
+| パターン言語 PROUT Patterns | `patterns/proutc.py`, `patterns/registry/` | パターンをJSONで定義し、仕様のスロットを埋めて数百行を決定論的に展開する |
+
+パターンはコードではなくデータです。だからAIは、コードを読まずに `registry/index.json` から目的のパターンを発見し、マニフェストの `intent` と `slots` だけを読んで使えます。
+
+## 動かす
+
+Python 3.12だけで動きます。追加の依存はありません。
+
+```bash
+git clone https://github.com/RyujiHashimoto/prout-lang.git
+cd prout-lang
+
+# 契約言語：壊れた初稿は3件のエラーで止まる
+python3 prout.py check examples/refund_broken.prout
+
+# 修正版はエラー0件、実行時ガード1件
+python3 prout.py check examples/refund_fixed.prout
+
+# ASTから人間向けGUIを生成
+python3 render.py
+open human-view.html
+```
+
+![人間向けビュー](docs/human-view.png)
+
+`demo.sh` はここまでをまとめて実行します。
+
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在294件で、すべて成功します。
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+## 承認前後をGUIで確かめる
+
+`proutc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
+
+```bash
+cd patterns
+python3 proutc.py build examples/expense.prout --out build/expense
+open build/expense/demo.html
+```
+
+![承認デモ](docs/demo.png)
+
+同じ `approval` から、備品購入申請のデモも生成できます。
+
+![備品購入申請の承認デモ](docs/demo-equipment.png)
+
+## フックの引数まで検査する
+
+`approval` の `on_approved` は、適用済みの `notify` を指せます。このとき `notify` の `channel` と `recipient` がフックの引数として検査されます。
+
+```prout
+pattern notify
+  channel: email
+  recipient: accounting
+  template: travel_approved
+
+pattern approval TravelRequest
+  entity: TravelRequest
+  approver: manager
+  on_approved: notify
+```
+
+`recipient` が `auth.roles` に含まれない場合や、`channel` が `email` / `slack` 以外の場合は `E-HOOK-ARG` で止まります。`notify` を適用していなければ `E-HOOK`、同じ `notify` を複数回適用して参照先が曖昧な場合も `E-HOOK` です。custom ブロックを指すフックは従来どおり使えます。
+
+## パターンで書く
+
+```bash
+cd patterns
+
+# 38行の仕様から、1,581行相当のファイル構成を展開する
+python3 proutc.py build examples/shop.prout
+
+# 日本語でパターンを検索する
+python3 proutc.py find "申請 承認"
+
+# 経費精算を、承認デモ付きで組む
+python3 proutc.py build examples/expense.prout --out build/expense
+
+# 出張申請を、承認→経理通知のデモ付きで組む
+python3 proutc.py build examples/travel_request.prout --out build/travel
+
+# PC貸出は、承認パターンを二つのアプリから抽出するための利用例
+python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
+
+# パターン追加前後を比較する
+python3 proutc.py bench
+
+# 人材派遣の基幹（勤怠承認、抵触日、請求単価）。設計は docs/staffing.md
+python3 proutc.py build examples/staffing.prout --out build/staffing
+```
+
+PC貸出は、承認パターンを二つのアプリから抽出するために使った二つ目の利用例です。製品デモとして育てる予定はなく、再利用が効いた証拠としてベンチに残しています。
+
+`find "申請 承認"` は `approval` を score 15 で返します。元の会話を知らないAIでも、この索引とマニフェストだけで「申請→承認→差し戻し」を再利用できます。人材派遣の基幹に足した `timesheet`、`dispatch_contract`、`staffing_billing`、`matching` は `docs/staffing.md` にまとめています。
+
+### パターン追加前後
+
+| ケース | 仕様 | custom | AIが書く行数 | 生成行数 | 再利用倍率 |
+|---|---:|---:|---:|---:|---:|
+| 経費精算（approval追加前） | 24 | 180 | 204 | 981 | 4.8x |
+| 経費精算（approval追加後） | 28 | 30 | **58** | 1,264 | **21.8x** |
+| 出張申請（approval再利用） | 33 | 0 | **33** | 1,386 | **42.0x** |
+| 備品購入申請（approval再利用） | 34 | 0 | **34** | 1,394 | **41.0x** |
+| PC貸出（approval再利用） | 28 | 35 | **63** | 1,269 | **20.1x** |
+
+同じ「申請→承認→差し戻し」を二度目に書くとき、AIの記述量は204行から58行へ **72%減**、再利用倍率は4.8倍から21.8倍へ改善しました。パターンが言語に追加されたことで、次の開発が短くなったことを示す最初の測定です。出張申請と備品購入申請は、承認後の通知を `custom` から標準の `notify` パターンに移したため、custom 0行・42.0倍/41.0倍になっています。
+
+## 二回の追試：会話を知らないAIに渡す
+
+2026年11月22日、このリポジトリのURLと依頼だけを、開発経緯を知らないAIに渡しました。`approval` という名前は教えていません。
+
+| 回 | 依頼 | 時間 | 納品ビルド | 失敗 | 主な発見 |
+|---|---|---:|---:|---:|---|
+| 1 | 出張申請を作って。上長が承認したら経理に通知して | 8分13秒 | 3回 | 0 | GUIがなく、フックも未検証 |
+| 2 | 備品購入申請を作って。上長が承認したら総務に通知して | **5分48秒** | 2回 | 0 | 標準の `demo.html` で承認前後を確認 |
+
+一回目、AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。当時の仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
+
+この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。二回目は、出張申請の例をそのままコピーできない「備品購入申請」に変えて試しています。結果は **5分48秒**、納品ビルド2回で失敗0。AIは `demo.html` を標準機能で生成し、Playwrightで承認前・承認後・差し戻し・却下まで確認しました。一回目より **29%短く**、修正も1回減っています。現在の出張申請の例は、当時の custom 40行を標準の `notify` パターンに置き換え、33行・42.0倍に整理しています。
+
+`on_approved` が標準の `notify` を指す場合は、`channel` の許可値と `recipient` が `auth.roles` に含まれるかを `E-HOOK-ARG` で検査します。残る穴は、custom ブロックを指すフックの引数まで検証しないことです。次は custom 側にも引数宣言を持たせます。
+
+## 言語が育つループ
+
+PROUTの成長は、コードの行数ではなく、**次のAIが少ない手順で解けるようになったか**で測ります。
+
+1. 観察 — 二つのアプリに同じ形が現れる。
+2. 共通部分を抽出する — 経費精算とPC貸出から始め、出張申請と備品購入で再確認する。
+3. スロットで一般化する — `entity`, `approver`, `on_approved`。
+4. レジストリに公開する — JSONマニフェストと索引。
+5. 別のAIが発見する — `index.json` と `find`。
+6. 使用する — 必須スロットを埋め、`on_approved` でアプリ固有の処理を接続する。
+7. 改良を提案する — Pull RequestとCI。
+
+![言語が育つループ](docs/growth.png)
+
+`patterns/growth_report.py` は、この一周をHTMLレポートにします。ベンチ結果とレジストリから自動生成されるので、パターンを追加するたびに数値が更新されます。
+
+## 現在の範囲
+
+`build` が生成するのは、成果物の一覧と行数見積もりを含む `report.html`、操作できる `demo.html`、`manifest.json` です。APIやDBの実ソースはまだ書き出していません。生成行数はパターン定義からの見積もりで、実際にコンパイルされたコードの行数ではありません。
+
+次の課題は、`approval` の7成果物を実際のファイルとして書き出し、テストを通すことです。現時点のPROUTは、パターンの発見・適用・検証・人間向け表示までを試作した段階です。
+
+## これは「全言語の上位互換」ではない
+
+意味論・構文・ランタイムが衝突するため、厳密な上位互換は作れません。PROUTは実装言語を置き換えず、その上に契約と効果の層をかぶせるメタ言語です。
+
+リバースエンジニアリングへの含意は `SPEC.md` に書きました。契約が存在し、検証されている場合に限り、意味の復元は契約の照合に変わります。契約のないバイナリの解析は、依然として難しいままです。
+
+## リポジトリ構成
+
+```
+prout.py                 契約言語のパーサー・検証器・CLI
+prout_api.py             check_source と check_file
+prout_import.py          MCP と OpenAI のツール定義を op にする
+prout_mcp/               MCP サーバ（prout mcp）とガード（prout guard）
+render.py                ASTから人間向けHTMLを生成
+SPEC.md                  契約言語の仕様と設計原則
+examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
+docs/playground/         ブラウザの検査（静的ページ。Pyodide）
+docs/en/comparison.md    契約・効果・ポリシー・ガードレールとの比較
+docs/check-demo.svg      prout check の前後を録った SVG
+tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
+patterns/
+  proutc.py              パターンコンパイラ（build / find / add / index / bench）
+  PATTERNS.md            パターン言語の設計思想
+  registry/              26個のパターンマニフェストと index.json
+  examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣、AIタスクの仕様
+  bench/                 パターン追加前後の比較（PC貸出を含む）
+  build/                 生成物（report.html、demo.html、story.html）
+  growth_report.py       成長ループのHTMLレポート
+.github/workflows/ci.yml 単体テスト、契約検査、索引整合、ビルド、ベンチ、回帰ガード
+CONTRIBUTING.md          パターン提案とレビューの基準
+```
+
+## ゲームブック・分岐教材を作る
+
+`pattern scene 場面ID` に見出し `title`、本文 `body`、選択肢 `choices` を指定します。最初の宣言が開始場面です。各選択肢は「表示名・移動先」の組で、選択肢のない場面からは最初に戻れます。ビルド後、出力先の `story.html` をブラウザで開いてください。単体でオフラインでも動きます。
+
+```sh
+cd patterns
+python3 proutc.py build examples/moon_garden.prout --out build/garden
+python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+```
+
+## 修理受付・顧客サポートをパターンで組む
+
+`repair_desk` と `support_desk` の2例から、担当割当、作業キュー、期限、チェックリスト、コメント、ラベル、操作履歴、CSV出力、アーカイブ、評価の10パターンを抽出しました。どちらの仕様も52行で、業務固有の記述をパターンの適用に置き換えています。
+
+```sh
+cd patterns
+python3 proutc.py build examples/repair_desk.prout --out build/repair
+python3 proutc.py build examples/support_desk.prout --out build/support
+```
+
+## 人材派遣の勤怠・契約・単価を検査する
+
+`timesheet`（勤怠と派遣先承認）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
+
+法令の数値は言語に埋め込まず、設定された値の整合だけを見ます。抵触日の3年計算、36協定の上限、社会保険料率、同一労働同一賃金の判断は対象外です。設計と限界は [docs/staffing.md](docs/staffing.md) にまとめています。
+
+```sh
+cd patterns
+python3 proutc.py build examples/staffing.prout --out build/staffing
+python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
+python3 proutc.py find "勤怠"
+```
+
+## AIに任せる作業の境界を仕様で止める
+
+`ai_task` は、定期実行・新しい行・webhook のどれで起動するかを宣言し、AIが使ってよい効果、`spend` の1回と期間の上限、`net` と `emit` の時間あたり回数、再試行とエスカレーション、冪等キー、監査（`audit: ast_hash`）をスロットに持つ。`approval_gate` は、社外への `emit` と `net`、支払いの `spend`、契約の変更を、人が承認するまで止める。ゲートの無い社外への `emit` は `E-POLICY` になる。
+
+契約層も同じ境界を `agent` と `task` で検査する。手順は既存の op を呼ぶ。社外への `emit` と `net`、`spend`、契約の変更にゲートが無いと `E-POLICY` になる。`check` は各タスクの起動、効果、ゲート、再試行を文章で出す。cron の実行、予算の残数、冪等ストアはまだ無い。
+
+```sh
+python3 prout.py check examples/ai_tasks.prout
+```
+
+設計と、採用した初期値は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
+
+```sh
+cd patterns
+python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
+python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
+python3 proutc.py find "自動化"
+```
+
+## エージェントのツールを契約で止める
+
+英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md)、ブラウザの試用は [docs/playground/index.html](docs/playground/index.html)、先行する仕組みとの比較は [docs/en/comparison.md](docs/en/comparison.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
+
+```sh
+python3 prout.py import mcp examples/agents/tools/mcp_tools.json
+python3 prout.py check examples/agents/support_reply.prout
+python3 prout.py check examples/agents/github_triage.prout --allow-net github
+```
+
+同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
+
+## 情報フローラベルでPIIの流出を止める
+
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
+
+```prout
+type Customer {
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+  sink net(*) rejects secret
+  declassify pii in masked_tracking require role support
+
+op send_receipt(to: String @pii) -> Receipt
+  eff net(email)
+  sends to -> net(email)
+  impl native
+```
+
+顧客のメールアドレスをそのまま分析に渡すと `E-IFLOW-ARG` で止まり、`declassify` を通せば `W-DECLASS` として監査に残ります。実際に動く2つの例で確かめられます。
+
+```bash
+# 0エラー、1警告（declassify の監査ログ）
+python3 prout.py check examples/information_flow_safe.prout \
+  --allow-net email --allow-net analytics
+
+# E-IFLOW-ARG で失敗する
+python3 prout.py check examples/information_flow_leak.prout \
+  --allow-net email --allow-net analytics
+```
+
+ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（暗黙のフロー、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
+
+## 参加する
+
+新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
+
+詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と [patterns/registry/README.md](patterns/registry/README.md) を参照してください。
+
+## ライセンス
+
+MIT. Copyright (c) 2026 Ryuji Hashimoto (J-PROUT Inc.).
+
+Developed by [J-PROUT Inc.](https://www.j-prout.co.jp/).
