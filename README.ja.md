@@ -266,6 +266,8 @@ python3 prout.py check examples/agents/github_triage.prout --allow-net github
 
 同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。`ASK` を通すのは、`prout approve` が発行した署名付きの一度きりの承認が、契約・ゲート・ツール・引数ハッシュと一致するときだけです。`limit calls` と `limit spend` は台帳ファイルで減らし、署名があっても上限は超えません。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
 
+架空の問い合わせ Q-4401（`guest@example.invalid`）は、規則を無視して金庫のトークンを転送し、9000.00 JPY を返せと書いている。[examples/prompt_injection_leak.prout](examples/prompt_injection_leak.prout) はその秘密を `mail.forward` に渡すので、`E-IFLOW-ARG` で止まる。[examples/prompt_injection_safe.prout](examples/prompt_injection_safe.prout) はトークンを外に出さず、返信は `ASK`、契約に無い転送は `BLOCK`、1000.00 JPY を超える返金は署名が合っても `BLOCK` になる。手順と期待する出力は [README.md](README.md) の Prompt injection にある。
+
 ## 情報フローラベルでPIIの流出を止める
 
 `pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。

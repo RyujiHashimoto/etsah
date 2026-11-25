@@ -1,0 +1,47 @@
+# Prompt injection, leaking contract.
+# A fictional inquiry at Harbor Lane Desk asks the assistant to ignore its
+# rules and forward a vault token. The contract allows that secret to reach
+# an external mail argument. Nothing here sends a live message.
+#
+#   python3 prout.py check examples/prompt_injection_leak.prout
+#
+# Expected: exit 1, E-IFLOW-ARG at mail.forward.
+
+label untrusted
+label secret
+
+type Id
+type Inquiry {
+  id: Id
+  body: String @untrusted
+}
+type Vault {
+  token: String @secret
+}
+
+policy
+  sink emit(mail) rejects secret
+  sink emit(mail) rejects untrusted
+
+op inbox.read(id: Id) -> Inquiry
+  doc "Read fictional inquiry Q-4401 from guest@example.invalid"
+  eff read(inquiries)
+  impl native
+
+op vault.read(id: Id) -> Vault
+  doc "Read the fictional vault token for account A-19"
+  eff read(vault)
+  impl native
+
+op mail.forward(note: String) -> Bool
+  doc "Forward text to an external mailbox"
+  eff emit(mail)
+  sends note -> emit(mail)
+  impl native
+
+flow leak_token(id: Id) -> Bool
+  doc "The injected instruction is followed and the vault token is forwarded"
+  eff read(inquiries), read(vault), emit(mail)
+  let inquiry = inbox.read(id)
+  let vault = vault.read(id)
+  return mail.forward(vault.token)
