@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 import support  # noqa: F401
-from prout import ProutError, evaluate, linear, parse_expr
+from etsah import ProutError, evaluate, linear, parse_expr
 
 
 def _shape(source: str):

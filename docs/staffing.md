@@ -10,11 +10,11 @@ The contract layer has `Date` and `Decimal`. A date literal is `YYYY-MM-DD` with
 
 ### What the contract layer already expresses
 
-`examples/staffing_dates.prout` uses calendar dates and decimal yen:
+`examples/staffing_dates.etsah` uses calendar dates and decimal yen:
 
 - Bill rate ≥ pay rate as `Decimal`. `1500.5 >= 1800.50` is `E-PRE`. `2800.50 >= 1800` passes. An `Int` may be passed where a `Decimal` is expected.
 - End date ≤ conflict date. `2029-04-02 <= 2029-04-01` is `E-PRE`. `Date - Date` is a number of days (`Int`). `Date + Int` shifts the date.
-- `examples/staffing.prout` keeps the older integer-yen and day-count encoding. `1500 >= 1800` and day count `21641 <= 21640` are still `E-PRE`.
+- `examples/staffing.etsah` keeps the older integer-yen and day-count encoding. `1500 >= 1800` and day count `21641 <= 21640` are still `E-PRE`.
 - Client approval: `Bool` `client_approved == true`. `false` is `E-PRE`.
 - Invoice amount: `Money * Int` is `Money`.
 - A monthly close must match `read(contracts)`, `write(invoices)`, `write(payroll)`, `emit(audit)`.
@@ -26,7 +26,7 @@ The network allow list (default `stripe`) and missing or extra effects work as e
 
 Existing patterns cover login and roles, lists, search, résumé upload, a margin dashboard, notification, and a generic approval transition. They do not know that a timesheet must be approved by the client site before billing, or that a bill rate must stay at or above the pay rate.
 
-Five patterns were added. `patterns/examples/staffing.prout` (the desk), `patterns/examples/staffing_desk.prout` (a short synthetic desk), and `patterns/examples/staffing_limits.prout` (leap day, cooling-off, and a continued term) build with no errors.
+Five patterns were added. `patterns/examples/staffing.etsah` (the desk), `patterns/examples/staffing_desk.etsah` (a short synthetic desk), and `patterns/examples/staffing_limits.etsah` (leap day, cooling-off, and a continued term) build with no errors.
 
 - `timesheet` — submit, then client approval. `approver` is required. States run `draft → submitted → client_approved`, with `returned` for a send-back. `overtime_cap_hours` is a `Duration`. A timesheet that declares overtime needs an `overtime_agreement`. Comparing hours worked with the cap is a generated runtime check. The compiler does not read live hours.
 - `overtime_agreement` — the agreement's caps are slots. `warn_at_hours`, `on_warning: notify`, and `on_limit: reject` are required. `notify` does not stop submission. `reject` does. A cap above the general ceiling is an error.
@@ -34,7 +34,7 @@ Five patterns were added. `patterns/examples/staffing.prout` (the desk), `patter
 - `staffing_billing` — `bill_rate` and `pay_rate` are non-negative decimals (`Rate`). `bill_rate >= pay_rate` is checked in the spec. Equal rates pass. `1800.50` and `1800.5` are the same value. A spec with no `timesheet` is `E-POLICY`. Social insurance, employment insurance, premiums, and commuting are not subtracted. A non-negative gap can still lose money after those. This check is not a determination of equal pay for equal work.
 - `matching` — the staff skill field and the opening's required-skill field exist. It does not prove that the person's skills satisfy the opening.
 
-`patterns/examples/staffing_broken.prout` fails four pattern checks: an end date after the conflict date, a timesheet with no approver, a bill rate of `1500` under a pay rate of `1800.50`, and overtime with no agreement. `patterns/examples/staffing_limits_broken.prout` fails the ceiling checks and a calculated conflict date. `examples/staffing_broken.prout` fails three `E-PRE` checks: `1500 >= 1800`, day count `21641 <= 21640`, and `false == true`.
+`patterns/examples/staffing_broken.etsah` fails four pattern checks: an end date after the conflict date, a timesheet with no approver, a bill rate of `1500` under a pay rate of `1800.50`, and overtime with no agreement. `patterns/examples/staffing_limits_broken.etsah` fails the ceiling checks and a calculated conflict date. `examples/staffing_broken.etsah` fails three `E-PRE` checks: `1500 >= 1800`, day count `21641 <= 21640`, and `false == true`.
 
 A local build of the current tree matches the measurements recorded in the Japanese section. Run `python3 -m unittest discover -s tests -v` for the current test count. The compiler's output separates `[static]` checks, which it evaluated, from `[runtime]` checks, which it only described.
 
@@ -48,7 +48,7 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 
 ---
 
-# 人材派遣の基幹を PROUT で書く
+# 人材派遣の基幹を Etsah で書く
 
 対象は、人材派遣会社の基幹で繰り返す部分である。スタッフ、派遣先と案件、マッチング、個別契約と就業条件、勤怠と派遣先承認、請求と給与、粗利。抵触日は仕様に書いた派遣期間から計算し、36協定の上限はスロットである。一般則の天井（月45時間、年360時間、特別条項は年720時間、時間外+休日は月100時間未満、2〜6か月平均80時間、月45時間超は年6回）を超える設定はエラーにする。この天井は法令意見ではなく、社労士の確認が要る。判断が分かれるところはこの文書に残す。
 
@@ -58,11 +58,11 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 
 ### 契約層
 
-`examples/staffing_dates.prout` は、暦日と小数円で次を表現する。
+`examples/staffing_dates.etsah` は、暦日と小数円で次を表現する。
 
 - 請求単価 >= 支払単価。`Decimal` で、`1500.5 >= 1800.50` は `E-PRE`、`2800.50 >= 1800` は静的に通る。整数は `Decimal` の引数に渡せる。
 - 終了日 <= 抵触日。`2029-04-02 <= 2029-04-01` は `E-PRE`。`Date - Date` は日数の `Int`、`Date + Int` は日をずらした `Date`。
-- `examples/staffing.prout` は、以前の整数円と通算日の書き方を残している。`1500 >= 1800` と通算日 `21641 <= 21640` も引き続き `E-PRE` になる。
+- `examples/staffing.etsah` は、以前の整数円と通算日の書き方を残している。`1500 >= 1800` と通算日 `21641 <= 21640` も引き続き `E-PRE` になる。
 - 派遣先承認。`Bool` の `client_approved == true`。`false` は `E-PRE`。
 - 請求額の式。`Money * Int` は `Money` になる。`invoice_amount` の `impl rate * hours` は型が付く。
 - 効果。月次締めは `read(contracts)`、`write(invoices)`、`write(payroll)`、`emit(audit)` と一致しなければならない。
@@ -105,7 +105,7 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 
 ## 追加したパターン
 
-五つとも `patterns/examples/staffing.prout`（基幹）、`patterns/examples/staffing_desk.prout`（短期案件）、`patterns/examples/staffing_limits.prout`（うるう日・クーリング・通算）でビルドが通る。エラーは0である。
+五つとも `patterns/examples/staffing.etsah`（基幹）、`patterns/examples/staffing_desk.etsah`（短期案件）、`patterns/examples/staffing_limits.etsah`（うるう日・クーリング・通算）でビルドが通る。エラーは0である。
 
 ### `timesheet`
 
@@ -146,7 +146,7 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 - 計算した抵触日。通知日と同じなら、終了日の判定は上の比較に任せる。計算した日の方が早く、終了日がそれを超えるなら `E-POLICY`
 - 通知日と計算日が違えば `W-POLICY`。通知日は上書きしない
 
-計算は `patterns/staffing_rules.py` の `datetime` で行う。`prout.py` は触っていない。
+計算は `patterns/staffing_rules.py` の `datetime` で行う。`etsah.py` は触っていない。
 
 抵触日は、起算日の3年後の応当日である。これは「3年の期間が満了する日の翌日」で、応当日がある日は応当日そのものになる。2026-04-01 の起算なら 2029-04-01。2015-09-30 なら 2018-09-30。応当日が無い 2024-02-29 は、満了日を2027-02-28とし、抵触日を 2027-03-01 にする。
 
@@ -177,7 +177,7 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 - 特別条項では、年720（または設定値）、時間外+休日の月上限、2・3・4・5・6か月の各平均、月上限超過が年6回（または設定値）を、同じ `reject` で止める。月上限ちょうどは「超えた月」に数えない。100時間ちょうどは「100時間未満」に反する
 - 保存された契約から、同じ事業所・同じ人と組織単位で抵触日を再計算する。通知日と違えば警告し、通知日は残す
 
-`proutc build` は、この区別を標準出力と `manifest.json` の `runtime_checks` に出す。`phase` が `static` の行は仕様の評価、`runtime` の行は生成した検査である。レポートの `lib/labor/overtime_checks.ts` と `lib/labor/conflict_date.ts` は、その説明を成果物の行として数える。実ソースはまだ書き出さない。
+`etsahc build` は、この区別を標準出力と `manifest.json` の `runtime_checks` に出す。`phase` が `static` の行は仕様の評価、`runtime` の行は生成した検査である。レポートの `lib/labor/overtime_checks.ts` と `lib/labor/conflict_date.ts` は、その説明を成果物の行として数える。実ソースはまだ書き出さない。
 
 ### `staffing_billing`
 
@@ -191,34 +191,34 @@ The Japanese section ends with questions for the owner. Date literals and `Decim
 
 ## 壊した例
 
-`patterns/examples/staffing_broken.prout` はパターン検査が4件で落とす。
+`patterns/examples/staffing_broken.etsah` はパターン検査が4件で落とす。
 
 1. 終了日 `2029-04-02` が通知された抵触日 `2029-04-01` の後。開始が `2026-04-01` なので計算値も同じ日で、終了日のエラーは従来の比較が1件出す
 2. `timesheet` に `approver` が無い
 3. 請求単価 `1500` が支払単価 `1800.50` を下回る
 4. `overtime_hours` があるのに `overtime_agreement` が無い
 
-`patterns/examples/staffing_limits_broken.prout` は、上限と計算した抵触日で落とす。エラー7、警告1。
+`patterns/examples/staffing_limits_broken.etsah` は、上限と計算した抵触日で落とす。エラー7、警告1。
 
 - 月50時間、特別条項の年721時間、時間外+休日100時間、月45時間超が年7回
 - もう一つの勤怠に時間外があり、協定が無い
 - `2024-02-29` 開始の終了 `2027-03-02` が抵触日 `2027-03-01` の後
 - `2024-04-01` から通算した事業所の抵触日は `2027-04-01`。終了 `2027-04-02` はそれを超える。通知した `2029-04-01` は計算値と違うので警告にもなる。通知日だけ見ればこの終了日は通ってしまう
 
-`examples/staffing_broken.prout` は契約検査が3件の `E-PRE` で落とす。整数円 `1500 >= 1800`、通算日 `21641 <= 21640`、`false == true`。
+`examples/staffing_broken.etsah` は契約検査が3件の `E-PRE` で落とす。整数円 `1500 >= 1800`、通算日 `21641 <= 21640`、`false == true`。
 
 ## 検証
 
 ローカルで次を確認した。数値は実行結果である。
 
 - `python3 -m unittest discover -s tests` が通る。`tests/test_spec_contracts.py` の回帰を含めて 310 件成功する。
-- `python3 prout.py check examples/staffing.prout` はエラー 0、警告 3（整数エンコードの実行時ガード）。
-- `python3 prout.py check examples/staffing_dates.prout` はエラー 0、警告 4（保存した単価・日付・日数・承認）。
-- `python3 prout.py check examples/staffing_broken.prout` は `E-PRE` が 3。
-- `python3 prout.py check examples/staffing_dates_broken.prout` は `E-PRE` が 3（`1500.5 >= 1800.50`、`2029-04-02 <= 2029-04-01`、`false == true`）。
-- `patterns/examples/staffing.prout` はエラー 0。仕様 121 行、生成見積もり 3,732 行、展開 30.8 倍。
-- `patterns/examples/staffing_desk.prout` はエラー 0。仕様 75 行、生成見積もり 1,870 行、展開 24.9 倍。
-- `patterns/examples/staffing_limits.prout` はエラー 0。仕様 76 行、生成見積もり 1,943 行、展開 25.6 倍。出力に `[static]` と `[runtime]` の両方がある。
+- `python3 etsah.py check examples/staffing.etsah` はエラー 0、警告 3（整数エンコードの実行時ガード）。
+- `python3 etsah.py check examples/staffing_dates.etsah` はエラー 0、警告 4（保存した単価・日付・日数・承認）。
+- `python3 etsah.py check examples/staffing_broken.etsah` は `E-PRE` が 3。
+- `python3 etsah.py check examples/staffing_dates_broken.etsah` は `E-PRE` が 3（`1500.5 >= 1800.50`、`2029-04-02 <= 2029-04-01`、`false == true`）。
+- `patterns/examples/staffing.etsah` はエラー 0。仕様 121 行、生成見積もり 3,732 行、展開 30.8 倍。
+- `patterns/examples/staffing_desk.etsah` はエラー 0。仕様 75 行、生成見積もり 1,870 行、展開 24.9 倍。
+- `patterns/examples/staffing_limits.etsah` はエラー 0。仕様 76 行、生成見積もり 1,943 行、展開 25.6 倍。出力に `[static]` と `[runtime]` の両方がある。
 - 壊したパターン仕様は、上の4件と、上限・計算抵触日の7エラー1警告で失敗する。
 - `find "申請 承認"` の先頭は従来どおり `approval`、score 15。`勤怠`、`抵触日`、`請求 給与`、`マッチング` は新しいパターンを返す。
 - 既存の shop、経費、出張、備品、PC貸出はエラー 0 のままである。

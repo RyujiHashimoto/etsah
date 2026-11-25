@@ -1,4 +1,4 @@
-# PROUT v0.6 — a contract language for AI
+# Etsah v0.6 — a contract language for AI
 
 This is an English translation of [SPEC.md](SPEC.md). The Japanese text is the original. If the two disagree, `SPEC.md` wins.
 
@@ -6,11 +6,11 @@ This is an English translation of [SPEC.md](SPEC.md). The Japanese text is the o
 
 As AI writes more code, the bottleneck moves from writing to checking. Existing general-purpose languages optimize for a human reader and a human author. They are not optimized for a loop in which an AI generates, an AI verifies, and a human confirms through a GUI.
 
-PROUT is a small language that assumes this division of work:
+Etsah is a small language that assumes this division of work:
 
-- An **AI** writes the specification and the skeleton of the implementation in PROUT, and a different AI verifies them.
+- An **AI** writes the specification and the skeleton of the implementation in Etsah, and a different AI verifies them.
 - The **checker** checks types, effects, contracts, and policy deterministically.
-- A **human** does not have to read PROUT directly. They confirm a natural-language summary and a GUI.
+- A **human** does not have to read Etsah directly. They confirm a natural-language summary and a GUI.
 
 ## Design principles
 
@@ -113,16 +113,17 @@ Triggers:
 
 The period boundary is `Asia/Tokyo`. There is no syntax to change it per task.
 
-The checker does not run cron, does not store remaining budget, and does not store an idempotency key. The static rules are:
+The checker does not run cron, does not store the remaining integer-yen budget, and does not store an idempotency key. `etsah guard` does store call counts and decimal spend. The static rules are:
 
 1. A task's `eff` equals the union of the effects of the ops it calls (`E-EFF`). That union must be a subset of the agent's `allow`. An effect outside the allow list is `E-POLICY`.
 2. An `emit` or `net` listed in `policy external`, every `spend`, and a `write` listed in `policy contract` need a `gate` whose `before` names that effect. Otherwise `E-POLICY`. An internal `emit` (one not listed as external) needs no gate. Whether a company-wide Slack notice is external is decided by whether that target is written in `policy external`.
 3. An agent allowed to `spend` has `budget run` and `budget period` as integers of at least 1 yen, and the per-run budget is at most the period budget. An agent that may not `spend` has budget 0. A task's own `budget` follows the same rule and may not exceed the agent's budget.
-4. `limit emit` and `limit net` are at least 1 when that effect is allowed, and 0 when it is not. The unit is one hour.
-5. `retry` is from 0 through 5. After that, the task escalates to the human role in `escalate`. That handoff is not part of the agent's `allow`. If escalation points at an op or an agent whose effect needs a gate, that is `E-POLICY`.
-6. `key` is a parameter or a field of a parameter. Idempotency identity is agent, task, and key. Changing the program hash is not a reason to repeat an external effect. The store itself does not exist yet.
-7. `audit ast_hash` is required on an agent. The audit identity is the full 64-hex SHA-256 of the normalized AST (`ast_digest`). The displayed `ast_hash` remains the first 12 hex digits.
-8. An approver is a human role. An agent's name cannot be an `approver`. The check does not yet prove that `on_approved` is the only call that performs the external effect.
+4. `limit emit` and `limit net` are at least 1 when that effect is allowed, and 0 when it is not. The unit is one hour. These are static caps. The checker does not count them down.
+5. `limit calls N period hour|day|month` and `limit spend AMOUNT CURRENCY period hour|day|month` may be written on an `agent`, a `task`, or an `op`. The count is a positive integer. The amount is a positive decimal. The currency is three uppercase letters. Period boundaries use `Asia/Tokyo`. A `spend` op names the amount with `spend from argument[.field] currency CURRENCY`, and that type must be `Decimal`. A task limit above the agent's limit for the same period and currency is `E-POLICY`. A task that `spend`s without a decimal cap on the task, the agent, or that op is a warning (`W-BUDGET`), not an error. A missing integer-yen `budget` is still `E-POLICY`.
+6. `retry` is from 0 through 5. After that, the task escalates to the human role in `escalate`. That handoff is not part of the agent's `allow`. If escalation points at an op or an agent whose effect needs a gate, that is `E-POLICY`.
+7. `key` is a parameter or a field of a parameter. Idempotency identity is agent, task, and key. Changing the program hash is not a reason to repeat an external effect. The store itself does not exist yet.
+8. `audit ast_hash` is required on an agent. The audit identity is the full 64-hex SHA-256 of the normalized AST (`ast_digest`). The displayed `ast_hash` remains the first 12 hex digits.
+9. An approver is a human role. An agent's name cannot be an `approver`. The check does not yet prove that `on_approved` is the only call that performs the external effect.
 
 Whether a `net` target is on the allow list (default `stripe`) is still the op policy check. `policy external` decides whether that target also needs a gate.
 
@@ -201,15 +202,15 @@ Three other roads are available.
 
 1. A common intermediate representation (LLVM IR, MLIR, WebAssembly, GraalVM). Meaning can be kept, but this is a platform, not a superset of the source language.
 2. A host language that embeds other languages (Racket `#lang`, Scala string interpolation, MPS). Meaning is delegated at each boundary.
-3. A metalanguage of contracts and effects (PROUT). The implementation language stays. A checkable contract is laid on top of it.
+3. A metalanguage of contracts and effects (Etsah). The implementation language stays. A checkable contract is laid on top of it.
 
-PROUT chooses 3. `impl` may be Python, Rust, or SQL. PROUT carries only "what is guaranteed." It connects to every language. It does not contain every language.
+Etsah chooses 3. `impl` may be Python, Rust, or SQL. Etsah carries only "what is guaranteed." It connects to every language. It does not contain every language.
 
 ## Implications for reverse engineering
 
-A contract layer like PROUT can turn reverse engineering from "recover the meaning" into "check the contract."
+A contract layer like Etsah can turn reverse engineering from "recover the meaning" into "check the contract."
 
-- If AI-generated code ships with a PROUT contract, a reviewer can check that the implementation matches the contract, instead of guessing intent from a binary or from obfuscated code.
+- If AI-generated code ships with an Etsah contract, a reviewer can check that the implementation matches the contract, instead of guessing intent from a binary or from obfuscated code.
 - A shared representation of effects and data flow makes comparison across languages easier. Behavior can be compared by what is read, what is written, and where it is sent, rather than by a raw list of API calls.
 - Information destroyed by compilation does not come back: optimization, inlining, stripped symbols, obfuscation, packing. Recovering meaning from a binary is in general undecidable. What an analyst finds is one program that matches the inputs they observed.
 - A self-asserted contract can be a lie. A contract is trustworthy only after it has been checked. That cuts both ways, for defenders and for attackers.
@@ -292,7 +293,7 @@ The reason is 1 to 200 characters and contains no newline. An allowed `declassif
 
 The order is arguments (`E-IFLOW-ARG`), return values (`E-IFLOW-RET`), contract expressions (`E-IFLOW-CONTRACT`), sinks (`E-IFLOW-SINK`), `sends` (`E-SINK`, `E-SINK-UNBOUND`), policy (`E-POLICY`), and `declassify` (`E-DECLASS`, `W-DECLASS`). Diagnostics carry a line and a suggested fix. `--json` puts "which value flowed into which argument" in `context`.
 
-A program with no label declaration, no annotation, and no information-flow policy skips the information-flow check entirely. Existing ASTs and hashes stay the same. `examples/refund_fixed.prout` remains `bae8501e8b3f`.
+A program with no label declaration, no annotation, and no information-flow policy skips the information-flow check entirely. Existing ASTs and hashes stay the same. `examples/refund_fixed.etsah` remains `bae8501e8b3f`.
 
 ### Limits
 

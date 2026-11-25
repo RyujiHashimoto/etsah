@@ -1,4 +1,4 @@
-# PROUT 情報フロー制御の設計（v0.1）
+# Etsah 情報フロー制御の設計（v0.1）
 
 ## 要約
 
@@ -146,7 +146,7 @@ primary        = ... | "declassify" "(" expr "," label_ref "," expr ")" ;
 
 ### 4.3 ラベル宣言
 
-```prout
+```etsah
 label pii "個人情報"
 label secret "秘密情報"
 label internal "社内情報"
@@ -159,7 +159,7 @@ label internal "社内情報"
 
 ### 4.4 型
 
-```prout
+```etsah
 type Customer {
   id: Id
   email: String @pii
@@ -181,7 +181,7 @@ type Money
 
 ### 4.5 op と flow のシグネチャ
 
-```prout
+```etsah
 op send_receipt(to: String @pii, body: String) -> Receipt
   eff net(email)
   sends to, body -> net(email)
@@ -197,7 +197,7 @@ op send_receipt(to: String @pii, body: String) -> Receipt
 
 ラベルだけでは「どの引数がどの sink へ流れるか」が分からない。特に `impl native` は本体が見えないため、明示的な束縛が必要になる。
 
-```prout
+```etsah
 op send_receipt(to: String @pii, body: String) -> Receipt
   eff net(email)
   sends to, body -> net(email)
@@ -231,7 +231,7 @@ op health_check() -> Bool
 
 ### 4.7 `policy`
 
-```prout
+```etsah
 policy
   sink net(email) accepts pii
   sink write(customers) accepts pii
@@ -284,7 +284,7 @@ def check_sink(effect, labels):
 
 ラベルを下げる唯一の操作。式として書く。
 
-```prout
+```etsah
 declassify(customer.email, pii, "領収書の宛先に使う")
 ```
 
@@ -302,7 +302,7 @@ declassify(customer.email, pii, "領収書の宛先に使う")
 
 許可は `policy` に書く。
 
-```prout
+```etsah
 policy
   declassify pii in masked_email require role support
 ```
@@ -361,7 +361,7 @@ String @pii @secret -> String @pii       拒否（secret を扱えない文脈�
 
 ### 5.4 レコードとフィールド
 
-```prout
+```etsah
 type Customer {
   id: Id
   email: String @pii
@@ -466,7 +466,7 @@ op の `impl` が別の op の呼び出しなら、その戻り値ラベルを�
 
 `pre` と `post` の式は public でなければならない。`labels(type_of(expr)) = ∅`。違反は `E-IFLOW-CONTRACT`。
 
-```prout
+```etsah
 op find_customer(email: String @pii) -> Customer
   pre email != ""          # E-IFLOW-CONTRACT
   eff read(customers)
@@ -601,7 +601,7 @@ v0.1 の `&&` / `||` は短絡評価をせず、両辺のラベルの和集合�
 
 ### 8.1 安全な例
 
-```prout
+```etsah
 label pii "個人情報"
 label secret "秘密情報"
 label internal "社内情報"
@@ -646,7 +646,7 @@ flow receipt(customer_id: Id) -> Receipt
 
 ### 8.2 違反例: 引数
 
-```prout
+```etsah
 flow leak(customer_id: Id) -> Bool
   eff read(customers), net(analytics)
   let customer = customers.get(customer_id)
@@ -664,7 +664,7 @@ flow leak(customer_id: Id) -> Bool
 
 ### 8.3 違反例: 戻り値
 
-```prout
+```etsah
 flow expose(customer_id: Id) -> String
   eff read(customers)
   let customer = customers.get(customer_id)
@@ -680,7 +680,7 @@ flow expose(customer_id: Id) -> String
 
 ### 8.4 違反例: 契約
 
-```prout
+```etsah
 op find_customer(email: String @pii) -> Customer
   pre email != ""
   eff read(customers)
@@ -696,7 +696,7 @@ op find_customer(email: String @pii) -> Customer
 
 ### 8.5 declassify を使う例
 
-```prout
+```etsah
 op mask_email(email: String @pii) -> String @pii
   impl native
 
@@ -722,7 +722,7 @@ flow masked_email(customer_id: Id) -> Bool
 
 ### 8.6 違反例: レコードの declassify
 
-```prout
+```etsah
 flow anonymize(customer_id: Id) -> Bool
   eff read(customers)
   let customer = customers.get(customer_id)
@@ -739,7 +739,7 @@ flow anonymize(customer_id: Id) -> Bool
 
 ### 8.7 違反例: native の sends 不足
 
-```prout
+```etsah
 op save_customer(customer: Customer) -> Id
   eff write(customers)
   impl native
@@ -820,7 +820,7 @@ op save_customer(customer: Customer) -> Id
 
 ### 9.3 後方互換の確認
 
-- `examples/refund_fixed.prout` のハッシュが `bae8501e8b3f` のままであること。
+- `examples/refund_fixed.etsah` のハッシュが `bae8501e8b3f` のままであること。
 - `tests/test_ast.py` の既存ケースがすべて通ること。
 - ラベルだけを追加したプログラムと、ラベルの順序を入れ替えたプログラムのハッシュが一致すること。
 
@@ -917,7 +917,7 @@ op save_customer(customer: Customer) -> Id
 
 ### 11.0 実装状況（2026年11月）
 
-v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。AIタスクの検査と合わせ、スイート全体は231件。`examples/information_flow_safe.prout` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.prout` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.prout` のハッシュは `bae8501e8b3f` のまま変わらない。
+v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。AIタスクの検査と合わせ、スイート全体は231件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
 
 | 項目 | 状態 |
 |---|---|
@@ -940,14 +940,14 @@ v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_
 5. **ハッシュ** — 9章の追加キーを空のとき省略する形で実装。既存ハッシュを維持する。
 6. **CLI** — `check --json` の `context` を追加。`ast` にラベル・ポリシー・`sends` を追加。
 7. **テスト** — `tests/test_information_flow.py` を追加。既存133件はそのまま通す。
-8. **サンプル** — `examples/information_flow_safe.prout` と `examples/information_flow_leak.prout` を追加。後者は CI で失敗することを確認する。
+8. **サンプル** — `examples/information_flow_safe.etsah` と `examples/information_flow_leak.etsah` を追加。後者は CI で失敗することを確認する。
 9. **ドキュメント** — `SPEC.md` に情報フローの節を追加。`README.md` からこの設計書へリンクする。
 
 ### 11.2 v0.2（分岐とパターン層）
 
 - `if` / `else` を flow に追加し、PC ラベルを実装する。
 - パターン manifest の `data_policy`、マージ、`security.json`、レポートバッジを実装する。
-- `patterns/proutc.py` の `build` に `security.json` を追加する。
+- `patterns/etsahc.py` の `build` に `security.json` を追加する。
 - パターンの `auth.roles` と `declassify.require role` を照合する。
 
 ### 11.3 v0.3（実行時強制）
@@ -1004,9 +1004,9 @@ v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_
 ### 11.5 受け入れ条件
 
 - `python3 -m unittest discover -s tests` が全件成功する。
-- `python3 prout.py check examples/information_flow_safe.prout` がエラー0。
-- `python3 prout.py check examples/information_flow_leak.prout` が `E-IFLOW-ARG` または `E-IFLOW-SINK` で失敗する。
-- `examples/refund_fixed.prout` のハッシュが `bae8501e8b3f` のまま。
+- `python3 etsah.py check examples/information_flow_safe.etsah` がエラー0。
+- `python3 etsah.py check examples/information_flow_leak.etsah` が `E-IFLOW-ARG` または `E-IFLOW-SINK` で失敗する。
+- `examples/refund_fixed.etsah` のハッシュが `bae8501e8b3f` のまま。
 - `human-view.html` の再生成差分がない。
 - CI が成功する。
 
@@ -1017,7 +1017,7 @@ v0.1 の静的検査は `prout.py` に実装済みで、`tests/test_information_
 - v0.1 では暗黙フローを扱わない。分岐・例外・タイミングなどによる漏洩は将来の課題。
 - ラベルは暗号化ではない。`secret` とラベルしても、保存時・通信時の暗号化は別途必要。
 - ネイティブ op の `sends` は宣言を信頼する。悪意ある native 実装は、ランタイムの能力制限でしか止められない。
-- 完全な情報フロー制御は決定不能な部分を含む。PROUT は「高リスクなフローを止める実用的な型システム」を目指す。
+- 完全な情報フロー制御は決定不能な部分を含む。Etsah は「高リスクなフローを止める実用的な型システム」を目指す。
 - 型引数の中のラベルを追跡しないため、`List<String @pii>` のようなコレクションの要素ラベルは表現できない。v0.2 以降の課題。
 
 ## 13. 未決事項

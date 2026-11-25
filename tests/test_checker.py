@@ -317,7 +317,7 @@ class TestPreconditions(unittest.TestCase):
             "flow handle(order: Order) -> Int",
             f"  return refund(order, {argument})",
         ]
-        from prout import Checker, Parser
+        from etsah import Checker, Parser
 
         return Checker(Parser("\n".join(lines) + "\n").parse()).check()
 
@@ -518,10 +518,10 @@ class TestMoney(unittest.TestCase):
 class TestCli(unittest.TestCase):
     def _run(self, source: str, *args: str, dedent: bool = True) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "sample.prout"
+            path = Path(tmp) / "sample.etsah"
             path.write_text(snippet(source) if dedent else source, encoding="utf-8")
             return subprocess.run(
-                [sys.executable, str(ROOT / "prout.py"), *args, str(path)],
+                [sys.executable, str(ROOT / "etsah.py"), *args, str(path)],
                 capture_output=True,
                 text=True,
                 check=False,

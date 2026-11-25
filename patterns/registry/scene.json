@@ -10,6 +10,6 @@
   },
   "effects": [],
   "artifacts": [{"path": "story.html#scene-{Entity}", "kind": "HTML", "lines": 8, "desc": "選択できる場面"}],
-  "examples": ["examples/moon_garden.prout", "examples/fraction_quiz.prout"],
+  "examples": ["examples/moon_garden.etsah", "examples/fraction_quiz.etsah"],
   "provenance": {"author": "OpenAI Codex", "date": "2026-11-22", "extracted_from": ["moon_garden", "fraction_quiz"]}
 }

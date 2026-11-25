@@ -181,16 +181,16 @@
     {"path": "lib/automation/{target_lower}.ts", "kind": "TS", "lines": 80, "desc": "{Entity}の起動、予算、再試行、ASTハッシュの監査行"},
     {"path": "tests/automation/{target_lower}.test.ts", "kind": "TEST", "lines": 45, "desc": "ゲートと予算の契約テスト"}
   ],
-  "examples": ["examples/ai_automation.prout", "examples/ai_desk.prout"],
+  "examples": ["examples/ai_automation.etsah", "examples/ai_desk.etsah"],
   "notes": [
-    "パターン層はスロットを検査する。契約層の agent / task は prout.py が別途検査する。このコンパイラは prout.py を読まない。",
+    "パターン層はスロットを検査する。契約層の agent / task は etsah.py が別途検査する。このコンパイラは etsah.py を読まない。",
     "audit が ast_hash であることは必須にする。ハッシュの計算は契約層の ast_hash の仕事で、このコンパイラは呼ばない。",
     "steps は op の呼び出しではない。custom か適用済みパターンの名前である。",
     "予算と回数の数値は宣言である。実行時のカウンタはまだ無い。",
     "承認ゲートの on_approved が、その外部効果の唯一の実行箇所であることまでは見ていない。"
   ],
   "provenance": {
-    "author": "PROUT automation proposal",
+    "author": "Etsah automation proposal",
     "date": "2026-11-22",
     "extracted_from": ["staffing", "pc_rental", "inquiry_triage"],
     "note": "人材派遣、PCレンタル、問い合わせ仕分けに共通する自動タスクの器。外部効果は承認ゲートに結ぶ。"

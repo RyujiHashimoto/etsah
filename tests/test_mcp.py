@@ -1,6 +1,6 @@
 """MCP server protocol tests and the decisions behind the tools.
 
-The protocol cases spawn ``prout mcp``. Decision cases call the same functions
+The protocol cases spawn ``etsah mcp``. Decision cases call the same functions
 the server calls, so a verdict does not depend on the transport.
 """
 from __future__ import annotations
@@ -14,11 +14,11 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_api import check_file
-from prout_mcp.decide import ALLOW, ASK, BLOCK, check_plan, check_report, decide_call, load_contract
-from prout_mcp.explain import explain_code
-from prout_mcp.framing import read_message, write_message
-from prout_mcp.imports import import_definitions
+from etsah_api import check_file
+from etsah_mcp.decide import ALLOW, ASK, BLOCK, check_plan, check_report, decide_call, load_contract
+from etsah_mcp.explain import explain_code
+from etsah_mcp.framing import read_message, write_message
+from etsah_mcp.imports import import_definitions
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "examples" / "agents"
@@ -180,7 +180,7 @@ task draft_invoice(ticket_id: Id) -> Id
 
 class DecisionTests(unittest.TestCase):
     def test_task_verdicts_on_the_shipped_contracts(self) -> None:
-        reply = check_report(_read_contract("support_reply.prout"))
+        reply = check_report(_read_contract("support_reply.etsah"))
         self.assertTrue(reply["ok"])
         self.assertEqual(reply["plans"][0]["verdict"], ASK)
         self.assertIn("support_lead", reply["plans"][0]["reason"])
@@ -188,7 +188,7 @@ class DecisionTests(unittest.TestCase):
         self.assertTrue(reply["ast_hash"])
         self.assertEqual(len(reply["audit_id"]), 64)
 
-        broken = check_report(_read_contract("support_reply_broken.prout"))
+        broken = check_report(_read_contract("support_reply_broken.etsah"))
         self.assertFalse(broken["ok"])
         self.assertEqual(broken["plans"][0]["verdict"], BLOCK)
         self.assertIn("emit to an external party has no approval gate", broken["plans"][0]["reason"])
@@ -196,22 +196,22 @@ class DecisionTests(unittest.TestCase):
         self.assertGreater(broken["diagnostics"][0]["line"], 0)
         self.assertIn("message", broken["diagnostics"][0])
 
-        triage = check_report(_read_contract("github_triage.prout"), allow_net=["github"])
+        triage = check_report(_read_contract("github_triage.etsah"), allow_net=["github"])
         self.assertTrue(triage["ok"])
         self.assertEqual(triage["plans"][0]["verdict"], ALLOW)
 
-        denied = check_report(_read_contract("github_triage.prout"))
+        denied = check_report(_read_contract("github_triage.etsah"))
         self.assertFalse(denied["ok"])
         self.assertEqual(denied["plans"][0]["verdict"], BLOCK)
         self.assertIn("github", denied["plans"][0]["reason"])
 
-        invoice = load_contract(_read_contract("invoice.prout"))
+        invoice = load_contract(_read_contract("invoice.etsah"))
         self.assertTrue(invoice.ok)
         self.assertEqual(decide_call(invoice, "ledger.draft").verdict, ALLOW)
         self.assertEqual(decide_call(invoice, "payments.charge").verdict, ASK)
         self.assertIn("billing_lead", decide_call(invoice, "payments.charge").reason)
 
-        cancel = load_contract(_read_contract("subscription_cancel.prout"))
+        cancel = load_contract(_read_contract("subscription_cancel.etsah"))
         self.assertTrue(cancel.ok)
         self.assertEqual(decide_call(cancel, "subscriptions.lookup").verdict, ALLOW)
         blocked_change = decide_call(cancel, "subscriptions.cancel")
@@ -248,7 +248,7 @@ class DecisionTests(unittest.TestCase):
 
     def test_a_broken_contract_blocks_every_step(self) -> None:
         plan = check_plan(
-            _read_contract("support_reply_broken.prout"),
+            _read_contract("support_reply_broken.etsah"),
             [{"tool": "tickets.read"}, {"name": "mail.send_reply"}],
         )
         self.assertFalse(plan["ok"])
@@ -335,7 +335,7 @@ class DecisionTests(unittest.TestCase):
 
 class ProtocolTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.rpc = RpcProcess([sys.executable, str(ROOT / "prout.py"), "mcp"])
+        self.rpc = RpcProcess([sys.executable, str(ROOT / "etsah.py"), "mcp"])
 
     def tearDown(self) -> None:
         self.rpc.close()
@@ -346,12 +346,12 @@ class ProtocolTests(unittest.TestCase):
             {
                 "protocolVersion": "2025-03-26",
                 "capabilities": {},
-                "clientInfo": {"name": "prout-test", "version": "0"},
+                "clientInfo": {"name": "etsah-test", "version": "0"},
             },
         )
         result = initialized["result"]
         self.assertEqual(result["protocolVersion"], "2025-03-26")
-        self.assertEqual(result["serverInfo"]["name"], "prout")
+        self.assertEqual(result["serverInfo"]["name"], "etsah")
         self.assertIn("tools", result["capabilities"])
         self.rpc.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         ping = self.rpc.request("ping", {})
@@ -361,7 +361,7 @@ class ProtocolTests(unittest.TestCase):
         tools = {tool["name"]: tool for tool in listed["result"]["tools"]}
         self.assertEqual(
             set(tools),
-            {"prout_check", "prout_import_tools", "prout_explain", "prout_check_plan"},
+            {"etsah_check", "etsah_import_tools", "etsah_explain", "etsah_check_plan"},
         )
         for tool in tools.values():
             self.assertEqual(tool["inputSchema"]["type"], "object")
@@ -369,15 +369,15 @@ class ProtocolTests(unittest.TestCase):
             self.assertTrue(tool["annotations"]["readOnlyHint"])
             self.assertFalse(tool["annotations"]["destructiveHint"])
             self.assertFalse(tool["annotations"]["openWorldHint"])
-        self.assertEqual(tools["prout_check"]["inputSchema"]["required"], ["source"])
-        self.assertEqual(tools["prout_import_tools"]["inputSchema"]["required"], ["tools"])
-        self.assertEqual(tools["prout_explain"]["inputSchema"]["required"], ["code"])
-        self.assertEqual(tools["prout_check_plan"]["inputSchema"]["required"], ["source", "steps"])
+        self.assertEqual(tools["etsah_check"]["inputSchema"]["required"], ["source"])
+        self.assertEqual(tools["etsah_import_tools"]["inputSchema"]["required"], ["tools"])
+        self.assertEqual(tools["etsah_explain"]["inputSchema"]["required"], ["code"])
+        self.assertEqual(tools["etsah_check_plan"]["inputSchema"]["required"], ["source", "steps"])
 
         checked = _tool_payload(
             self.rpc.request(
                 "tools/call",
-                {"name": "prout_check", "arguments": {"source": _read_contract("support_reply.prout")}},
+                {"name": "etsah_check", "arguments": {"source": _read_contract("support_reply.etsah")}},
             )
         )
         self.assertTrue(checked["ok"])
@@ -385,7 +385,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(checked["diagnostics"], [])
 
         explained = _tool_payload(
-            self.rpc.request("tools/call", {"name": "prout_explain", "arguments": {"code": "E-POLICY"}})
+            self.rpc.request("tools/call", {"name": "etsah_explain", "arguments": {"code": "E-POLICY"}})
         )
         self.assertTrue(explained["known"])
         self.assertTrue(explained["suggested_fix"])
@@ -394,7 +394,7 @@ class ProtocolTests(unittest.TestCase):
             self.rpc.request(
                 "tools/call",
                 {
-                    "name": "prout_import_tools",
+                    "name": "etsah_import_tools",
                     "arguments": {
                         "kind": "mcp",
                         "tools": {
@@ -421,9 +421,9 @@ class ProtocolTests(unittest.TestCase):
             self.rpc.request(
                 "tools/call",
                 {
-                    "name": "prout_check_plan",
+                    "name": "etsah_check_plan",
                     "arguments": {
-                        "source": _read_contract("support_reply.prout"),
+                        "source": _read_contract("support_reply.etsah"),
                         "steps": [
                             {"tool": "tickets.read", "arguments": {"ticket_id": "T-1042"}},
                             {"tool": "mail.send_reply", "arguments": {}},
@@ -436,9 +436,9 @@ class ProtocolTests(unittest.TestCase):
         self.assertFalse(plan["ok"])
         self.assertEqual([step["verdict"] for step in plan["steps"]], [ALLOW, ASK, BLOCK])
         self.assertTrue(plan["needs_approval"])
-        self.assertEqual(plan["audit_id"], check_file(AGENTS / "support_reply.prout").audit_id)
+        self.assertEqual(plan["audit_id"], check_file(AGENTS / "support_reply.etsah").audit_id)
 
-        missing = self.rpc.request("tools/call", {"name": "prout_check", "arguments": {}})
+        missing = self.rpc.request("tools/call", {"name": "etsah_check", "arguments": {}})
         self.assertTrue(missing["result"]["isError"])
         unknown = self.rpc.request("no/such", {})
         self.assertEqual(unknown["error"]["code"], -32601)
@@ -447,13 +447,13 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(bad_params["error"]["code"], -32602)
 
     def test_module_entry_point_initializes(self) -> None:
-        other = RpcProcess([sys.executable, "-m", "prout_mcp"])
+        other = RpcProcess([sys.executable, "-m", "etsah_mcp"])
         try:
             reply = other.request(
                 "initialize",
                 {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "mod", "version": "0"}},
             )
-            self.assertEqual(reply["result"]["serverInfo"]["name"], "prout")
+            self.assertEqual(reply["result"]["serverInfo"]["name"], "etsah")
             self.assertEqual(reply["result"]["protocolVersion"], "2024-11-05")
         finally:
             other.close()

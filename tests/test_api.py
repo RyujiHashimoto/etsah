@@ -5,18 +5,18 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_api import check_file, check_source
+from etsah_api import check_file, check_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
 # Display hashes for programs that do not declare agent or task.
 SAMPLE_HASHES = {
-    "refund_broken.prout": "c0ee67d7cba1",
-    "refund_fixed.prout": "bae8501e8b3f",
-    "staffing.prout": "afd29e7ccdd0",
-    "staffing_broken.prout": "afbf07d01bd2",
-    "staffing_dates.prout": "ecc914507aae",
-    "staffing_dates_broken.prout": "5a9f7cb9dd46",
+    "refund_broken.etsah": "c0ee67d7cba1",
+    "refund_fixed.etsah": "bae8501e8b3f",
+    "staffing.etsah": "afd29e7ccdd0",
+    "staffing_broken.etsah": "afbf07d01bd2",
+    "staffing_dates.etsah": "ecc914507aae",
+    "staffing_dates_broken.etsah": "5a9f7cb9dd46",
 }
 
 
@@ -35,13 +35,13 @@ class CheckSourceTests(unittest.TestCase):
         self.assertEqual(diagnostic.as_dict()["code"], "E-PARSE")
 
     def test_clean_task_returns_a_plan_and_the_display_hash(self) -> None:
-        result = check_file(ROOT / "examples" / "agents" / "support_reply.prout")
+        result = check_file(ROOT / "examples" / "agents" / "support_reply.etsah")
         self.assertTrue(result.ok)
         self.assertEqual(result.diagnostics, ())
         self.assertEqual(len(result.ast_hash), 12)
         self.assertEqual(len(result.audit_id), 64)
         self.assertTrue(result.audit_id.startswith(result.ast_hash))
-        self.assertEqual(result.path, str(ROOT / "examples" / "agents" / "support_reply.prout"))
+        self.assertEqual(result.path, str(ROOT / "examples" / "agents" / "support_reply.etsah"))
         self.assertEqual(len(result.plans), 1)
         plan = result.plans[0]
         self.assertEqual(plan.name, "draft_reply")
@@ -55,7 +55,7 @@ class CheckSourceTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
 
     def test_policy_failure_keeps_the_plan_and_names_the_line(self) -> None:
-        result = check_file(ROOT / "examples" / "agents" / "support_reply_broken.prout")
+        result = check_file(ROOT / "examples" / "agents" / "support_reply_broken.etsah")
         self.assertFalse(result.ok)
         errors = [item for item in result.diagnostics if item.severity == "error"]
         self.assertEqual([item.code for item in errors], ["E-POLICY"])
@@ -65,7 +65,7 @@ class CheckSourceTests(unittest.TestCase):
         self.assertEqual(result.plans[0].gates, ())
 
     def test_allow_net_is_passed_through(self) -> None:
-        path = ROOT / "examples" / "agents" / "github_triage.prout"
+        path = ROOT / "examples" / "agents" / "github_triage.etsah"
         blocked = check_file(path)
         self.assertFalse(blocked.ok)
         self.assertTrue(any("github" in item.message for item in blocked.diagnostics))
@@ -84,7 +84,7 @@ class CheckSourceTests(unittest.TestCase):
         self.assertIn("denied", result.diagnostics[0].message)
 
     def test_a_warning_stays_ok_and_keeps_the_sample_hash(self) -> None:
-        result = check_file(ROOT / "examples" / "refund_fixed.prout")
+        result = check_file(ROOT / "examples" / "refund_fixed.etsah")
         self.assertTrue(result.ok)
         self.assertEqual(result.ast_hash, "bae8501e8b3f")
         warnings = [item for item in result.diagnostics if item.severity == "warning"]
@@ -100,7 +100,7 @@ class CheckSourceTests(unittest.TestCase):
 
     def test_missing_file_raises(self) -> None:
         with self.assertRaises(OSError):
-            check_file(ROOT / "examples" / "agents" / "missing.prout")
+            check_file(ROOT / "examples" / "agents" / "missing.etsah")
 
 
 if __name__ == "__main__":

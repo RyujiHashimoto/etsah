@@ -1,0 +1,37 @@
+# GitHub issue triage for the fictional repo example-org/widget.
+# Both calls stay on the host named github. That host is not in the default
+# allowlist, so the check passes only when github is named:
+#   python3 etsah.py check examples/agents/github_triage.etsah --allow-net github
+# limit net is the hourly cap. No issue is opened or labeled for real.
+
+type Id
+type Issue
+
+op github.list_issues(repo: Id) -> Issue
+  doc "Read one open issue from the allowlisted GitHub host"
+  eff read(issues), net(github)
+  impl native
+
+op github.add_label(issue: Issue) -> Bool
+  doc "Write the needs-review label through the allowlisted GitHub host"
+  eff write(issues), net(github)
+  impl native
+
+agent issue_triage
+  doc "Labels issues on github, at most 30 network calls an hour"
+  allow read(issues), write(issues), net(github)
+  budget run 0 period 0
+  limit net 30 hour
+  limit emit 0 hour
+  audit ast_hash
+
+task triage_open_issues(repo: Id) -> Bool
+  agent issue_triage
+  doc "Label open issues. The host must be on the net allowlist."
+  trigger schedule "15 9 * * 1-5"
+  eff read(issues), write(issues), net(github)
+  key repo
+  retry 2 escalate maintainer
+  let issue = github.list_issues(repo)
+  let labeled = github.add_label(issue)
+  return labeled

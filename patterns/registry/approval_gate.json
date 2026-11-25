@@ -62,7 +62,7 @@
     {"path": "lib/gates/{target_lower}.ts", "kind": "TS", "lines": 40, "desc": "承認後フック"},
     {"path": "tests/gates/{target_lower}.test.ts", "kind": "TEST", "lines": 35, "desc": "未承認では作用しないテスト"}
   ],
-  "examples": ["examples/ai_automation.prout", "examples/ai_desk.prout"],
+  "examples": ["examples/ai_automation.etsah", "examples/ai_desk.etsah"],
   "notes": [
     "パターン名のうしろに名前が要る。タスクの approval スロットはその名前を指す。",
     "action が emit または net で audience が external のとき、対応する ai_task はここを指さないと E-POLICY になる。",
@@ -71,7 +71,7 @@
     "demo.html のボタン操作は approval のままである。このパターンの画面遷移はまだ生成していない。"
   ],
   "provenance": {
-    "author": "PROUT automation proposal",
+    "author": "Etsah automation proposal",
     "date": "2026-11-22",
     "extracted_from": ["staffing", "pc_rental", "inquiry_triage"],
     "note": "メール、請求、支払い、契約変更を人が許可してから動かす。"

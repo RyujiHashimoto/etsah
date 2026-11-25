@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 import support  # noqa: F401
-from prout import Checker, Parser, ProutError, ast_hash, parse_expr, program_to_dict
+from etsah import Checker, Parser, ProutError, ast_hash, parse_expr, program_to_dict
 from support import ROOT, check, codes, snippet
 
 
@@ -164,10 +164,10 @@ class TestExistingHashes(unittest.TestCase):
         # These match origin/main after pre/post canonicalization. Date and
         # Decimal literals are absent from these files, so their hashes stay put.
         expected = {
-            "refund_broken.prout": "c0ee67d7cba1",
-            "refund_fixed.prout": "bae8501e8b3f",
-            "staffing.prout": "afd29e7ccdd0",
-            "staffing_broken.prout": "afbf07d01bd2",
+            "refund_broken.etsah": "c0ee67d7cba1",
+            "refund_fixed.etsah": "bae8501e8b3f",
+            "staffing.etsah": "afd29e7ccdd0",
+            "staffing_broken.etsah": "afbf07d01bd2",
         }
         for name, digest in expected.items():
             program = Parser((ROOT / "examples" / name).read_text(encoding="utf-8")).parse()
@@ -176,12 +176,12 @@ class TestExistingHashes(unittest.TestCase):
 
 class TestStaffingDateSamples(unittest.TestCase):
     def test_dates_sample_checks_and_broken_sample_fails(self) -> None:
-        good = Parser((ROOT / "examples" / "staffing_dates.prout").read_text(encoding="utf-8")).parse()
+        good = Parser((ROOT / "examples" / "staffing_dates.etsah").read_text(encoding="utf-8")).parse()
         diags = Checker(good).check()
         self.assertEqual(codes(diags, "error"), [])
         self.assertEqual(codes(diags, "warning"), ["W-PRE", "W-PRE", "W-PRE", "W-PRE"])
 
-        broken = Parser((ROOT / "examples" / "staffing_dates_broken.prout").read_text(encoding="utf-8")).parse()
+        broken = Parser((ROOT / "examples" / "staffing_dates_broken.etsah").read_text(encoding="utf-8")).parse()
         failed = Checker(broken).check()
         self.assertEqual(codes(failed, "error"), ["E-PRE", "E-PRE", "E-PRE"])
         text = " ".join(item.message for item in failed)

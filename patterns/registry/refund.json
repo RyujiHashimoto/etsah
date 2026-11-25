@@ -17,6 +17,6 @@
     {"path": "lib/refunds.ts", "kind": "TS", "lines": 60, "desc": "返金ポリシー、上限、監査ログ"},
     {"path": "tests/refunds.test.ts", "kind": "TEST", "lines": 70, "desc": "返金の契約テスト"}
   ],
-  "examples": ["examples/shop.prout"],
+  "examples": ["examples/shop.etsah"],
   "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 import support  # noqa: F401
-from prout import Parser, ProutError
+from etsah import Parser, ProutError
 from support import parse, snippet
 
 

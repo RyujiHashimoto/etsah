@@ -1,4 +1,4 @@
-"""Shared helpers for the PROUT unit tests.
+"""Shared helpers for the Etsah unit tests.
 
 Tests are stdlib ``unittest`` and stay pytest-compatible. Snippets are
 dedented so cases can be indented with the surrounding Python, while the
@@ -18,8 +18,8 @@ for _path in (ROOT, PATTERNS):
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
-import prout  # noqa: E402
-from prout import Checker, Parser  # noqa: E402
+import etsah  # noqa: E402
+from etsah import Checker, Parser  # noqa: E402
 
 
 def snippet(text: str) -> str:
@@ -27,11 +27,11 @@ def snippet(text: str) -> str:
     return textwrap.dedent(text).strip() + "\n"
 
 
-def parse(text: str) -> prout.Program:
+def parse(text: str) -> etsah.Program:
     return Parser(snippet(text)).parse()
 
 
-def check(text: str, **kwargs) -> list[prout.Diagnostic]:
+def check(text: str, **kwargs) -> list[etsah.Diagnostic]:
     return Checker(parse(text), **kwargs).check()
 
 

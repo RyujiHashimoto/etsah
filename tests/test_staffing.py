@@ -11,8 +11,8 @@ from datetime import date
 from decimal import Decimal
 
 import support  # noqa: F401
-from prout import Checker, Parser
-from proutc import (
+from etsah import Checker, Parser
+from etsahc import (
     DEFAULT_REGISTRY,
     find_patterns,
     load_registry,
@@ -68,11 +68,11 @@ class TestStaffingPatterns(unittest.TestCase):
         cls.registry = load_registry(DEFAULT_REGISTRY)
 
     def test_examples_build_and_the_broken_one_is_caught(self) -> None:
-        for name in ("staffing.prout", "staffing_desk.prout"):
+        for name in ("staffing.etsah", "staffing_desk.etsah"):
             app = parse_app((PATTERNS / "examples" / name).read_text(encoding="utf-8"))
             self.assertEqual(validate(app, self.registry), [], name)
 
-        broken = parse_app((PATTERNS / "examples" / "staffing_broken.prout").read_text(encoding="utf-8"))
+        broken = parse_app((PATTERNS / "examples" / "staffing_broken.etsah").read_text(encoding="utf-8"))
         diags = validate(broken, self.registry)
         self.assertEqual(_codes(diags), ["E-POLICY", "E-SLOT", "E-POLICY", "E-POLICY"])
         text = " ".join(item.message for item in diags)
@@ -84,11 +84,11 @@ class TestStaffingPatterns(unittest.TestCase):
 
     def test_existing_apps_still_validate(self) -> None:
         for path in (
-            PATTERNS / "examples" / "shop.prout",
-            PATTERNS / "examples" / "expense.prout",
-            PATTERNS / "examples" / "travel_request.prout",
-            PATTERNS / "examples" / "equipment_purchase.prout",
-            PATTERNS / "bench" / "pc_lending.prout",
+            PATTERNS / "examples" / "shop.etsah",
+            PATTERNS / "examples" / "expense.etsah",
+            PATTERNS / "examples" / "travel_request.etsah",
+            PATTERNS / "examples" / "equipment_purchase.etsah",
+            PATTERNS / "bench" / "pc_lending.etsah",
         ):
             app = parse_app(path.read_text(encoding="utf-8"))
             errors = [item for item in validate(app, self.registry) if item.severity == "error"]
@@ -291,7 +291,7 @@ class TestStaffingPatterns(unittest.TestCase):
 
 class TestStaffingContract(unittest.TestCase):
     def test_constant_case_is_proved_and_stored_case_is_a_guard(self) -> None:
-        program = Parser((ROOT / "examples" / "staffing.prout").read_text(encoding="utf-8")).parse()
+        program = Parser((ROOT / "examples" / "staffing.etsah").read_text(encoding="utf-8")).parse()
         diags = Checker(program).check()
         self.assertEqual(codes(diags, "error"), [])
         self.assertEqual(codes(diags, "warning"), ["W-PRE", "W-PRE", "W-PRE"])
@@ -301,7 +301,7 @@ class TestStaffingContract(unittest.TestCase):
         self.assertIn("contract.client_approved == true", messages)
 
     def test_broken_contract_fails_rate_term_and_approval(self) -> None:
-        program = Parser((ROOT / "examples" / "staffing_broken.prout").read_text(encoding="utf-8")).parse()
+        program = Parser((ROOT / "examples" / "staffing_broken.etsah").read_text(encoding="utf-8")).parse()
         diags = Checker(program).check()
         self.assertEqual(codes(diags, "error"), ["E-PRE", "E-PRE", "E-PRE"])
         messages = [item.message for item in diags]

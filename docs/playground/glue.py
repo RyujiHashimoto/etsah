@@ -12,9 +12,9 @@ import json
 import zlib
 from typing import Any, Optional
 
-from prout import Expr, Parser, ProutError, format_effect
-from prout_api import check_source
-from prout_import import ToolImportError, import_mcp, import_openai
+from etsah import Expr, Parser, ProutError, format_effect
+from etsah_api import check_source
+from etsah_import import ToolImportError, import_mcp, import_openai
 
 
 def check_text(source: str, allow_net: str = "") -> str:

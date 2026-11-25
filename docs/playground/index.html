@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PROUT playground — check an agent contract in the browser</title>
-  <meta name="description" content="PROUT checks an AI agent's declared effects and approval gates before anything runs. Load a contract, press Run, and see ALLOW, ASK, or BLOCK.">
+  <title>Etsah playground — check an agent contract in the browser</title>
+  <meta name="description" content="Etsah checks an AI agent's declared effects and approval gates before anything runs. Load a contract, press Run, and see ALLOW, ASK, or BLOCK.">
   <link rel="canonical" href="https://ryujihashimoto.github.io/prout-lang/playground/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="PROUT playground — contracts for AI agents">
+  <meta property="og:title" content="Etsah playground — contracts for AI agents">
   <meta property="og:description" content="Declare effects and approvals. Catch unsafe automations before they run. The check shows ALLOW, ASK, or BLOCK.">
   <meta property="og:url" content="https://ryujihashimoto.github.io/prout-lang/playground/">
   <meta property="og:image" content="https://ryujihashimoto.github.io/prout-lang/playground/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="PROUT: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
+  <meta property="og:image:alt" content="Etsah: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PROUT playground — contracts for AI agents">
+  <meta name="twitter:title" content="Etsah playground — contracts for AI agents">
   <meta name="twitter:description" content="Declare effects and approvals. Catch unsafe automations before they run. The check shows ALLOW, ASK, or BLOCK.">
   <meta name="twitter:image" content="https://ryujihashimoto.github.io/prout-lang/playground/og.png">
-  <meta name="twitter:image:alt" content="PROUT: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
+  <meta name="twitter:image:alt" content="Etsah: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
   <style>
     :root {
       color-scheme: light;
@@ -103,7 +103,7 @@
 <body>
 <main>
   <header>
-    <h1>PROUT playground</h1>
+    <h1>Etsah playground</h1>
     <p class="tag">Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.</p>
     <p class="prevent">It stops an agent from emailing a customer, charging a card, changing a contract, or calling a host that is not allowlisted, before any of those calls run. The checker reads the contract. It does not run the agent.</p>
   </header>
@@ -115,9 +115,9 @@
     <p>The checker reports <strong>BLOCK</strong>: <code>E-POLICY</code> (line 35), task draft_reply: emit to an external party has no approval gate (emit(mail)).</p>
     <details>
       <summary>Example source, support reply with no gate</summary>
-      <pre id="static-example"># Same reply draft as support_reply.prout, with the task gate left off.
+      <pre id="static-example"># Same reply draft as support_reply.etsah, with the task gate left off.
 # Expected: E-POLICY, emit to an external party has no approval gate.
-#   python3 prout.py check examples/agents/support_reply_broken.prout
+#   python3 etsah.py check examples/agents/support_reply_broken.etsah
 
 type Id
 type Ticket
@@ -161,12 +161,12 @@ task draft_reply(ticket_id: Id) -> Bool
   return sent
 </pre>
     </details>
-    <p>More contracts live in the repository under <code>examples/agents/</code> and <code>examples/ai_tasks.prout</code>. A comparison with Cedar, OPA, Dafny, Koka, and LLM guardrails is in <a href="../en/comparison.md">docs/en/comparison.md</a>. The five-minute tour is <a href="../en/agents-quickstart.md">docs/en/agents-quickstart.md</a>.</p>
+    <p>More contracts live in the repository under <code>examples/agents/</code> and <code>examples/ai_tasks.etsah</code>. A comparison with Cedar, OPA, Dafny, Koka, and LLM guardrails is in <a href="../en/comparison.md">docs/en/comparison.md</a>. The five-minute tour is <a href="../en/agents-quickstart.md">docs/en/agents-quickstart.md</a>.</p>
   </section>
 
   <section class="tool" id="app">
     <h2>Run a contract</h2>
-    <p>An example is already loaded. One Run shows the verdicts, the diagnostics, the AST hash, and the task plan. The page loads <code>prout.py</code> and <code>prout_api.py</code> from this site and runs them with <a href="https://pyodide.org/en/stable/usage/quickstart.html">Pyodide</a>. A link's hash is the editor text, compressed, so opening it restores the same check.</p>
+    <p>An example is already loaded. One Run shows the verdicts, the diagnostics, the AST hash, and the task plan. The page loads <code>etsah.py</code> and <code>etsah_api.py</code> from this site and runs them with <a href="https://pyodide.org/en/stable/usage/quickstart.html">Pyodide</a>. A link's hash is the editor text, compressed, so opening it restores the same check.</p>
     <div class="tabs" role="tablist" aria-label="Examples">
       <button type="button" role="tab" id="tab-reply-blocked" data-example="reply-blocked" aria-selected="true">Reply, blocked</button>
       <button type="button" role="tab" id="tab-reply-gated" data-example="reply-gated">Reply, gated</button>
@@ -186,7 +186,7 @@ task draft_reply(ticket_id: Id) -> Bool
       </div>
       <p id="allow-help">Comma-separated host names. An empty field keeps the default allowlist, which is <code>stripe</code>. Issue triage sets this to <code>github</code>, and that replaces the default rather than adding to it.</p>
       <label>Contract
-        <textarea id="editor" spellcheck="false" aria-label="PROUT source"></textarea>
+        <textarea id="editor" spellcheck="false" aria-label="Etsah source"></textarea>
       </label>
     </div>
 
@@ -231,11 +231,11 @@ task draft_reply(ticket_id: Id) -> Bool
 <script>
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/";
 const EXAMPLES = [
-  { id: "reply-blocked", label: "Reply, blocked", file: "agents/support_reply_broken.prout", allow: "" },
-  { id: "reply-gated", label: "Reply, gated", file: "agents/support_reply.prout", allow: "" },
-  { id: "invoice", label: "Invoice", file: "agents/invoice.prout", allow: "" },
-  { id: "cancel", label: "Cancel plan", file: "agents/subscription_cancel_broken.prout", allow: "" },
-  { id: "triage", label: "Issue triage", file: "agents/github_triage.prout", allow: "github" },
+  { id: "reply-blocked", label: "Reply, blocked", file: "agents/support_reply_broken.etsah", allow: "" },
+  { id: "reply-gated", label: "Reply, gated", file: "agents/support_reply.etsah", allow: "" },
+  { id: "invoice", label: "Invoice", file: "agents/invoice.etsah", allow: "" },
+  { id: "cancel", label: "Cancel plan", file: "agents/subscription_cancel_broken.etsah", allow: "" },
+  { id: "triage", label: "Issue triage", file: "agents/github_triage.etsah", allow: "github" },
 ];
 const TOOLS = {
   mcp: "agents/tools/mcp_tools.json",
@@ -327,9 +327,9 @@ async function fetchFirst(paths, accept) {
 }
 
 async function loadPythonFile(name) {
-  // runtime/prout.py ships under docs/ so GitHub Pages (source folder /docs)
+  // runtime/etsah.py ships under docs/ so GitHub Pages (source folder /docs)
   // and `python -m http.server` in docs/ can load it.
-  // ../../prout.py is the same file at the repository root when the site root is the repo.
+  // ../../etsah.py is the same file at the repository root when the site root is the repo.
   const found = await fetchFirst(["runtime/" + name, "../../" + name], looksLikePython);
   return found;
 }
@@ -435,7 +435,7 @@ function renderResult(data) {
 async function bootPython() {
   const files = {};
   const loaded = [];
-  for (const name of ["prout.py", "prout_api.py", "prout_import.py"]) {
+  for (const name of ["etsah.py", "etsah_api.py", "etsah_import.py"]) {
     const found = await loadPythonFile(name);
     files[name] = found.text;
     loaded.push(found.path);

@@ -1,0 +1,46 @@
+# Etsah v0.1 — repaired version.
+# The AI adds the missing effects, fixes the amount, and returns the receipt.
+
+type Order {
+  id: Id
+  total: Money
+  status: Status
+}
+
+type Receipt {
+  id: Id
+  status: Status
+  amount: Money
+}
+
+type Money
+type Id
+type Status
+
+op orders.get(order_id: Id) -> Order
+  doc "注文をIDで取得する"
+  eff read(orders)
+  impl native
+
+op stripe.refund(order: Order, amount: Money) -> Receipt
+  doc "Stripeで返金を実行する"
+  eff write(payments), net(stripe)
+  pre amount <= order.total
+  post result.status == "refunded"
+  impl native
+
+op refund(order: Order, amount: Money) -> Receipt
+  doc "注文を指定額だけ返金する"
+  eff write(payments), net(stripe)
+  pre amount <= order.total
+  pre order.status == "paid"
+  post result.status == "refunded"
+  impl stripe.refund(order, amount)
+
+flow handle_refund(order_id: Id) -> Receipt
+  doc "返金リクエストを処理する"
+  summary "注文を取得し、全額を返金して、領収書を返します。"
+  eff read(orders), write(payments), net(stripe)
+  let order = orders.get(order_id)
+  let receipt = refund(order, order.total)
+  return receipt

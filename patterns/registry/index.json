@@ -27,8 +27,8 @@
         "read(events)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/activity_log.json"
     },
@@ -135,8 +135,8 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/ai_automation.prout",
-        "examples/ai_desk.prout"
+        "examples/ai_automation.etsah",
+        "examples/ai_desk.etsah"
       ],
       "path": "registry/ai_task.json",
       "automation": {
@@ -199,10 +199,10 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/expense.prout",
-        "examples/travel_request.prout",
-        "examples/equipment_purchase.prout",
-        "bench/pc_lending.prout"
+        "examples/expense.etsah",
+        "examples/travel_request.etsah",
+        "examples/equipment_purchase.etsah",
+        "bench/pc_lending.etsah"
       ],
       "path": "registry/approval.json"
     },
@@ -254,8 +254,8 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/ai_automation.prout",
-        "examples/ai_desk.prout"
+        "examples/ai_automation.etsah",
+        "examples/ai_desk.etsah"
       ],
       "path": "registry/approval_gate.json",
       "requires_target": true
@@ -286,8 +286,8 @@
         "write(entity)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/archive.json"
     },
@@ -317,8 +317,8 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/assignment.json"
     },
@@ -351,8 +351,8 @@
         "write(sessions)"
       ],
       "examples": [
-        "examples/shop.prout",
-        "examples/expense.prout"
+        "examples/shop.etsah",
+        "examples/expense.etsah"
       ],
       "path": "registry/auth.json"
     },
@@ -382,8 +382,8 @@
         "write(checks)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/checklist.json"
     },
@@ -423,7 +423,7 @@
         "net(payment)"
       ],
       "examples": [
-        "examples/shop.prout"
+        "examples/shop.etsah"
       ],
       "path": "registry/checkout.json"
     },
@@ -453,8 +453,8 @@
         "write(comments)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/comment_thread.json"
     },
@@ -496,7 +496,7 @@
         "write(entity)"
       ],
       "examples": [
-        "examples/shop.prout"
+        "examples/shop.etsah"
       ],
       "path": "registry/crud.json"
     },
@@ -525,8 +525,8 @@
         "read(entity)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/csv_export.json"
     },
@@ -562,7 +562,7 @@
         "read(entity)"
       ],
       "examples": [
-        "examples/shop.prout"
+        "examples/shop.etsah"
       ],
       "path": "registry/dashboard.json"
     },
@@ -640,9 +640,9 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/staffing.prout",
-        "examples/staffing_desk.prout",
-        "examples/staffing_limits.prout"
+        "examples/staffing.etsah",
+        "examples/staffing_desk.etsah",
+        "examples/staffing_limits.etsah"
       ],
       "path": "registry/dispatch_contract.json",
       "field_types": {
@@ -686,8 +686,8 @@
         "read(entity)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/due_date.json"
     },
@@ -717,8 +717,8 @@
         "write(labels)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/labels.json"
     },
@@ -760,8 +760,8 @@
         "write(matches)"
       ],
       "examples": [
-        "examples/staffing.prout",
-        "examples/staffing_desk.prout"
+        "examples/staffing.etsah",
+        "examples/staffing_desk.etsah"
       ],
       "path": "registry/matching.json"
     },
@@ -797,8 +797,8 @@
         "read(templates)"
       ],
       "examples": [
-        "examples/travel_request.prout",
-        "examples/equipment_purchase.prout"
+        "examples/travel_request.etsah",
+        "examples/equipment_purchase.etsah"
       ],
       "path": "registry/notify.json"
     },
@@ -872,9 +872,9 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/staffing.prout",
-        "examples/staffing_desk.prout",
-        "examples/staffing_limits.prout"
+        "examples/staffing.etsah",
+        "examples/staffing_desk.etsah",
+        "examples/staffing_limits.etsah"
       ],
       "path": "registry/overtime_agreement.json"
     },
@@ -915,7 +915,7 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/shop.prout"
+        "examples/shop.etsah"
       ],
       "path": "registry/refund.json"
     },
@@ -950,8 +950,8 @@
       "states": [],
       "effects": [],
       "examples": [
-        "examples/moon_garden.prout",
-        "examples/fraction_quiz.prout"
+        "examples/moon_garden.etsah",
+        "examples/fraction_quiz.etsah"
       ],
       "path": "registry/scene.json"
     },
@@ -1024,8 +1024,8 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/staffing.prout",
-        "examples/staffing_desk.prout"
+        "examples/staffing.etsah",
+        "examples/staffing_desk.etsah"
       ],
       "path": "registry/staffing_billing.json",
       "field_types": {
@@ -1069,8 +1069,8 @@
         "read(responses)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/survey.json"
     },
@@ -1123,8 +1123,8 @@
         "emit(audit)"
       ],
       "examples": [
-        "examples/staffing.prout",
-        "examples/staffing_desk.prout"
+        "examples/staffing.etsah",
+        "examples/staffing_desk.etsah"
       ],
       "path": "registry/timesheet.json",
       "field_types": {
@@ -1193,8 +1193,8 @@
         "read(entity)"
       ],
       "examples": [
-        "examples/repair_desk.prout",
-        "examples/support_desk.prout"
+        "examples/repair_desk.etsah",
+        "examples/support_desk.etsah"
       ],
       "path": "registry/work_queue.json"
     }

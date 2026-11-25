@@ -12,25 +12,32 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_api import check_file
-from prout_mcp.approval import hash_arguments, sign_payload
-from prout_mcp.decide import load_contract
+from etsah_api import check_file
+from etsah_mcp.approval import hash_arguments, sign_payload
+from etsah_mcp.decide import load_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "examples" / "agents"
 FAKE = ROOT / "tests" / "fake_mcp_upstream.py"
 KEY = "example-harbor-lane-key"
 _SECRET_ENV = (
+    "ETSAH_APPROVAL_TOKEN",
+    "ETSAH_APPROVAL_KEY",
+    "ETSAH_APPROVAL_KEY_FILE",
+    "ETSAH_APPROVAL_NONCE_FILE",
+    "ETSAH_LEDGER_FILE",
+    "ETSAH_ALLOW_LEGACY_APPROVAL_TOKEN",
     "PROUT_APPROVAL_TOKEN",
     "PROUT_APPROVAL_KEY",
     "PROUT_APPROVAL_KEY_FILE",
     "PROUT_APPROVAL_NONCE_FILE",
+    "PROUT_LEDGER_FILE",
     "PROUT_ALLOW_LEGACY_APPROVAL_TOKEN",
 )
 
 
 def _approval_token(**overrides) -> tuple[str, dict]:
-    loaded = load_contract((AGENTS / "support_reply.prout").read_text(encoding="utf-8"))
+    loaded = load_contract((AGENTS / "support_reply.etsah").read_text(encoding="utf-8"))
     payload = {
         "v": 1,
         "approval_id": "a" * 32,
@@ -60,12 +67,12 @@ class GuardProcess:
             env.pop(name, None)
         env["FAKE_MCP_LOG"] = str(log_path)
         if token is not None:
-            env["PROUT_APPROVAL_TOKEN"] = token
+            env["ETSAH_APPROVAL_TOKEN"] = token
         if env_extra:
             env.update(env_extra)
         argv = [
             sys.executable,
-            str(ROOT / "prout.py"),
+            str(ROOT / "etsah.py"),
             "guard",
             "--contract",
             str(contract),
@@ -144,13 +151,13 @@ class GuardTests(unittest.TestCase):
     def test_allow_forwards_block_and_ask_do_not(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "calls.jsonl"
-            guard = GuardProcess(AGENTS / "support_reply.prout", log_path)
+            guard = GuardProcess(AGENTS / "support_reply.etsah", log_path)
             try:
                 init = guard.request(
                     "initialize",
                     {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "guard-test", "version": "0"}},
                 )
-                self.assertEqual(init["result"]["serverInfo"]["name"], "prout-guard")
+                self.assertEqual(init["result"]["serverInfo"]["name"], "etsah-guard")
                 listed = guard.request("tools/list")
                 names = [tool["name"] for tool in listed["result"]["tools"]]
                 self.assertEqual(names, ["tickets.read", "mail.send_reply", "github.list_issues"])
@@ -175,9 +182,9 @@ class GuardTests(unittest.TestCase):
             self.assertEqual(_logged_tools(log_path), ["tickets.read"])
             audit = [row for row in _audit(stderr) if row.get("tool")]
             self.assertEqual([row["verdict"] for row in audit], ["ALLOW", "ASK", "BLOCK"])
-            self.assertTrue(all(row["audit_id"] == check_file(AGENTS / "support_reply.prout").audit_id for row in audit))
+            self.assertTrue(all(row["audit_id"] == check_file(AGENTS / "support_reply.etsah").audit_id for row in audit))
             self.assertEqual([row["forwarded"] for row in audit], [True, False, False])
-            self.assertNotIn(b"PROUT_APPROVAL_TOKEN", stderr)
+            self.assertNotIn(b"ETSAH_APPROVAL_TOKEN", stderr)
 
     def test_signed_approval_forwards_the_matching_ask_and_still_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -187,7 +194,7 @@ class GuardTests(unittest.TestCase):
             key_path.write_text(KEY + "\n", encoding="utf-8")
             token, payload = _approval_token()
             guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 log_path,
                 extra=[
                     "--approval-key-file",
@@ -235,7 +242,7 @@ class GuardTests(unittest.TestCase):
             nonce_path = Path(tmp) / "nonces.json"
             key_path.write_text(KEY + "\n", encoding="utf-8")
             guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 log_path,
                 extra=[
                     "--approval-key-file",
@@ -268,7 +275,7 @@ class GuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "calls.jsonl"
             guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 log_path,
                 extra=["--allow-legacy-approval-token", "--approval-token", "example-approval"],
             )
@@ -306,12 +313,12 @@ class GuardTests(unittest.TestCase):
             token, payload = _approval_token()
             log_path = root / "reuse.jsonl"
             guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 log_path,
                 env_extra={
-                    "PROUT_APPROVAL_KEY": KEY,
-                    "PROUT_APPROVAL_NONCE_FILE": str(nonce_path),
-                    "PROUT_APPROVAL_TOKEN": token,
+                    "ETSAH_APPROVAL_KEY": KEY,
+                    "ETSAH_APPROVAL_NONCE_FILE": str(nonce_path),
+                    "ETSAH_APPROVAL_TOKEN": token,
                 },
             )
             try:
@@ -338,12 +345,12 @@ class GuardTests(unittest.TestCase):
             other, _ = _approval_token(audit_id="ab" * 32, nonce="c" * 32, approval_id="d" * 32)
             other_log = root / "other.jsonl"
             other_guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 other_log,
                 env_extra={
-                    "PROUT_APPROVAL_KEY": KEY,
-                    "PROUT_APPROVAL_NONCE_FILE": str(root / "other-nonces.json"),
-                    "PROUT_APPROVAL_TOKEN": other,
+                    "ETSAH_APPROVAL_KEY": KEY,
+                    "ETSAH_APPROVAL_NONCE_FILE": str(root / "other-nonces.json"),
+                    "ETSAH_APPROVAL_TOKEN": other,
                 },
             )
             try:
@@ -360,12 +367,12 @@ class GuardTests(unittest.TestCase):
             expired, _ = _approval_token(exp=int(time.time()) - 10, nonce="e" * 32, approval_id="f" * 32)
             expired_log = root / "expired.jsonl"
             expired_guard = GuardProcess(
-                AGENTS / "support_reply.prout",
+                AGENTS / "support_reply.etsah",
                 expired_log,
                 env_extra={
-                    "PROUT_APPROVAL_KEY": KEY,
-                    "PROUT_APPROVAL_NONCE_FILE": str(root / "expired-nonces.json"),
-                    "PROUT_APPROVAL_TOKEN": expired,
+                    "ETSAH_APPROVAL_KEY": KEY,
+                    "ETSAH_APPROVAL_NONCE_FILE": str(root / "expired-nonces.json"),
+                    "ETSAH_APPROVAL_TOKEN": expired,
                 },
             )
             try:
@@ -387,12 +394,12 @@ class GuardTests(unittest.TestCase):
             for label, bad in (("different tool", wrong_tool), ("different gate", wrong_gate)):
                 bad_log = root / f"{label}.jsonl"
                 bad_guard = GuardProcess(
-                    AGENTS / "support_reply.prout",
+                    AGENTS / "support_reply.etsah",
                     bad_log,
                     env_extra={
-                        "PROUT_APPROVAL_KEY": KEY,
-                        "PROUT_APPROVAL_NONCE_FILE": str(root / f"{label}-nonces.json"),
-                        "PROUT_APPROVAL_TOKEN": bad,
+                        "ETSAH_APPROVAL_KEY": KEY,
+                        "ETSAH_APPROVAL_NONCE_FILE": str(root / f"{label}-nonces.json"),
+                        "ETSAH_APPROVAL_TOKEN": bad,
                     },
                 )
                 try:
@@ -409,7 +416,7 @@ class GuardTests(unittest.TestCase):
     def test_net_allow_list_and_a_broken_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             blocked_log = Path(tmp) / "blocked.jsonl"
-            blocked = GuardProcess(AGENTS / "github_triage.prout", blocked_log)
+            blocked = GuardProcess(AGENTS / "github_triage.etsah", blocked_log)
             try:
                 blocked.request(
                     "initialize",
@@ -424,7 +431,7 @@ class GuardTests(unittest.TestCase):
 
             allowed_log = Path(tmp) / "allowed.jsonl"
             allowed = GuardProcess(
-                AGENTS / "github_triage.prout",
+                AGENTS / "github_triage.etsah",
                 allowed_log,
                 extra=["--allow-net", "github"],
             )
@@ -441,17 +448,17 @@ class GuardTests(unittest.TestCase):
 
     def test_missing_contract_exits_before_serving(self) -> None:
         proc = subprocess.run(
-            [sys.executable, str(ROOT / "prout.py"), "guard", "--contract", str(AGENTS / "missing.prout"), "--", sys.executable, "-c", "print('no')"],
+            [sys.executable, str(ROOT / "etsah.py"), "guard", "--contract", str(AGENTS / "missing.etsah"), "--", sys.executable, "-c", "print('no')"],
             cwd=ROOT,
             capture_output=True,
             text=True,
             check=False,
         )
         self.assertEqual(proc.returncode, 2)
-        self.assertIn("missing.prout", proc.stderr)
+        self.assertIn("missing.etsah", proc.stderr)
         self.assertNotIn("no", proc.stdout)
         empty = subprocess.run(
-            [sys.executable, str(ROOT / "prout.py"), "guard", "--contract", str(AGENTS / "support_reply.prout")],
+            [sys.executable, str(ROOT / "etsah.py"), "guard", "--contract", str(AGENTS / "support_reply.etsah")],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -471,10 +478,10 @@ class GuardTests(unittest.TestCase):
                 [
                     sys.executable,
                     "-m",
-                    "prout_mcp",
+                    "etsah_mcp",
                     "guard",
                     "--contract",
-                    str(AGENTS / "support_reply.prout"),
+                    str(AGENTS / "support_reply.etsah"),
                     "--",
                     sys.executable,
                     str(FAKE),
@@ -502,7 +509,7 @@ class GuardTests(unittest.TestCase):
                 ready, _, _ = select.select([proc.stdout], [], [], 5)
                 self.assertTrue(ready)
                 reply = json.loads(proc.stdout.readline().decode("utf-8"))
-                self.assertEqual(reply["result"]["serverInfo"]["name"], "prout-guard")
+                self.assertEqual(reply["result"]["serverInfo"]["name"], "etsah-guard")
             finally:
                 if proc.stdin is not None and not proc.stdin.closed:
                     proc.stdin.close()

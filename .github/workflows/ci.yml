@@ -20,41 +20,41 @@ jobs:
 
       - name: Contract language
         run: |
-          python3 prout.py check examples/refund_fixed.prout
-          python3 prout.py check examples/staffing.prout
-          python3 prout.py check examples/staffing_dates.prout
-          python3 prout.py check examples/ai_tasks.prout
-          python3 prout.py check examples/agents/support_reply.prout
-          python3 prout.py check examples/agents/invoice.prout
-          python3 prout.py check examples/agents/subscription_cancel.prout
-          python3 prout.py check examples/agents/github_triage.prout --allow-net github
-          python3 prout.py import mcp examples/agents/tools/mcp_tools.json | diff -u examples/agents/tools/mcp_tools.prout -
-          python3 prout.py import openai examples/agents/tools/openai_tools.json | diff -u examples/agents/tools/openai_tools.prout -
+          python3 etsah.py check examples/refund_fixed.etsah
+          python3 etsah.py check examples/staffing.etsah
+          python3 etsah.py check examples/staffing_dates.etsah
+          python3 etsah.py check examples/ai_tasks.etsah
+          python3 etsah.py check examples/agents/support_reply.etsah
+          python3 etsah.py check examples/agents/invoice.etsah
+          python3 etsah.py check examples/agents/subscription_cancel.etsah
+          python3 etsah.py check examples/agents/github_triage.etsah --allow-net github
+          python3 etsah.py import mcp examples/agents/tools/mcp_tools.json | diff -u examples/agents/tools/mcp_tools.etsah -
+          python3 etsah.py import openai examples/agents/tools/openai_tools.json | diff -u examples/agents/tools/openai_tools.etsah -
           python3 render.py
           test -s human-view.html
           git diff --exit-code -- human-view.html
 
       - name: Broken example must fail
         run: |
-          if python3 prout.py check examples/refund_broken.prout; then
+          if python3 etsah.py check examples/refund_broken.etsah; then
             echo "broken example unexpectedly passed"
             exit 1
           fi
-          if python3 prout.py check examples/staffing_broken.prout > /tmp/staffing-contract.txt 2>&1; then
+          if python3 etsah.py check examples/staffing_broken.etsah > /tmp/staffing-contract.txt 2>&1; then
             echo "broken staffing contract unexpectedly passed"
             exit 1
           fi
           grep -q "1500 >= 1800" /tmp/staffing-contract.txt
           grep -q "21641 <= 21640" /tmp/staffing-contract.txt
           grep -q "false == true" /tmp/staffing-contract.txt
-          if python3 prout.py check examples/staffing_dates_broken.prout > /tmp/staffing-dates.txt 2>&1; then
+          if python3 etsah.py check examples/staffing_dates_broken.etsah > /tmp/staffing-dates.txt 2>&1; then
             echo "broken staffing date contract unexpectedly passed"
             exit 1
           fi
           grep -q "1500.5 >= 1800.50" /tmp/staffing-dates.txt
           grep -q "2029-04-02 <= 2029-04-01" /tmp/staffing-dates.txt
           grep -q "false == true" /tmp/staffing-dates.txt
-          if python3 prout.py check examples/ai_tasks_broken.prout > /tmp/ai-tasks.txt 2>&1; then
+          if python3 etsah.py check examples/ai_tasks_broken.etsah > /tmp/ai-tasks.txt 2>&1; then
             echo "broken ai task contract unexpectedly passed"
             exit 1
           fi
@@ -65,22 +65,22 @@ jobs:
           grep -q "5000 <= 1000" /tmp/ai-tasks.txt
           grep -q "retries must be from 0 through 5" /tmp/ai-tasks.txt
           grep -q "escalation path produces external effects" /tmp/ai-tasks.txt
-          if python3 prout.py check examples/agents/support_reply_broken.prout > /tmp/support-reply.txt 2>&1; then
+          if python3 etsah.py check examples/agents/support_reply_broken.etsah > /tmp/support-reply.txt 2>&1; then
             echo "broken support reply unexpectedly passed"
             exit 1
           fi
           grep -q "emit to an external party has no approval gate" /tmp/support-reply.txt
-          if python3 prout.py check examples/agents/invoice_broken.prout > /tmp/invoice.txt 2>&1; then
+          if python3 etsah.py check examples/agents/invoice_broken.etsah > /tmp/invoice.txt 2>&1; then
             echo "broken invoice unexpectedly passed"
             exit 1
           fi
           grep -q "spend has no approval gate" /tmp/invoice.txt
-          if python3 prout.py check examples/agents/subscription_cancel_broken.prout > /tmp/subscription.txt 2>&1; then
+          if python3 etsah.py check examples/agents/subscription_cancel_broken.etsah > /tmp/subscription.txt 2>&1; then
             echo "broken subscription cancellation unexpectedly passed"
             exit 1
           fi
           grep -q "a contract change has no approval gate" /tmp/subscription.txt
-          if python3 prout.py check examples/agents/github_triage_broken.prout --allow-net github > /tmp/github-triage.txt 2>&1; then
+          if python3 etsah.py check examples/agents/github_triage_broken.etsah --allow-net github > /tmp/github-triage.txt 2>&1; then
             echo "broken github triage unexpectedly passed"
             exit 1
           fi
@@ -89,41 +89,48 @@ jobs:
 
       - name: Information flow
         run: |
-          python3 prout.py check examples/information_flow_safe.prout \
+          python3 etsah.py check examples/information_flow_safe.etsah \
             --allow-net email --allow-net analytics
-          if python3 prout.py check examples/information_flow_leak.prout \
+          if python3 etsah.py check examples/information_flow_leak.etsah \
             --allow-net email --allow-net analytics > /tmp/iflow-leak.txt 2>&1; then
             echo "leaking example unexpectedly passed"
             exit 1
           fi
           grep -q "E-IFLOW-ARG" /tmp/iflow-leak.txt
           grep -q "track_event" /tmp/iflow-leak.txt
+          python3 etsah.py check examples/prompt_injection_safe.etsah
+          if python3 etsah.py check examples/prompt_injection_leak.etsah > /tmp/injection-leak.txt 2>&1; then
+            echo "prompt injection leak unexpectedly passed"
+            exit 1
+          fi
+          grep -q "E-IFLOW-ARG" /tmp/injection-leak.txt
+          grep -q "mail.forward" /tmp/injection-leak.txt
 
       - name: Pattern registry
         working-directory: patterns
         run: |
-          python3 proutc.py index
+          python3 etsahc.py index
           git diff --exit-code registry/index.json
-          python3 proutc.py find "申請 承認" | grep -q approval
-          python3 proutc.py build examples/shop.prout
-          python3 proutc.py build examples/expense.prout
-          python3 proutc.py build bench/pc_lending.prout
-          python3 proutc.py build examples/staffing.prout
-          python3 proutc.py build examples/staffing_desk.prout
-          python3 proutc.py find "勤怠" | grep -q timesheet
-          python3 proutc.py find "抵触日" | grep -q dispatch_contract
-          if python3 proutc.py build examples/staffing_broken.prout > /tmp/staffing-pattern.txt 2>&1; then
+          python3 etsahc.py find "申請 承認" | grep -q approval
+          python3 etsahc.py build examples/shop.etsah
+          python3 etsahc.py build examples/expense.etsah
+          python3 etsahc.py build bench/pc_lending.etsah
+          python3 etsahc.py build examples/staffing.etsah
+          python3 etsahc.py build examples/staffing_desk.etsah
+          python3 etsahc.py find "勤怠" | grep -q timesheet
+          python3 etsahc.py find "抵触日" | grep -q dispatch_contract
+          if python3 etsahc.py build examples/staffing_broken.etsah > /tmp/staffing-pattern.txt 2>&1; then
             echo "broken staffing spec unexpectedly passed"
             exit 1
           fi
           grep -q "抵触日" /tmp/staffing-pattern.txt
           grep -q "approver" /tmp/staffing-pattern.txt
           grep -q "bill rate is below pay rate" /tmp/staffing-pattern.txt
-          python3 proutc.py build examples/ai_automation.prout
-          python3 proutc.py build examples/ai_desk.prout
-          python3 proutc.py find "自動化" | grep -q ai_task
-          python3 proutc.py find "承認ゲート" | grep -q approval_gate
-          if python3 proutc.py build examples/ai_automation_broken.prout > /tmp/ai-automation.txt 2>&1; then
+          python3 etsahc.py build examples/ai_automation.etsah
+          python3 etsahc.py build examples/ai_desk.etsah
+          python3 etsahc.py find "自動化" | grep -q ai_task
+          python3 etsahc.py find "承認ゲート" | grep -q approval_gate
+          if python3 etsahc.py build examples/ai_automation_broken.etsah > /tmp/ai-automation.txt 2>&1; then
             echo "broken ai automation spec unexpectedly passed"
             exit 1
           fi
@@ -134,13 +141,13 @@ jobs:
       - name: Build service desk examples
         working-directory: patterns
         run: |
-          python3 proutc.py build examples/repair_desk.prout
-          python3 proutc.py build examples/support_desk.prout
+          python3 etsahc.py build examples/repair_desk.etsah
+          python3 etsahc.py build examples/support_desk.etsah
 
       - name: Benchmark
         working-directory: patterns
         run: |
-          python3 proutc.py bench
+          python3 etsahc.py bench
           python3 growth_report.py
           test -s build/growth.html
 
@@ -161,9 +168,9 @@ jobs:
       - name: Staffing limits
         working-directory: patterns
         run: |
-          python3 proutc.py build examples/staffing_limits.prout
-          python3 proutc.py find "36協定" | grep -q overtime_agreement
-          if python3 proutc.py build examples/staffing_limits_broken.prout > /tmp/staffing-limits.txt 2>&1; then
+          python3 etsahc.py build examples/staffing_limits.etsah
+          python3 etsahc.py find "36協定" | grep -q overtime_agreement
+          if python3 etsahc.py build examples/staffing_limits_broken.etsah > /tmp/staffing-limits.txt 2>&1; then
             echo "broken staffing limits spec unexpectedly passed"
             exit 1
           fi
