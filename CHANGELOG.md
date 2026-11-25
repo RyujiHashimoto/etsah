@@ -10,6 +10,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 
 ### Added
 
+- A parent agent's declared `limit calls` or `limit spend` bounds the sum of the tasks that name it. Two or more child limits of the same period, and for spend the same currency, must fit. Overflow is `E-POLICY`. A different currency is not added. Phase 1 does not share a ledger or block calls in the guard. The next step is described in `docs/ai_automation.md`.
 - Japanese fill-in templates for a timesheet, an assignment, and a bill rate, each with one fictional filled example. They live in `examples/templates/`. Open legal numbers are not asserted.
 - E-POLICY diagnostics that CI checks now include an English `fix` line with one contract line to write. `etsah check` prints it, and `etsah check --json` adds `fix` without removing the existing fields. Diagnostic codes are unchanged.
 - A composite action (`action.yml`) checks `.etsah` files changed in a pull request, prints GitHub `::error` annotations with file and line, and fails the job when the checker reports an error. `glob`, `scope`, `allow-net`, and `deny-net` are inputs. The same action also reads the legacy source extension. Tags are not published; pin `@main`. This repository's CI calls it with `uses: ./` on `examples/ai_tasks.etsah` and on `examples/ai_tasks_broken.etsah`, which fails with `E-POLICY`.

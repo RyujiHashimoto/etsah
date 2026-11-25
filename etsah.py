@@ -2347,6 +2347,71 @@ class Checker:
                 line,
             )
 
+    def _check_child_quota_sums(self) -> None:
+        """The declared parent cap is the whole remaining budget in phase 1.
+
+        Tasks that name an agent are its children. Two or more declared limits
+        of the same period are added. A different spend currency is left out of
+        that sum; the one-to-one check already reports the mismatch. This does
+        not read or write a ledger.
+        """
+        grouped: dict[str, list[TaskDef]] = {}
+        for task in self.program.tasks:
+            if task.agent:
+                grouped.setdefault(task.agent, []).append(task)
+        agents = {agent.name: agent for agent in self.program.agents}
+        for name, tasks in grouped.items():
+            agent = agents.get(name)
+            if agent is None:
+                continue
+            self._sum_call_limits(agent, tasks)
+            self._sum_spend_limits(agent, tasks)
+
+    def _sum_call_limits(self, agent: AgentDef, tasks: list[TaskDef]) -> None:
+        parent = agent.call_quota
+        if parent is None:
+            return
+        shares = [
+            task.call_quota
+            for task in tasks
+            if task.call_quota is not None and task.call_quota.period == parent.period
+        ]
+        if len(shares) < 2:
+            return
+        total = sum(share.count for share in shares)
+        if total > parent.count:
+            self.error(
+                "E-POLICY",
+                f"agent {agent.name}: call limits of its tasks sum to {total}, "
+                f"which exceeds {parent.count} per {parent.period} "
+                f"({total} <= {parent.count} is false)",
+                agent.line,
+            )
+
+    def _sum_spend_limits(self, agent: AgentDef, tasks: list[TaskDef]) -> None:
+        parent = agent.spend_quota
+        if parent is None:
+            return
+        shares = [
+            task.spend_quota
+            for task in tasks
+            if task.spend_quota is not None
+            and task.spend_quota.currency == parent.currency
+            and task.spend_quota.period == parent.period
+        ]
+        if len(shares) < 2:
+            return
+        total = sum((share.amount for share in shares), Decimal(0))
+        if total > parent.amount:
+            shown = format(total, "f")
+            cap = format(parent.amount, "f")
+            self.error(
+                "E-POLICY",
+                f"agent {agent.name}: spend limits of its tasks sum to {shown} {parent.currency}, "
+                f"which exceeds {cap} per {parent.period} ({shown} <= {cap} is false)",
+                agent.line,
+            )
+
     def _called_op_names(self, task: TaskDef) -> set[str]:
         found: set[str] = set()
 
@@ -2440,6 +2505,7 @@ class Checker:
                     task.spend_quota,
                     agent.spend_quota,
                 )
+        self._check_child_quota_sums()
 
     def check_ai_tasks(self) -> None:
         """Static envelope for agent and task. Cron and the idempotency store are not run."""
