@@ -54,7 +54,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在391件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在394件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -250,7 +250,7 @@ python3 etsahc.py build examples/support_desk.etsah --out build/support
 
 `timesheet`（勤怠と派遣先承認）、`overtime_agreement`（36協定の上限、警告と硬停止）、`dispatch_contract`（個別契約と抵触日）、`staffing_billing`（請求単価 >= 支払単価、勤怠承認が必須）、`matching`（スキル欄で候補を結ぶ）を追加しました。`Date`、`Duration`、`Rate` はパターン層の型として扱い、スロットの制約をコンパイル時に検査します。
 
-36協定の上限はスロットで、一般則を既定かつ天井にします。抵触日は、通知された日に加え、同じ事業所・同じ人と組織単位の開始日から3年後を計算します。どちらも仕様の定数だけを見て、実績の時間や保存済みの契約は実行時の検査として生成します。社会保険料率と同一労働同一賃金は対象外です。設計と、社労士の確認が要る箇所は [docs/staffing.md](docs/staffing.md) にまとめています。
+36協定の上限はスロットで、一般則を既定かつ天井にします。抵触日は、通知された日に加え、同じ事業所・同じ人と組織単位の開始日から3年後を計算します。どちらも仕様の定数だけを見て、実績の時間や保存済みの契約は実行時の検査として生成します。社会保険料率と同一労働同一賃金は対象外です。設計と、社労士の確認が要る箇所は [docs/staffing.md](docs/staffing.md) にまとめています。勤怠、配属、請求単価をコピーして埋める空欄は [examples/templates/README.md](examples/templates/README.md) です。
 
 ```sh
 cd patterns

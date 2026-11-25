@@ -1,0 +1,24 @@
+# 配属の記入テンプレート。コピーして【空欄】を埋める。
+# 個別契約の終了日が、通知された抵触日より後なら止まる。
+# 抵触日までの年数は計算しない。開始日に何年を足すかは各社の規程や専門家に確認。
+# 同じ事業所・同じ組織単位かどうかも、チェッカーは見ない。
+# 仮の値のままでは検査を通る。記入例は assignment_filled.etsah。
+
+type Id
+
+# 【空欄】配属開始日: 空白なしの YYYY-MM-DD。
+# 【空欄】個別契約の終了日: 開始日以降の YYYY-MM-DD。
+# 【空欄】通知された抵触日: 派遣元が通知を受けた YYYY-MM-DD。
+# 仮の値は 2026-01-01、2026-01-31、2026-01-31。
+# 終了日は抵触日以前でなければならない。年数の式は書かない。
+# 年数の決め方は各社の規程や専門家に確認。
+op flag_assignment(start_date: Date, end_date: Date, conflict_date: Date) -> Bool
+  doc "終了日は通知された抵触日以前。開始日への年数の加算はしない"
+  pre end_date - start_date >= 0
+  pre end_date <= conflict_date
+  impl native
+
+flow fill_in() -> Bool
+  doc "仮の日付。三つの空欄を、通知された日付に書き換える"
+  let flagged = flag_assignment(2026-01-01, 2026-01-31, 2026-01-31)
+  return flagged

@@ -1,0 +1,17 @@
+# 勤怠の記入例。架空の青葉ブリッジ派遣が、架空の派遣先「月見ヶ丘製作所」の
+# 2026年6月の勤怠を閉じる。承認ロールは site_lead。人の氏名はない。
+# 152 は、この架空の月に働いた時間の合計であり、時間外の法定上限ではない。
+# 上限の数値は置いていない。各社の規程や専門家に確認。
+
+type Id
+
+op accept_timesheet(client_approved: Bool, hours: Int) -> Bool
+  doc "月見ヶ丘製作所（架空）の勤怠。site_lead が承認したあとだけ閉じる"
+  pre client_approved == true
+  pre hours >= 0
+  impl native
+
+flow example() -> Bool
+  doc "青葉ブリッジ派遣（架空）。2026年6月、承認済み、合計152時間"
+  let closed = accept_timesheet(true, 152)
+  return closed

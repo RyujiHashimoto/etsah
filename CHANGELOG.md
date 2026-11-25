@@ -10,6 +10,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 
 ### Added
 
+- Japanese fill-in templates for a timesheet, an assignment, and a bill rate, each with one fictional filled example. They live in `examples/templates/`. Open legal numbers are not asserted.
 - E-POLICY diagnostics that CI checks now include an English `fix` line with one contract line to write. `etsah check` prints it, and `etsah check --json` adds `fix` without removing the existing fields. Diagnostic codes are unchanged.
 - A composite action (`action.yml`) checks `.etsah` files changed in a pull request, prints GitHub `::error` annotations with file and line, and fails the job when the checker reports an error. `glob`, `scope`, `allow-net`, and `deny-net` are inputs. The same action also reads the legacy source extension. Tags are not published; pin `@main`. This repository's CI calls it with `uses: ./` on `examples/ai_tasks.etsah` and on `examples/ai_tasks_broken.etsah`, which fails with `E-POLICY`.
 - The language name is Etsah. Commands are `etsah`, `etsahc`, and `etsah-mcp`, and source files use `.etsah`. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and warn on stderr, `.prout` files still check, and the old module names re-export the new ones. The repository URL is unchanged.

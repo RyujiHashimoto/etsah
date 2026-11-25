@@ -1,0 +1,18 @@
+# 配属の記入例。架空の青葉ブリッジ派遣が、スタッフ記号 ST-204 を
+# 架空の派遣先「北浜ガラス工房」の北浜第一へ配属する。氏名はない。
+# 開始 2026-04-06、終了 2027-03-31、通知された抵触日 2029-04-06。
+# 2029-04-06 は記入例が通知日として置いた架空の日付である。
+# 開始日に何年を足すかは計算していない。各社の規程や専門家に確認。
+
+type Id
+
+op flag_assignment(start_date: Date, end_date: Date, conflict_date: Date) -> Bool
+  doc "ST-204 の北浜第一（架空）への配属。抵触日は通知された日"
+  pre end_date - start_date >= 0
+  pre end_date <= conflict_date
+  impl native
+
+flow example() -> Bool
+  doc "青葉ブリッジ派遣（架空）。終了日は通知された抵触日以前"
+  let flagged = flag_assignment(2026-04-06, 2027-03-31, 2029-04-06)
+  return flagged
