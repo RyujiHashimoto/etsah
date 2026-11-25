@@ -280,6 +280,14 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 
 スケジューラ、webhook の受け口、冪等ストア、期間ごとの `spend` カウンタ、`net` と `emit` の時間枠。再試行が尽きたら人のロールへ渡す。失敗の経路では外部効果を出さない。
 
+## 親の上限と子の合計
+
+A parent agent's declared `limit calls` or `limit spend` is, in phase 1, its whole remaining budget. Tasks that name the agent are its children. Two or more declared child limits of the same period are added, and that sum must fit in the parent. Overflow is `E-POLICY`. Amounts in another currency are not added; the mismatch is its own `E-POLICY`. A child with no limit is not counted as zero, and a child on another period is not added. An op's own limit is not a share of the task, so op caps are not summed into the task. The one-to-one check, that a single task may not exceed its agent, stays as it was. The integer-yen `budget` is unchanged.
+
+phase 1 では、agent に書いた `limit calls` と `limit spend` が、その親の残予算のすべてである。使い済みの量は引かない。その agent を名指しする task が子である。同じ期間の回数、同じ期間かつ同じ通貨の金額を、子が二つ以上宣言しているとき、その合計が親を超えると `E-POLICY` になる。通貨が違う金額は足さない。その不一致は、これまでどおり一対一の `E-POLICY` である。期間が違う子は足さない。上限の無い子は 0 にはしない。op の上限は、その op 自身の天井であり、task の分け前ではないので、task へは合計しない。一つの task が agent を超える既存の検査はそのままである。整数円の `budget` も変えていない。
+
+次の段階では、親と子が同じ元帳の残数を共有し、親の残数を超える子の呼び出しは、署名付きの承認があっても guard が `BLOCK` する。今回は作らない。
+
 ## 検証
 
 ローカルで次を確認した。数値は実行結果である。
