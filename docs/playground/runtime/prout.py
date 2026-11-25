@@ -29,6 +29,19 @@ class ProutError(Exception):
         self.line = line
 
 
+def decode_string_literal(raw: str, line: int) -> str:
+    """Decode a quoted string literal.
+
+    Malformed escapes are user input errors, so they surface as a
+    structured ProutError instead of a raw json.JSONDecodeError
+    traceback (SPEC: diagnostics, not stack traces).
+    """
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as ex:
+        raise ProutError(f"invalid string literal {raw!r}: {ex.msg}", line) from ex
+
+
 @dataclass
 class Diagnostic:
     code: str
@@ -401,7 +414,7 @@ class ExprParser:
             return Expr("lit", line=line, name="int", value=int(value))
         if kind == "STRING":
             self.advance()
-            return Expr("lit", line=line, name="str", value=json.loads(value))
+            return Expr("lit", line=line, name="str", value=decode_string_literal(value, line))
         if kind == "IDENT":
             self.advance()
             name = value
@@ -1065,7 +1078,7 @@ class Parser:
         s = s.strip()
         if not (s.startswith('"') and s.endswith('"')):
             raise ProutError("expected a quoted string", line)
-        return json.loads(s)
+        return decode_string_literal(s, line)
 
 
 # ---------------------------------------------------------------------------
