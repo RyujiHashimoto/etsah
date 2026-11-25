@@ -146,6 +146,12 @@ class TestAutomationExamples(unittest.TestCase):
         self.assertEqual(find_patterns("自動化", self.registry)[0][1].name, "ai_task")
         self.assertEqual(find_patterns("承認ゲート", self.registry)[0][1].name, "approval_gate")
 
+    def test_safety_phrases_find_the_gate_and_the_task(self) -> None:
+        for phrase in ("安全性", "safety", "診断"):
+            names = [item.name for _score, item in find_patterns(phrase, self.registry)]
+            self.assertIn("approval_gate", names, phrase)
+            self.assertIn("ai_task", names, phrase)
+
     def test_manifest_notes_keep_the_phase_one_limits(self) -> None:
         notes = " ".join(self.registry["ai_task"].notes)
         self.assertIn("etsah.py", notes)
