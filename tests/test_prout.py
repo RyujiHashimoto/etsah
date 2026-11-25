@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prout import Checker, Parser  # noqa: E402
+from prout import Checker, Parser, ProutError, parse_expr  # noqa: E402
 
 HEADER = """
 type Order {
@@ -178,6 +178,36 @@ flow f(order: Order) -> Order
 """
         )
         self.assertEqual([], codes(diags))
+
+
+class StringLiteralDiagnostics(unittest.TestCase):
+    """Malformed string escapes must surface as ProutError diagnostics,
+    never as a raw json.JSONDecodeError traceback."""
+
+    def test_bad_escape_in_doc_is_a_prout_error(self):
+        with self.assertRaises(ProutError):
+            Parser(
+                HEADER
+                + """
+op refund(order: Order, amount: Money) -> Receipt
+  doc "bad \\x escape"
+  eff read(orders)
+  impl native
+"""
+            ).parse()
+
+    def test_bad_escape_in_expression_is_a_prout_error(self):
+        with self.assertRaises(ProutError):
+            parse_expr('amount == "bad \\x"', 1)
+
+    def test_bad_escape_in_parse_string_is_a_prout_error(self):
+        with self.assertRaises(ProutError):
+            Parser.parse_string('"bad \\x"', 1)
+
+    def test_valid_escapes_still_decode(self):
+        self.assertEqual(Parser.parse_string('"a\\nb"', 1), "a\nb")
+        expr = parse_expr('amount == "paid"', 1)
+        self.assertEqual(expr.right.value, "paid")
 
 
 if __name__ == "__main__":
