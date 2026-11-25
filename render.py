@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Render a human-facing view from a PROUT AST.
+Render a human-facing view from an Etsah AST.
 
 The view is a projection: every label, step, effect, and contract status is
 derived from the parsed program. The HTML is not a second source of truth.
@@ -11,7 +11,7 @@ import html
 import json
 from pathlib import Path
 
-from prout import Checker, Parser, ast_hash, fmt_expr
+from etsah import Checker, Parser, ast_hash, fmt_expr
 
 ROOT = Path(__file__).resolve().parent
 EXAMPLES = ROOT / "examples"
@@ -311,18 +311,18 @@ def build_html(fixed_src: str, flow, ops, fixed_diags, broken_diags, digest: str
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PROUT — {esc(flow.doc)}</title>
+<title>Etsah — {esc(flow.doc)}</title>
 <style>{css}</style>
 </head>
 <body>
 <div class="wrap">
-  <div class="kicker">PROUT / FLOW / HUMAN VIEW</div>
+  <div class="kicker">Etsah / FLOW / HUMAN VIEW</div>
   <h1>{esc(flow.doc or flow.name)}</h1>
   <div class="status {status_class}"><span class="dot"></span>{status_text} <span class="sub">{status_sub}</span></div>
   <p class="lead">{esc(summary)}</p>
 
   <div class="layers">
-    <span class="layer"><strong>AI</strong> がPROUTを書く</span><span class="arrow">→</span>
+    <span class="layer"><strong>AI</strong> がEtsahを書く</span><span class="arrow">→</span>
     <span class="layer"><strong>検証器</strong> が型・効果・契約を検査</span><span class="arrow">→</span>
     <span class="layer"><strong>人間</strong> はこの画面で確認</span>
   </div>
@@ -363,13 +363,13 @@ def build_html(fixed_src: str, flow, ops, fixed_diags, broken_diags, digest: str
     <h2>形式コード</h2>
     <p style="font-size:13px;color:var(--muted);margin-bottom:0;">人間はこのコードを読まなくてよい。ただし、この画面のすべての表示はこのコードから生成されている。</p>
     <details>
-      <summary>PROUTのソースを開く</summary>
+      <summary>Etsahのソースを開く</summary>
       <pre><code>{esc(fixed_src)}</code></pre>
     </details>
   </div>
 
   <div class="footer">
-    <span>Generated from the PROUT AST.</span>
+    <span>Generated from the Etsah AST.</span>
     <span>AST <span class="hash">{esc(digest)}</span></span>
     <span>表示は派生物であり、編集の対象ではない。</span>
   </div>
@@ -381,8 +381,8 @@ def build_html(fixed_src: str, flow, ops, fixed_diags, broken_diags, digest: str
 
 
 def main() -> None:
-    broken_src = (EXAMPLES / "refund_broken.prout").read_text(encoding="utf-8")
-    fixed_src = (EXAMPLES / "refund_fixed.prout").read_text(encoding="utf-8")
+    broken_src = (EXAMPLES / "refund_broken.etsah").read_text(encoding="utf-8")
+    fixed_src = (EXAMPLES / "refund_fixed.etsah").read_text(encoding="utf-8")
 
     broken = Parser(broken_src).parse()
     fixed = Parser(fixed_src).parse()

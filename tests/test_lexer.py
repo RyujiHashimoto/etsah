@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 import support  # noqa: F401  (puts the repo root on sys.path)
-from prout import ProutError, tokenize
+from etsah import ProutError, tokenize
 
 
 class TestLexer(unittest.TestCase):

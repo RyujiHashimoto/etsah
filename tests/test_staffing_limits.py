@@ -1,6 +1,6 @@
 """36協定 ceilings and automatic 抵触日 calculation.
 
-Date edges live on `staffing_rules` (datetime), not in `prout.py`.
+Date edges live on `staffing_rules` (datetime), not in `etsah.py`.
 The compiler evaluates spec constants. Runtime checks are described, not run
 on live rows.
 """
@@ -16,7 +16,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import support  # noqa: F401
-from proutc import DEFAULT_REGISTRY, cmd_build, load_registry, parse_app, validate
+from etsahc import DEFAULT_REGISTRY, cmd_build, load_registry, parse_app, validate
 from staffing_rules import (
     MONTHLY_OVERTIME_MAX,
     Span,
@@ -99,7 +99,7 @@ class TestOvertimeAndConflictPolicy(unittest.TestCase):
         cls.registry = load_registry(DEFAULT_REGISTRY)
 
     def test_examples_with_limits_build_and_the_broken_one_fails(self) -> None:
-        app = parse_app((PATTERNS / "examples" / "staffing_limits.prout").read_text(encoding="utf-8"))
+        app = parse_app((PATTERNS / "examples" / "staffing_limits.etsah").read_text(encoding="utf-8"))
         self.assertEqual(validate(app, self.registry), [])
         checks = runtime_checks(app)
         text = format_checks(checks)
@@ -114,7 +114,7 @@ class TestOvertimeAndConflictPolicy(unittest.TestCase):
         self.assertTrue(any(item["phase"] == "runtime" for item in checks))
 
         broken = parse_app(
-            (PATTERNS / "examples" / "staffing_limits_broken.prout").read_text(encoding="utf-8")
+            (PATTERNS / "examples" / "staffing_limits_broken.etsah").read_text(encoding="utf-8")
         )
         diags = validate(broken, self.registry)
         self.assertTrue(any(item.severity == "error" for item in diags))
@@ -466,9 +466,9 @@ class TestOvertimeAndConflictPolicy(unittest.TestCase):
 
     def test_build_writes_static_and_runtime_checks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "limits.prout"
+            path = Path(tmp) / "limits.etsah"
             path.write_text(
-                (PATTERNS / "examples" / "staffing_limits.prout").read_text(encoding="utf-8"),
+                (PATTERNS / "examples" / "staffing_limits.etsah").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             out = Path(tmp) / "out"

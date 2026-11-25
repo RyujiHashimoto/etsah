@@ -8,7 +8,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_api import check_file
+from etsah_api import check_file
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAY = ROOT / "docs" / "playground"
@@ -22,13 +22,13 @@ demo = importlib.util.module_from_spec(DEMO)
 assert DEMO.loader is not None
 DEMO.loader.exec_module(demo)
 
-RUNTIME = ("prout.py", "prout_api.py", "prout_import.py")
+RUNTIME = ("etsah.py", "etsah_api.py", "etsah_import.py")
 SAMPLES = (
-    "examples/agents/support_reply.prout",
-    "examples/agents/support_reply_broken.prout",
-    "examples/agents/invoice.prout",
-    "examples/agents/subscription_cancel_broken.prout",
-    "examples/agents/github_triage.prout",
+    "examples/agents/support_reply.etsah",
+    "examples/agents/support_reply_broken.etsah",
+    "examples/agents/invoice.etsah",
+    "examples/agents/subscription_cancel_broken.etsah",
+    "examples/agents/github_triage.etsah",
     "examples/agents/tools/mcp_tools.json",
     "examples/agents/tools/openai_tools.json",
 )
@@ -61,7 +61,7 @@ def _verdict(payload: dict, kind: str, name: str) -> dict:
 
 class VerdictTests(unittest.TestCase):
     def test_missing_gate_is_block_and_the_send_is_ask(self) -> None:
-        path = ROOT / "examples" / "agents" / "support_reply_broken.prout"
+        path = ROOT / "examples" / "agents" / "support_reply_broken.etsah"
         payload = glue.check_payload(path.read_text(encoding="utf-8"))
         direct = check_file(path)
         self.assertFalse(payload["ok"])
@@ -80,7 +80,7 @@ class VerdictTests(unittest.TestCase):
         self.assertIn("draft_reply", payload["plans"][0]["text"])
 
     def test_named_gate_asks_the_human_role(self) -> None:
-        path = ROOT / "examples" / "agents" / "support_reply.prout"
+        path = ROOT / "examples" / "agents" / "support_reply.etsah"
         payload = glue.check_payload(path.read_text(encoding="utf-8"))
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["ast_hash"], check_file(path).ast_hash)
@@ -92,20 +92,20 @@ class VerdictTests(unittest.TestCase):
         self.assertIn("emit(mail)", task["reason"])
 
     def test_invoice_spend_asks_and_cancel_without_a_gate_blocks(self) -> None:
-        invoice = glue.check_payload((ROOT / "examples" / "agents" / "invoice.prout").read_text(encoding="utf-8"))
+        invoice = glue.check_payload((ROOT / "examples" / "agents" / "invoice.etsah").read_text(encoding="utf-8"))
         self.assertEqual(invoice["summary"]["verdict"], "ASK")
         self.assertIn("billing_lead", _verdict(invoice, "task", "issue_invoice")["reason"])
         self.assertEqual(_verdict(invoice, "op", "payments.charge")["verdict"], "ASK")
         self.assertEqual(_verdict(invoice, "op", "ledger.draft")["verdict"], "ALLOW")
         cancel = glue.check_payload(
-            (ROOT / "examples" / "agents" / "subscription_cancel_broken.prout").read_text(encoding="utf-8")
+            (ROOT / "examples" / "agents" / "subscription_cancel_broken.etsah").read_text(encoding="utf-8")
         )
         self.assertEqual(cancel["summary"]["verdict"], "BLOCK")
         self.assertIn("contract change", _verdict(cancel, "task", "cancel_subscription")["reason"])
         self.assertEqual(_verdict(cancel, "op", "subscriptions.cancel")["verdict"], "ASK")
 
     def test_triage_allowlist_and_a_blocked_host(self) -> None:
-        path = ROOT / "examples" / "agents" / "github_triage.prout"
+        path = ROOT / "examples" / "agents" / "github_triage.etsah"
         text = path.read_text(encoding="utf-8")
         blocked = glue.check_payload(text)
         self.assertEqual(blocked["summary"]["verdict"], "BLOCK")
@@ -115,7 +115,7 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(allowed["summary"]["verdict"], "ALLOW")
         self.assertEqual(_verdict(allowed, "task", "triage_open_issues")["verdict"], "ALLOW")
         broken = glue.check_payload(
-            (ROOT / "examples" / "agents" / "github_triage_broken.prout").read_text(encoding="utf-8"),
+            (ROOT / "examples" / "agents" / "github_triage_broken.etsah").read_text(encoding="utf-8"),
             "github",
         )
         self.assertEqual(broken["summary"]["verdict"], "BLOCK")
@@ -124,7 +124,7 @@ class VerdictTests(unittest.TestCase):
         self.assertTrue(any("hourly rate limit" in item["message"] for item in broken["diagnostics"]))
 
     def test_a_warning_does_not_block(self) -> None:
-        path = ROOT / "examples" / "refund_fixed.prout"
+        path = ROOT / "examples" / "refund_fixed.etsah"
         payload = glue.check_payload(path.read_text(encoding="utf-8"))
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["summary"]["verdict"], "ALLOW")
@@ -202,7 +202,7 @@ class AssetTests(unittest.TestCase):
         parser = TextPull("static-example")
         parser.feed(html)
         shown = "".join(parser.parts).strip() + "\n"
-        original = (ROOT / "examples" / "agents" / "support_reply_broken.prout").read_text(encoding="utf-8").strip() + "\n"
+        original = (ROOT / "examples" / "agents" / "support_reply_broken.etsah").read_text(encoding="utf-8").strip() + "\n"
         self.assertEqual(shown, original)
         self.assertIn("emit to an external party has no approval gate", html)
 

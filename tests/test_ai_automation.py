@@ -10,8 +10,8 @@ import textwrap
 import unittest
 
 import support  # noqa: F401
-from prout import Parser, ProutError
-from proutc import (
+from etsah import Parser, ProutError
+from etsahc import (
     DEFAULT_REGISTRY,
     find_patterns,
     load_registry,
@@ -116,11 +116,11 @@ class TestAutomationExamples(unittest.TestCase):
         cls.registry = load_registry(DEFAULT_REGISTRY)
 
     def test_examples_build_and_the_broken_one_is_caught(self) -> None:
-        for name in ("ai_automation.prout", "ai_desk.prout"):
+        for name in ("ai_automation.etsah", "ai_desk.etsah"):
             app = parse_app((PATTERNS / "examples" / name).read_text(encoding="utf-8"))
             self.assertEqual(validate(app, self.registry), [], name)
 
-        broken = parse_app((PATTERNS / "examples" / "ai_automation_broken.prout").read_text(encoding="utf-8"))
+        broken = parse_app((PATTERNS / "examples" / "ai_automation_broken.etsah").read_text(encoding="utf-8"))
         diags = validate(broken, self.registry)
         self.assertEqual(_codes(diags), ["E-POLICY", "E-POLICY", "E-POLICY"])
         text = " ".join(item.message for item in diags)
@@ -130,10 +130,10 @@ class TestAutomationExamples(unittest.TestCase):
 
     def test_existing_apps_still_validate(self) -> None:
         for path in (
-            PATTERNS / "examples" / "shop.prout",
-            PATTERNS / "examples" / "expense.prout",
-            PATTERNS / "examples" / "staffing.prout",
-            PATTERNS / "examples" / "staffing_desk.prout",
+            PATTERNS / "examples" / "shop.etsah",
+            PATTERNS / "examples" / "expense.etsah",
+            PATTERNS / "examples" / "staffing.etsah",
+            PATTERNS / "examples" / "staffing_desk.etsah",
         ):
             app = parse_app(path.read_text(encoding="utf-8"))
             errors = [item for item in validate(app, self.registry) if item.severity == "error"]
@@ -148,7 +148,7 @@ class TestAutomationExamples(unittest.TestCase):
 
     def test_manifest_notes_keep_the_phase_one_limits(self) -> None:
         notes = " ".join(self.registry["ai_task"].notes)
-        self.assertIn("prout.py", notes)
+        self.assertIn("etsah.py", notes)
         self.assertIn("ast_hash", notes)
         self.assertIn("on_approved", notes)
         gate = " ".join(self.registry["approval_gate"].notes)

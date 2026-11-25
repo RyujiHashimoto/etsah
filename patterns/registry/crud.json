@@ -20,6 +20,6 @@
     {"path": "tests/{plural}.test.ts", "kind": "TEST", "lines": 85, "desc": "CRUDの契約テスト"},
     {"path": "db/schema.sql#{plural}", "kind": "SQL", "lines": 6, "per_field": 2, "desc": "{Entity}テーブル"}
   ],
-  "examples": ["examples/shop.prout"],
+  "examples": ["examples/shop.etsah"],
   "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
 }

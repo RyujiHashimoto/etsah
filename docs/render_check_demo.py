@@ -1,4 +1,4 @@
-"""Build docs/check-demo.svg from real ``prout check`` stdout.
+"""Build docs/check-demo.svg from real ``etsah check`` stdout.
 
 The two terminals are the broken support-reply contract and the same
 task after it names ``gate approve_reply``. Headings are labels. Every
@@ -14,13 +14,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SVG_PATH = ROOT / "docs" / "check-demo.svg"
 
-BEFORE_CMD = "python3 prout.py check examples/agents/support_reply_broken.prout"
-AFTER_CMD = "python3 prout.py check examples/agents/support_reply.prout"
+BEFORE_CMD = "python3 etsah.py check examples/agents/support_reply_broken.etsah"
+AFTER_CMD = "python3 etsah.py check examples/agents/support_reply.etsah"
 
 
 def capture(args: list[str]) -> tuple[int, str]:
     proc = subprocess.run(
-        [sys.executable, str(ROOT / "prout.py"), *args],
+        [sys.executable, str(ROOT / "etsah.py"), *args],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -32,8 +32,8 @@ def capture(args: list[str]) -> tuple[int, str]:
 
 
 def render_svg() -> str:
-    before_code, before = capture(["check", "examples/agents/support_reply_broken.prout"])
-    after_code, after = capture(["check", "examples/agents/support_reply.prout"])
+    before_code, before = capture(["check", "examples/agents/support_reply_broken.etsah"])
+    after_code, after = capture(["check", "examples/agents/support_reply.etsah"])
     if before_code == 0:
         raise RuntimeError("broken support reply unexpectedly passed")
     if after_code != 0:
@@ -69,7 +69,7 @@ def _svg(before: str, after: str) -> str:
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" role="img">',
-        "<title>prout check fails with E-POLICY, then passes after the task names an approval gate</title>",
+        "<title>etsah check fails with E-POLICY, then passes after the task names an approval gate</title>",
         "<desc>Recorded stdout. The first command is the support-reply task with no gate. "
         "The second is the same task after gate approve_reply is named. The checker does not send mail.</desc>",
         "<style>",
@@ -82,9 +82,9 @@ def _svg(before: str, after: str) -> str:
         "</style>",
         f'<rect width="{width}" height="{height}" fill="#f4f1ea"/>',
         f'<text x="{margin}" y="{top}" fill="#5c564c" font-family="ui-sans-serif, Segoe UI, sans-serif" font-size="15">Before — the task emails the customer with no gate</text>',
-        *_panel(margin, before_y, panel_width, before_h, "prout check  exit 1", before_lines, "bad"),
+        *_panel(margin, before_y, panel_width, before_h, "etsah check  exit 1", before_lines, "bad"),
         f'<text x="{margin}" y="{before_y + before_h + 22}" fill="#5c564c" font-family="ui-sans-serif, Segoe UI, sans-serif" font-size="15">After — the task names gate approve_reply</text>',
-        *_panel(margin, after_y, panel_width, after_h, "prout check  exit 0", after_lines, "ok"),
+        *_panel(margin, after_y, panel_width, after_h, "etsah check  exit 0", after_lines, "ok"),
         f'<text x="{margin}" y="{height - 14}" fill="#8a8175" font-family="ui-sans-serif, Segoe UI, sans-serif" font-size="13">stdout from the commands above. The checker does not send the email.</text>',
         "</svg>",
         "",

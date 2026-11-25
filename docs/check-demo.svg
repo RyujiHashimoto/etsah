@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 912" width="1080" height="912" role="img">
-<title>prout check fails with E-POLICY, then passes after the task names an approval gate</title>
+<title>etsah check fails with E-POLICY, then passes after the task names an approval gate</title>
 <desc>Recorded stdout. The first command is the support-reply task with no gate. The second is the same task after gate approve_reply is named. The checker does not send mail.</desc>
 <style>
 .hl-bad { animation: show-bad 10s ease-in-out infinite; }
@@ -18,9 +18,9 @@
 <circle cx="50" cy="68" r="5" fill="#e25b45"/>
 <circle cx="66" cy="68" r="5" fill="#d2a85a"/>
 <circle cx="82" cy="68" r="5" fill="#7dba6a"/>
-<text x="100" y="73" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">prout check  exit 1</text>
-<text x="48" y="112" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 prout.py check examples/agents/support_reply_broken.prout</text>
-<text x="48" y="130" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">PROUT check: examples/agents/support_reply_broken.prout</text>
+<text x="100" y="73" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">etsah check  exit 1</text>
+<text x="48" y="112" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 etsah.py check examples/agents/support_reply_broken.etsah</text>
+<text x="48" y="130" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">Etsah check: examples/agents/support_reply_broken.etsah</text>
 <text x="48" y="148" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: 2bce93ed6e30</text>
 <text x="48" y="166" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>
 <text x="48" y="184" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">1 task(s):</text>
@@ -45,9 +45,9 @@
 <circle cx="50" cy="506" r="5" fill="#e25b45"/>
 <circle cx="66" cy="506" r="5" fill="#d2a85a"/>
 <circle cx="82" cy="506" r="5" fill="#7dba6a"/>
-<text x="100" y="511" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">prout check  exit 0</text>
-<text x="48" y="550" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 prout.py check examples/agents/support_reply.prout</text>
-<text x="48" y="568" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">PROUT check: examples/agents/support_reply.prout</text>
+<text x="100" y="511" fill="#d9d0c3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">etsah check  exit 0</text>
+<text x="48" y="550" fill="#e2c27a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">$ python3 etsah.py check examples/agents/support_reply.etsah</text>
+<text x="48" y="568" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">Etsah check: examples/agents/support_reply.etsah</text>
 <text x="48" y="586" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">AST hash: 270d77fe2df0</text>
 <text x="48" y="604" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13"> </text>
 <text x="48" y="622" fill="#e7e1d5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">1 task(s):</text>

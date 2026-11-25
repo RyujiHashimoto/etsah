@@ -12,8 +12,8 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-import proutc
-from proutc import (
+import etsahc
+from etsahc import (
     DEFAULT_REGISTRY,
     expand,
     find_patterns,
@@ -42,7 +42,7 @@ def _codes(diags, code: str | None = None) -> list[str]:
     return [item for item in found if item == code]
 
 
-def _manifest(name: str, **overrides) -> proutc.PatternManifest:
+def _manifest(name: str, **overrides) -> etsahc.PatternManifest:
     data = {
         "name": name,
         "version": "0.1.0",
@@ -495,7 +495,7 @@ class TestFind(unittest.TestCase):
 
     def test_find_command(self) -> None:
         proc = subprocess.run(
-            [sys.executable, str(PATTERNS / "proutc.py"), "find", "申請 承認"],
+            [sys.executable, str(PATTERNS / "etsahc.py"), "find", "申請 承認"],
             cwd=PATTERNS,
             capture_output=True,
             text=True,
@@ -506,7 +506,7 @@ class TestFind(unittest.TestCase):
         self.assertIn("score=15", proc.stdout)
 
         missing = subprocess.run(
-            [sys.executable, str(PATTERNS / "proutc.py"), "find", "no-such-pattern"],
+            [sys.executable, str(PATTERNS / "etsahc.py"), "find", "no-such-pattern"],
             cwd=PATTERNS,
             capture_output=True,
             text=True,
@@ -712,7 +712,7 @@ class TestBuild(unittest.TestCase):
         cls.registry = load_registry(DEFAULT_REGISTRY)
 
     def test_shared_artifacts_grow_with_fields(self) -> None:
-        def app(*fields: str) -> proutc.App:
+        def app(*fields: str) -> etsahc.App:
             lines = ["app demo", "  stack nextjs", "  entity Note"]
             lines.extend(f"    {field}" for field in fields)
             return parse_app("\n".join(lines) + "\n")
@@ -834,7 +834,7 @@ class TestBuild(unittest.TestCase):
     def test_build_command_writes_report_and_demo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            plain = root / "plain.prout"
+            plain = root / "plain.etsah"
             plain.write_text(
                 snippet(
                     """
@@ -858,7 +858,7 @@ class TestBuild(unittest.TestCase):
             self.assertIn("middleware.ts", [a["path"] for a in manifest["artifacts"]])
             self.assertFalse((out / "demo.html").exists())
 
-            approved = root / "approved.prout"
+            approved = root / "approved.etsah"
             approved.write_text(
                 snippet(
                     """
@@ -888,7 +888,7 @@ class TestBuild(unittest.TestCase):
             demo_manifest = json.loads((demo_out / "manifest.json").read_text(encoding="utf-8"))
             self.assertIn("api/approvals/route.ts", [a["path"] for a in demo_manifest["artifacts"]])
 
-            broken = root / "broken.prout"
+            broken = root / "broken.etsah"
             broken.write_text("this is not an app\n", encoding="utf-8")
             self.assertEqual(
                 _quiet(cmd_build, argparse.Namespace(file=str(broken), registry=str(DEFAULT_REGISTRY), out=str(root / "nope"))),
@@ -896,7 +896,7 @@ class TestBuild(unittest.TestCase):
             )
             self.assertFalse((root / "nope").exists())
 
-            incomplete = root / "incomplete.prout"
+            incomplete = root / "incomplete.etsah"
             incomplete.write_text(
                 snippet(
                     """

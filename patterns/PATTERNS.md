@@ -1,10 +1,10 @@
-# PROUT Patterns v0.1 — AIが速く書くためのパターン言語
+# Etsah Patterns v0.1 — AIが速く書くためのパターン言語
 
 ## 前提：人間が欲しがる形は有限
 
 Webアプリの依頼は、驚くほど同じ形の組み合わせでできている。認証、一覧、詳細、作成、編集、削除、検索、ページネーション、決済、返金、通知、ダッシュボード、ファイルアップロード。AIから見れば、これは有限のパターン集合と、その合成問題である。
 
-長尾は確かにある。しかし長尾に時間を使う前に、頭の部分を一瞬で生成できる言語が必要になる。PROUT Patternsは、その「頭」を言語の第一級要素にしたものである。
+長尾は確かにある。しかし長尾に時間を使う前に、頭の部分を一瞬で生成できる言語が必要になる。Etsah Patternsは、その「頭」を言語の第一級要素にしたものである。
 
 ## 設計：パターンを第一級にする
 
@@ -42,7 +42,7 @@ app shop
 
 - `strict` — パターンのみ。最も速く、最も検証しやすい。新規事業の立ち上げ向け。
 - `guided` — パターン + `custom` ブロック。customには `why` が必須。既存業務ロジックとの接続向け。
-- `open` — パターン + 任意のコード。最も自由だが、検証はPROUTの契約層に委ねる。
+- `open` — パターン + 任意のコード。最も自由だが、検証はEtsahの契約層に委ねる。
 
 自由度は言語の外にあるのではなく、言語のモードとして明示する。これにより「速いが縛られる」と「自由だが遅い」のトレードオフを、プロジェクトごとに選べる。
 
@@ -81,7 +81,7 @@ app shop
 
 `ai_task` の `automation` は、トリガーに対応するスロット、効果と予算の一致、社外への `emit` / `net` と `spend` と契約変更に `approval_gate` が要ることを仕様時に検査する。`count` は非負整数、`cron` は5欄の数値 cron である。使い方と、契約層へまだ移していない構文は `docs/ai_automation.md` に書いた。
 
-パターンは `registry/<name>.json` のマニフェストとして定義する。`proutc.py index` が `registry/index.json` を作り、`proutc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
+パターンは `registry/<name>.json` のマニフェストとして定義する。`etsahc.py index` が `registry/index.json` を作り、`etsahc.py find` が `intent` と `tags` から候補を返す。AIはコードを読まずに、この索引とマニフェストだけでパターンを発見・適用できる。
 
 ## 展開の例
 
@@ -105,7 +105,7 @@ tests/orders.test.ts
 `build` は `report.html` に加えて `demo.html` を生成する。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できる。サーバも外部依存も不要で、生成されたHTMLを開くだけでよい。
 
 ```bash
-python3 proutc.py build examples/expense.prout --out build/expense
+python3 etsahc.py build examples/expense.etsah --out build/expense
 open build/expense/demo.html
 ```
 
@@ -122,7 +122,7 @@ open build/expense/demo.html
 ## なぜ「最も自由度が高い」と言えるのか
 
 - パターンは追加できる。ユーザーもAIも、新しいパターンをライブラリに足せる。
-- `custom` ブロックで任意のコードを埋め込める。PROUTの契約で効果と事前条件を宣言する。
+- `custom` ブロックで任意のコードを埋め込める。Etsahの契約で効果と事前条件を宣言する。
 - ターゲットは一つではない。Next.js、Rails、Django、Phoenixなど、同じ仕様から複数のスタックに展開できる。
 - 生成物は決定論的で、差分が安定する。AIが何度生成しても同じ結果になる。
 
@@ -133,6 +133,6 @@ open build/expense/demo.html
 - 生成物の品質はパターンライブラリの品質に依存する。ライブラリは言語の一部である。
 - `on_approved` が custom ブロックを指す場合、その引数スキーマまではまだ検証できない。標準パターンを指すフックの引数は検証できる。
 
-## PROUTとの関係
+## Etsahとの関係
 
-PROUTは「何を保証するか」を書く契約言語。PROUT Patternsは「何を作るか」を書くパターン言語。パターンは契約を運び、`custom` ブロックはPROUTで検証される。二つは置き換えではなく、上下の層である。
+Etsahは「何を保証するか」を書く契約言語。Etsah Patternsは「何を作るか」を書くパターン言語。パターンは契約を運び、`custom` ブロックはEtsahで検証される。二つは置き換えではなく、上下の層である。

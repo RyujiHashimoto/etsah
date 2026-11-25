@@ -53,8 +53,8 @@
     }
   ],
   "examples": [
-    "examples/travel_request.prout",
-    "examples/equipment_purchase.prout"
+    "examples/travel_request.etsah",
+    "examples/equipment_purchase.etsah"
   ],
   "provenance": {
     "author": "橋元 龍二",

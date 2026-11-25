@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PROUT — 返金リクエストを処理する</title>
+<title>Etsah — 返金リクエストを処理する</title>
 <style>
     :root {
       --bg: #f4f1e9;
@@ -124,13 +124,13 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="kicker">PROUT / FLOW / HUMAN VIEW</div>
+  <div class="kicker">Etsah / FLOW / HUMAN VIEW</div>
   <h1>返金リクエストを処理する</h1>
   <div class="status ok"><span class="dot"></span>検証済み <span class="sub">実行時ガード 1件</span></div>
   <p class="lead">注文を取得し、全額を返金して、領収書を返します。</p>
 
   <div class="layers">
-    <span class="layer"><strong>AI</strong> がPROUTを書く</span><span class="arrow">→</span>
+    <span class="layer"><strong>AI</strong> がEtsahを書く</span><span class="arrow">→</span>
     <span class="layer"><strong>検証器</strong> が型・効果・契約を検査</span><span class="arrow">→</span>
     <span class="layer"><strong>人間</strong> はこの画面で確認</span>
   </div>
@@ -265,8 +265,8 @@
     <h2>形式コード</h2>
     <p style="font-size:13px;color:var(--muted);margin-bottom:0;">人間はこのコードを読まなくてよい。ただし、この画面のすべての表示はこのコードから生成されている。</p>
     <details>
-      <summary>PROUTのソースを開く</summary>
-      <pre><code># PROUT v0.1 — repaired version.
+      <summary>Etsahのソースを開く</summary>
+      <pre><code># Etsah v0.1 — repaired version.
 # The AI adds the missing effects, fixes the amount, and returns the receipt.
 
 type Order {
@@ -317,7 +317,7 @@ flow handle_refund(order_id: Id) -&gt; Receipt
   </div>
 
   <div class="footer">
-    <span>Generated from the PROUT AST.</span>
+    <span>Generated from the Etsah AST.</span>
     <span>AST <span class="hash">bae8501e8b3f</span></span>
     <span>表示は派生物であり、編集の対象ではない。</span>
   </div>

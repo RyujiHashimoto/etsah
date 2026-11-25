@@ -17,6 +17,6 @@
     {"path": "app/(shop)/checkout/page.tsx", "kind": "UI", "lines": 90, "desc": "チェックアウト画面"},
     {"path": "lib/payments.ts", "kind": "TS", "lines": 55, "desc": "Stripeクライアントと冪等性"}
   ],
-  "examples": ["examples/shop.prout"],
+  "examples": ["examples/shop.etsah"],
   "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
 }

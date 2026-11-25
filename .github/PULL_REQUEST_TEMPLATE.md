@@ -8,21 +8,21 @@ Paste the commands you ran and the result. The CI workflow is the baseline:
 
 ```bash
 python3 -m unittest discover -s tests -v
-python3 prout.py check examples/refund_fixed.prout
+python3 etsah.py check examples/refund_fixed.etsah
 ```
 
 ## Contract language
 
-- [ ] No change to `prout.py`
+- [ ] No change to `etsah.py`
 - [ ] `SPEC.md` and `SPEC.en.md` updated in this pull request
 
-If this pull request changes checker meaning, update `SPEC.md` and `SPEC.en.md` here. Do not restyle `prout.py` in a docs-only change.
+If this pull request changes checker meaning, update `SPEC.md` and `SPEC.en.md` here. Do not restyle `etsah.py` in a docs-only change.
 
 ## Patterns
 
-- [ ] No change to `patterns/proutc.py`
+- [ ] No change to `patterns/etsahc.py`
 - [ ] Manifest, `index.json`, and at least two example specs
-- [ ] `python3 proutc.py bench` output pasted below
+- [ ] `python3 etsahc.py bench` output pasted below
 
 `ai_task` and `approval_gate` are already registered.
 

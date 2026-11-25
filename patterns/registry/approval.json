@@ -129,10 +129,10 @@
     }
   ],
   "examples": [
-    "examples/expense.prout",
-    "examples/travel_request.prout",
-    "examples/equipment_purchase.prout",
-    "bench/pc_lending.prout"
+    "examples/expense.etsah",
+    "examples/travel_request.etsah",
+    "examples/equipment_purchase.etsah",
+    "bench/pc_lending.etsah"
   ],
   "provenance": {
     "author": "橋元 龍二",

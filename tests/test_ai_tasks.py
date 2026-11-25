@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout import Checker, Parser, ProutError, ast_digest, ast_hash, program_to_dict, task_plan
+from etsah import Checker, Parser, ProutError, ast_digest, ast_hash, program_to_dict, task_plan
 from support import check, codes, parse, snippet
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,12 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 # Hashes captured before agent/task nodes were added to the canonical AST.
 # Programs that do not declare them must keep these prefixes.
 SAMPLE_HASHES = {
-    "refund_broken.prout": "c0ee67d7cba1",
-    "refund_fixed.prout": "bae8501e8b3f",
-    "staffing.prout": "afd29e7ccdd0",
-    "staffing_broken.prout": "afbf07d01bd2",
-    "staffing_dates.prout": "ecc914507aae",
-    "staffing_dates_broken.prout": "5a9f7cb9dd46",
+    "refund_broken.etsah": "c0ee67d7cba1",
+    "refund_fixed.etsah": "bae8501e8b3f",
+    "staffing.etsah": "afd29e7ccdd0",
+    "staffing_broken.etsah": "afbf07d01bd2",
+    "staffing_dates.etsah": "ecc914507aae",
+    "staffing_dates_broken.etsah": "5a9f7cb9dd46",
 }
 
 HEADER = """
@@ -809,7 +809,7 @@ class AstHash(unittest.TestCase):
         self.assertNotIn(ast_digest(first), str(data["tasks"][0]["key"]))
 
     def test_examples_and_the_check_plan(self) -> None:
-        good = Parser((ROOT / "examples" / "ai_tasks.prout").read_text(encoding="utf-8")).parse()
+        good = Parser((ROOT / "examples" / "ai_tasks.etsah").read_text(encoding="utf-8")).parse()
         self.assertEqual(codes(check(good.source), "error"), [])
         plan = "\n".join(task_plan(good))
         self.assertIn("remind_timesheet", plan)
@@ -819,7 +819,7 @@ class AstHash(unittest.TestCase):
         self.assertIn("remind_return", plan)
         self.assertIn("Asia/Tokyo", plan)
         self.assertIn(ast_digest(good), plan)
-        broken = check((ROOT / "examples" / "ai_tasks_broken.prout").read_text(encoding="utf-8"))
+        broken = check((ROOT / "examples" / "ai_tasks_broken.etsah").read_text(encoding="utf-8"))
         errors = [item for item in broken if item.severity == "error"]
         self.assertEqual([item.code for item in errors], ["E-POLICY"] * 7)
         text = "\n".join(item.message for item in errors)

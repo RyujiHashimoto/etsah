@@ -2,7 +2,7 @@
 
 橋元龍二（J-PROUT）からの依頼は、AIに任せる作業を安全に宣言する機能を考案することである。J-PROUTの事業は、再生PCのレンタルと販売、ZPOOLのクラウド運用支援、AI導入とDXの支援である。人材派遣の基幹（`docs/staffing.md`）で繰り返す定型作業も、同じ境界で扱う。
 
-この文書は設計提案である。契約層の静的検査（`agent`、`task`、`gate`、`policy`）は `prout.py` に入った。日付と小数は、そのブランチの字句を同じ検証器で使っている。パターン層の検査はそのまま残る。cron の実行、予算の残数、冪等ストアはまだ無い。**要決定** と書いた箇所は、本文が勧める初期値で入れた。判断の一覧はプルリクエストに残す。
+この文書は設計提案である。契約層の静的検査（`agent`、`task`、`gate`、`policy`）は `etsah.py` に入った。日付と小数は、そのブランチの字句を同じ検証器で使っている。パターン層の検査はそのまま残る。cron の実行、予算の残数、冪等ストアはまだ無い。**要決定** と書いた箇所は、本文が勧める初期値で入れた。判断の一覧はプルリクエストに残す。
 
 ## 今の言語で既に守れること
 
@@ -157,7 +157,7 @@ trigger webhook "inbound/inquiry"
 
 ## パターン層に入れたもの
 
-phase 1 は、上の規則のうち仕様時に見られるものを `patterns/proutc.py` に入れた。`prout.py` は読んでいない。
+phase 1 は、上の規則のうち仕様時に見られるものを `patterns/etsahc.py` に入れた。`etsah.py` は読んでいない。
 
 | パターン | 役割 |
 |---|---|
@@ -227,7 +227,7 @@ pattern approval_gate RemindClient
 
 ## 実例
 
-三つの業務を、二つの仕様に置いた。人材派遣が `patterns/examples/ai_automation.prout`、PCレンタルと問い合わせ仕分けが `patterns/examples/ai_desk.prout` である。どちらもエラー 0 でビルドできる。
+三つの業務を、二つの仕様に置いた。人材派遣が `patterns/examples/ai_automation.etsah`、PCレンタルと問い合わせ仕分けが `patterns/examples/ai_desk.etsah` である。どちらもエラー 0 でビルドできる。
 
 ### 人材派遣
 
@@ -248,7 +248,7 @@ pattern approval_gate RemindClient
 
 返却日が近いレンタルの文面は毎日 9:00 に作り、顧客へ出す `emit` は `RemindReturnMail`（承認者 `ops`）が要る。出荷できる再生PCの台数は、毎週月曜 7:00 に社内の在庫表へ書く。こちらは `read` と `write` だけで、ゲートは無い。
 
-既存の `bench/pc_lending.prout` は、社員がPCを借りる申請を `approval` で回すベンチである。今回のタスクは、顧客へ返却を促し、在庫を数える運用である。申請の承認パターンは置き換えない。
+既存の `bench/pc_lending.etsah` は、社員がPCを借りる申請を `approval` で回すベンチである。今回のタスクは、顧客へ返却を促し、在庫を数える運用である。申請の承認パターンは置き換えない。
 
 ### DX支援の問い合わせ仕分け
 
@@ -258,7 +258,7 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 
 ### 壊した仕様
 
-`patterns/examples/ai_automation_broken.prout` は、ほかのスロットを揃えたうえで次の3件だけを出す。
+`patterns/examples/ai_automation_broken.etsah` は、ほかのスロットを揃えたうえで次の3件だけを出す。
 
 1. 社外への `emit` にゲートが無い。`emit to an external party has no approval gate`
 2. `spend_per_run` 5000 が `spend_per_period` 1000 を超える。`5000 <= 1000 is false`
@@ -285,11 +285,11 @@ ZPOOLの監視 webhook を同じ `trigger webhook` で受けるかは **要決�
 ローカルで次を確認した。数値は実行結果である。
 
 - `python3 -m unittest discover -s tests -v` は 148 件がすべて成功する。以前 `expectedFailure` だった契約の穴は `tests/test_spec_contracts.py` で通常のテストになっている。
-- `patterns/examples/ai_automation.prout` はエラー 0。仕様 163 行、生成見積もり 2,081 行、展開 12.8 倍。
-- `patterns/examples/ai_desk.prout` はエラー 0。仕様 85 行、生成見積もり 1,100 行、展開 12.9 倍。
+- `patterns/examples/ai_automation.etsah` はエラー 0。仕様 163 行、生成見積もり 2,081 行、展開 12.8 倍。
+- `patterns/examples/ai_desk.etsah` はエラー 0。仕様 85 行、生成見積もり 1,100 行、展開 12.9 倍。
 - 壊した仕様は上の 3 件の `E-POLICY` だけで失敗する。
 - `find "申請 承認"` の先頭は従来どおり `approval`、score 15。`自動化` は `ai_task`、`承認ゲート` は `approval_gate` を返す。
-- `python3 prout.py check examples/staffing.prout` と `examples/refund_fixed.prout` は、パターンを足した時点ではこの変更の前と同じ結果だった。その後の契約層は `task` を受け、`examples/ai_tasks.prout` をエラー 0 で検査する。
+- `python3 etsah.py check examples/staffing.etsah` と `examples/refund_fixed.etsah` は、パターンを足した時点ではこの変更の前と同じ結果だった。その後の契約層は `task` を受け、`examples/ai_tasks.etsah` をエラー 0 で検査する。
 
 ## オーナーへの質問
 

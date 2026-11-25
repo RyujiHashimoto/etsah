@@ -1,4 +1,4 @@
-# PROUT
+# Etsah
 
 **Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.**
 
@@ -12,9 +12,9 @@ It stops an agent from emailing a customer, charging a card, changing a contract
 
 Author: Ryuji Hashimoto (J-PROUT Inc.)
 
-![prout check fails with E-POLICY, then passes after the task names an approval gate](docs/check-demo.svg)
+![etsah check fails with E-POLICY, then passes after the task names an approval gate](docs/check-demo.svg)
 
-```prout
+```etsah
 # before — E-POLICY, the send has no approval gate
 task draft_reply(ticket_id: Id) -> Bool
   eff read(tickets), emit(mail)
@@ -33,13 +33,13 @@ Python 3.12 and the standard library. No extra packages.
 
 ```bash
 git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
-python3 prout.py check examples/agents/support_reply.prout
-python3 patterns/proutc.py build patterns/examples/expense.prout --out patterns/build/expense
+python3 etsah.py check examples/agents/support_reply.etsah
+python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/build/expense
 ```
 
 The second command checks a fictional support desk (Harbor Lane Support, ticket T-1042). The task may read the ticket. Emailing the customer is `emit(mail)`, marked external, and the task names `gate approve_reply`. The check exits 0. The checker reads the source. It does not send mail.
 
-`examples/agents/support_reply_broken.prout` is the same desk with the gate left off the task. That check exits 1 with `E-POLICY`.
+`examples/agents/support_reply_broken.etsah` is the same desk with the gate left off the task. That check exits 1 with `E-POLICY`.
 
 The third command expands a 28-line expense spec and writes `patterns/build/expense/demo.html`. Open that file. No server. Submit, approve, send back, and reject. The approved step runs only after approval. `patterns/build/` is gitignored.
 
@@ -58,12 +58,16 @@ The package is not on PyPI. From a clone:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install .
-.venv/bin/prout check examples/agents/support_reply.prout
-.venv/bin/proutc build patterns/examples/expense.prout --out patterns/build/expense
-.venv/bin/prout-mcp
+.venv/bin/etsah check examples/agents/support_reply.etsah
+.venv/bin/etsahc build patterns/examples/expense.etsah --out patterns/build/expense
+.venv/bin/etsah-mcp
 ```
 
-`prout`, `proutc`, and `prout-mcp` are console scripts. `prout-mcp` is the same stdio server as `python3 prout.py mcp`. Nothing here uploads the package.
+`etsah`, `etsahc`, and `etsah-mcp` are console scripts. `etsah-mcp` is the same stdio server as `python3 etsah.py mcp`. Nothing here uploads the package.
+
+## Renamed from prout
+
+The language is Etsah. For one minor version, the old commands `prout`, `proutc`, and `prout-mcp` still run and write `新名称は etsah` to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. `PROUT_*` environment variables are still read when the matching `ETSAH_*` variable is unset, and approval tokens that start with `prout1.` still verify. The repository URL is unchanged.
 
 ## What the checker enforces
 
@@ -73,20 +77,20 @@ python3 -m venv .venv
 | A task's effects stay inside its agent's `allow` list | `E-POLICY` |
 | External `emit` / `net`, every `spend`, and a `write` marked as a contract change name a human `gate` | `E-POLICY` |
 | Network targets sit on the allow list (default `stripe`; override with `--allow-net`) | `E-POLICY` |
-| Spend budgets are integer yen, and per-run does not exceed the period. Hourly `net` and `emit` limits are static | Declared and checked. Those running totals are not counted. `limit calls` and `limit spend` are counted by `prout guard` |
-| `audit ast_hash` on the agent | Required. The full id is 64 hex digits. `prout check` prints the 12-digit prefix |
+| Spend budgets are integer yen, and per-run does not exceed the period. Hourly `net` and `emit` limits are static | Declared and checked. Those running totals are not counted. `limit calls` and `limit spend` are counted by `etsah guard` |
+| `audit ast_hash` on the agent | Required. The full id is 64 hex digits. `etsah check` prints the 12-digit prefix |
 | Preconditions in linear arithmetic, including `Decimal` and calendar `Date` | False is `E-PRE`. Unproved is a visible `W-PRE` guard |
 | Information-flow labels (`pii`, `secret`) when the program declares them | `E-IFLOW-*`, `E-DECLASS`. Programs with no labels keep their old AST hash |
 
-The checker does not run cron, store the remaining integer-yen budget, or store idempotency keys. A gate stops the static check. It does not send the approval email. `impl` may be Python, Rust, or SQL. PROUT records what that implementation may read, write, charge, and promise.
+The checker does not run cron, store the remaining integer-yen budget, or store idempotency keys. A gate stops the static check. It does not send the approval email. `impl` may be Python, Rust, or SQL. Etsah records what that implementation may read, write, charge, and promise.
 
 Full rules: [SPEC.md](SPEC.md) (Japanese, the original) and [SPEC.en.md](SPEC.en.md).
 
 ## Contract layer
 
-A repaired refund, abbreviated from [`examples/refund_fixed.prout`](examples/refund_fixed.prout). The flow's effects must equal the effects of the operations it calls.
+A repaired refund, abbreviated from [`examples/refund_fixed.etsah`](examples/refund_fixed.etsah). The flow's effects must equal the effects of the operations it calls.
 
-```prout
+```etsah
 op refund(order: Order, amount: Money) -> Receipt
   doc "注文を指定額だけ返金する"
   eff write(payments), net(stripe)
@@ -102,13 +106,13 @@ flow handle_refund(order_id: Id) -> Receipt
   return receipt
 ```
 
-`python3 prout.py check examples/refund_fixed.prout` exits 0 with one runtime guard (`W-PRE`: `order.status == "paid"`) and AST hash `bae8501e8b3f`. `python3 render.py` rebuilds [`human-view.html`](human-view.html) from the AST.
+`python3 etsah.py check examples/refund_fixed.etsah` exits 0 with one runtime guard (`W-PRE`: `order.status == "paid"`) and AST hash `bae8501e8b3f`. `python3 render.py` rebuilds [`human-view.html`](human-view.html) from the AST.
 
 ![Human view generated from the AST](docs/human-view.png)
 
-An agent envelope, abbreviated from [`examples/agents/support_reply.prout`](examples/agents/support_reply.prout):
+An agent envelope, abbreviated from [`examples/agents/support_reply.etsah`](examples/agents/support_reply.etsah):
 
-```prout
+```etsah
 policy
   external emit(mail)
 
@@ -141,12 +145,12 @@ task draft_reply(ticket_id: Id) -> Bool
 The same check is an MCP server. It speaks stdio and uses only the standard library. There is no `mcp` package to install.
 
 ```bash
-python3 prout.py mcp
-python3 prout.py import mcp examples/agents/tools/mcp_tools.json
-python3 prout.py guard --contract examples/agents/support_reply.prout -- python3 path/to/upstream_server.py
+python3 etsah.py mcp
+python3 etsah.py import mcp examples/agents/tools/mcp_tools.json
+python3 etsah.py guard --contract examples/agents/support_reply.etsah -- python3 path/to/upstream_server.py
 ```
 
-`prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `prout approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. `limit calls` and `limit spend` are counted in a ledger file, and a signed approval does not raise those caps. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
+`etsah_check`, `etsah_import_tools`, `etsah_explain`, and `etsah_check_plan` are read-only. `etsah guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `etsah approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. `limit calls` and `limit spend` are counted in a ledger file, and a signed approval does not raise those caps. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
 
 ## Prompt injection
 
@@ -155,7 +159,7 @@ A fictional inquiry, Q-4401 from `guest@example.invalid`, tells Harbor Lane Desk
 The leaking contract lets the secret token reach `mail.forward`. The check rejects it:
 
 ```bash
-python3 prout.py check examples/prompt_injection_leak.prout
+python3 etsah.py check examples/prompt_injection_leak.etsah
 ```
 
 Expected: exit 1, `E-IFLOW-ARG` at `mail.forward` (`argument 'note' of mail.forward expects no labels, got secret`).
@@ -163,12 +167,12 @@ Expected: exit 1, `E-IFLOW-ARG` at `mail.forward` (`argument 'note' of mail.forw
 The safe contract keeps the token inside the vault and answers with a fixed public sentence. External mail and the refund wait for `desk_lead`. The refund is a decimal in JPY and is capped at 1000.00 per day.
 
 ```bash
-python3 prout.py check examples/prompt_injection_safe.prout
+python3 etsah.py check examples/prompt_injection_safe.etsah
 ```
 
 Expected: exit 0, no errors.
 
-Against that safe contract, `prout guard` treats the calls as follows.
+Against that safe contract, `etsah guard` treats the calls as follows.
 
 | Call | Verdict | Why |
 |---|---|---|
@@ -178,15 +182,15 @@ Against that safe contract, `prout guard` treats the calls as follows.
 | `payments.refund` of `100.00` with a matching signed approval | forwarded | Under the 1000.00 JPY daily cap |
 | `payments.refund` of `9000.00` with a matching signed approval | `BLOCK` | The signature fits the call, and the cap still rejects it |
 
-The approval is issued with `prout approve` for that op, gate `approve_reply`, approver `desk_lead`, and the same argument object the client will send. The guard needs the same HMAC key, a nonce file, and `--ledger-file`.
+The approval is issued with `etsah approve` for that op, gate `approve_reply`, approver `desk_lead`, and the same argument object the client will send. The guard needs the same HMAC key, a nonce file, and `--ledger-file`.
 
 ## Pattern layer
 
 App specs fill slots. The compiler checks them and estimates database, API, UI, and test files. It does not yet write those source files.
 
 ```bash
-python3 patterns/proutc.py find "approval"
-python3 patterns/proutc.py find "申請 承認"
+python3 patterns/etsahc.py find "approval"
+python3 patterns/etsahc.py find "申請 承認"
 ```
 
 `find "申請 承認"` returns `approval`. The registry has 27 manifests, including `overtime_agreement`, `ai_task`, and `approval_gate`. Patterns are JSON, so another agent can discover one from [`patterns/registry/index.json`](patterns/registry/index.json) without reading the compiler.
@@ -205,13 +209,13 @@ The longer trial write-up is in [README.ja.md](README.ja.md).
 
 ## Industry example: a staffing desk
 
-[`patterns/examples/staffing.prout`](patterns/examples/staffing.prout) is one industry, not the center of the language. It is a fictional staffing desk: staff, openings, a dispatch contract, a timesheet the client site must approve, a 36-agreement whose limits are slots, and a bill rate at or above the pay rate. Omitted agreement limits default to the general statutory ceilings, and a higher cap is an error. The conflict date is both the date the client notified and a date calculated from the earliest dispatch start at the same office and for the same person and organizational unit. The compiler reads the spec only. Live hours and stored contracts are described as runtime checks and are not evaluated. Social-insurance rates and equal-pay determinations are out of scope.
+[`patterns/examples/staffing.etsah`](patterns/examples/staffing.etsah) is one industry, not the center of the language. It is a fictional staffing desk: staff, openings, a dispatch contract, a timesheet the client site must approve, a 36-agreement whose limits are slots, and a bill rate at or above the pay rate. Omitted agreement limits default to the general statutory ceilings, and a higher cap is an error. The conflict date is both the date the client notified and a date calculated from the earliest dispatch start at the same office and for the same person and organizational unit. The compiler reads the spec only. Live hours and stored contracts are described as runtime checks and are not evaluated. Social-insurance rates and equal-pay determinations are out of scope.
 
 ```bash
-python3 patterns/proutc.py build patterns/examples/staffing.prout --out patterns/build/staffing
+python3 patterns/etsahc.py build patterns/examples/staffing.etsah --out patterns/build/staffing
 ```
 
-Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can also write those dates and decimal rates directly. See `examples/staffing_dates.prout`.
+Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can also write those dates and decimal rates directly. See `examples/staffing_dates.etsah`.
 
 ## Features
 
@@ -221,8 +225,8 @@ Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can 
 - Information-flow labels. Programs that do not use them keep their previous AST hash.
 - Diagnostics an agent can repair from: code, location, expected, actual, suggestion.
 - Human HTML from the AST (`render.py`) and a static browser playground (`docs/playground/`).
-- Import of MCP and OpenAI tool lists into `op` declarations (`prout import`).
-- MCP server and a stdio guard (`prout mcp`, `prout guard`, `prout-mcp`).
+- Import of MCP and OpenAI tool lists into `op` declarations (`etsah import`).
+- MCP server and a stdio guard (`etsah mcp`, `etsah guard`, `etsah-mcp`).
 - 27 pattern manifests, `find`, and an approval `demo.html`.
 - CI on GitHub Actions.
 
@@ -254,12 +258,12 @@ Prototype. No release tag. Not published to PyPI. `build` emits a report, a demo
 ## Repository
 
 ```
-prout.py                 contract parser, checker, CLI
-prout_api.py             check_source and check_file
-prout_import.py          MCP and OpenAI tool lists become ops
-prout_mcp/               MCP server (prout mcp) and guard (prout guard)
+etsah.py                 contract parser, checker, CLI
+etsah_api.py             check_source and check_file
+etsah_import.py          MCP and OpenAI tool lists become ops
+etsah_mcp/               MCP server (etsah mcp) and guard (etsah guard)
 render.py                AST to human HTML
-patterns/proutc.py       pattern compiler (build, find, add, index, bench)
+patterns/etsahc.py       pattern compiler (build, find, add, index, bench)
 patterns/registry/       27 manifests and index.json
 examples/agents/         agent contracts, including broken ones
 docs/playground/         browser checker (static, Pyodide)

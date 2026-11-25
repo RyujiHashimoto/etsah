@@ -1,10 +1,10 @@
-# PROUT
+# Etsah
 
-> PROUT is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
+> Etsah is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
 
-Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (355 tests, all passing).
+Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 etsah.py check` on `.etsah` files. `python3 -m unittest discover -s tests` is the test command (365 tests, all passing).
 
-Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `prout.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
+Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `etsah.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
 
 ## Docs
 
@@ -15,11 +15,11 @@ Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor t
 - [SPEC.en.md](SPEC.en.md): English translation of `SPEC.md`.
 - [CONTRIBUTING.md](CONTRIBUTING.md): How to add a pattern manifest, review criteria, and versioning.
 - [docs/information-flow.md](docs/information-flow.md): Information-flow labels, sinks, and `declassify`.
-- [docs/ai_automation.md](docs/ai_automation.md): Design notes for `agent` / `task` / `gate` / `policy`. The checker is static. `prout guard` counts `limit calls` and `limit spend`. Cron, the integer-yen budget counter, and an idempotency store are not implemented.
+- [docs/ai_automation.md](docs/ai_automation.md): Design notes for `agent` / `task` / `gate` / `policy`. The checker is static. `etsah guard` counts `limit calls` and `limit spend`. Cron, the integer-yen budget counter, and an idempotency store are not implemented.
 - [docs/staffing.md](docs/staffing.md): Staffing-domain contracts (timesheets, assignment limits, billing rates). Sample data is fictional.
 - [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md): Five-minute agent check.
 - [docs/en/comparison.md](docs/en/comparison.md): How this differs from a Cedar or OPA policy plus a wrapper.
-- [docs/en/mcp.md](docs/en/mcp.md): MCP stdio server (`python3 prout.py mcp`), guard (`python3 prout.py guard`), signed one-time approvals (`python3 prout.py approve`), and the call/spend ledger.
+- [docs/en/mcp.md](docs/en/mcp.md): MCP stdio server (`python3 etsah.py mcp`), guard (`python3 etsah.py guard`), signed one-time approvals (`python3 etsah.py approve`), and the call/spend ledger.
 - [docs/mcp.ja.md](docs/mcp.ja.md): Japanese version of the MCP guide.
 - [docs/playground/index.html](docs/playground/index.html): Static browser checker. The repository does not enable GitHub Pages by itself.
 - [SECURITY.md](SECURITY.md): How to report a vulnerability.
@@ -27,12 +27,12 @@ Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor t
 
 ## Examples
 
-- [examples/agents/support_reply.prout](examples/agents/support_reply.prout): Passing support-reply contract (fictional ticket). The broken twin is [examples/agents/support_reply_broken.prout](examples/agents/support_reply_broken.prout) and fails with `E-POLICY`.
-- [examples/ai_tasks.prout](examples/ai_tasks.prout): Passing `agent` / `task` contracts. The broken twin is [examples/ai_tasks_broken.prout](examples/ai_tasks_broken.prout).
-- [examples/refund_fixed.prout](examples/refund_fixed.prout): Passing refund contract. The broken twin is [examples/refund_broken.prout](examples/refund_broken.prout).
-- [examples/information_flow_safe.prout](examples/information_flow_safe.prout): Passing information-flow example (`--allow-net email --allow-net analytics`). The leaking twin is [examples/information_flow_leak.prout](examples/information_flow_leak.prout).
-- [examples/prompt_injection_safe.prout](examples/prompt_injection_safe.prout): Fictional inquiry Q-4401. The safe contract keeps a vault token inside. The leaking twin is [examples/prompt_injection_leak.prout](examples/prompt_injection_leak.prout) and fails with `E-IFLOW-ARG`. Steps are in [README.md](README.md).
-- [examples/staffing.prout](examples/staffing.prout) and [examples/staffing_dates.prout](examples/staffing_dates.prout): Staffing contracts. Broken twins sit beside them.
+- [examples/agents/support_reply.etsah](examples/agents/support_reply.etsah): Passing support-reply contract (fictional ticket). The broken twin is [examples/agents/support_reply_broken.etsah](examples/agents/support_reply_broken.etsah) and fails with `E-POLICY`.
+- [examples/ai_tasks.etsah](examples/ai_tasks.etsah): Passing `agent` / `task` contracts. The broken twin is [examples/ai_tasks_broken.etsah](examples/ai_tasks_broken.etsah).
+- [examples/refund_fixed.etsah](examples/refund_fixed.etsah): Passing refund contract. The broken twin is [examples/refund_broken.etsah](examples/refund_broken.etsah).
+- [examples/information_flow_safe.etsah](examples/information_flow_safe.etsah): Passing information-flow example (`--allow-net email --allow-net analytics`). The leaking twin is [examples/information_flow_leak.etsah](examples/information_flow_leak.etsah).
+- [examples/prompt_injection_safe.etsah](examples/prompt_injection_safe.etsah): Fictional inquiry Q-4401. The safe contract keeps a vault token inside. The leaking twin is [examples/prompt_injection_leak.etsah](examples/prompt_injection_leak.etsah) and fails with `E-IFLOW-ARG`. Steps are in [README.md](README.md).
+- [examples/staffing.etsah](examples/staffing.etsah) and [examples/staffing_dates.etsah](examples/staffing_dates.etsah): Staffing contracts. Broken twins sit beside them.
 
 ## Optional
 

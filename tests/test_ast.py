@@ -11,7 +11,7 @@ import json
 import unittest
 
 import support
-from prout import Parser, ast_hash, program_to_dict
+from etsah import Parser, ast_hash, program_to_dict
 from support import parse, snippet
 
 BASE = """

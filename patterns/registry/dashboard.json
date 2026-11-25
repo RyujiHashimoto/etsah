@@ -14,6 +14,6 @@
     {"path": "lib/metrics.ts", "kind": "TS", "lines": 65, "desc": "集計クエリ"},
     {"path": "api/metrics/route.ts", "kind": "API", "lines": 40, "desc": "指標API"}
   ],
-  "examples": ["examples/shop.prout"],
+  "examples": ["examples/shop.etsah"],
   "provenance": {"author": "橋元 龍二", "date": "2026-11-22"}
 }
