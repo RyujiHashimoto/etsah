@@ -1,12 +1,47 @@
+# PROUT
+
+**Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.**
+
+It stops an agent from emailing a customer, charging a card, changing a contract, or calling a host that is not allowlisted, before any of those calls run.
+
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![ci](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml)
+[![playground](https://img.shields.io/badge/playground-try%20it-2f6f4e)](docs/playground/index.html)
+
+![prout check fails with E-POLICY, then passes after the task names an approval gate](docs/check-demo.svg)
+
+```prout
+# before — E-POLICY, the send has no approval gate
+task draft_reply(ticket_id: Id) -> Bool
+  eff read(tickets), emit(mail)
+
+# after — ask support_lead, then send
+task draft_reply(ticket_id: Id) -> Bool
+  eff read(tickets), emit(mail)
+  gate approve_reply
+```
+
+[Try it in your browser](docs/playground/index.html). The page is static files under `docs/`. It goes live once GitHub Pages is enabled for this repository, with `/docs` as the site source. This change does not enable Pages.
+
+## Quickstart
+
+```bash
+git clone https://github.com/RyujiHashimoto/prout-lang.git
+cd prout-lang
+python3 prout.py check examples/agents/support_reply_broken.prout
+```
+
+That command exits 1. `E-POLICY` means the checker stopped the send before anything ran. `examples/agents/support_reply.prout` names `gate approve_reply` and exits 0.
+
+Prior art, including why a Cedar or OPA policy plus a wrapper is a different check: [docs/en/comparison.md](docs/en/comparison.md). Five-minute tour: [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md).
+
 # PROUT（プラウト）
 
 **AIが書き、AIが検証し、人間は自然言語とGUIで読む。**
 
-[![ci](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml)
-
 PROUTは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
 
-作者: 橋元 龍二（Ryuji Hashimoto） / [@RyujiHashimoto](https://github.com/RyujiHashimoto)
+Ryuji Hashimoto (J-PROUT Inc.)
 
 ## 出発点
 
@@ -48,7 +83,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在231件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在284件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -184,6 +219,9 @@ prout_mcp/               MCP サーバ（prout mcp）とガード（prout guard�
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
 examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
+docs/playground/         ブラウザの検査（静的ページ。Pyodide）
+docs/en/comparison.md    契約・効果・ポリシー・ガードレールとの比較
+docs/check-demo.svg      prout check の前後を録った SVG
 tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
   proutc.py              パターンコンパイラ（build / find / add / index / bench）
@@ -251,7 +289,7 @@ python3 proutc.py find "自動化"
 
 ## エージェントのツールを契約で止める
 
-英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
+英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md)、ブラウザの試用は [docs/playground/index.html](docs/playground/index.html)、先行する仕組みとの比較は [docs/en/comparison.md](docs/en/comparison.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
 
 ```sh
 python3 prout.py import mcp examples/agents/tools/mcp_tools.json
@@ -303,4 +341,6 @@ python3 prout.py check examples/information_flow_leak.prout \
 
 ## ライセンス
 
-MIT。Copyright (c) 2026 橋元 龍二（Ryuji Hashimoto）。
+MIT. Copyright (c) 2026 Ryuji Hashimoto (J-PROUT Inc.).
+
+Developed by [J-PROUT Inc.](https://www.j-prout.co.jp/).

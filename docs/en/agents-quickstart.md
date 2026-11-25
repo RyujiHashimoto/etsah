@@ -4,6 +4,8 @@ PROUT is contracts for AI agents: declare effects and approvals, catch unsafe au
 
 This is a five-minute path from a tool list to a check that fails before an agent emails a customer, charges a card, cancels a subscription, or calls a host that is not on the allowlist. Python 3.12 is enough. There are no packages to install.
 
+The same check runs in the browser at [docs/playground/index.html](../playground/index.html). That page goes live once GitHub Pages is enabled. It does not enable Pages by itself. How this differs from Cedar, OPA, Guardrails, and effect systems is in [comparison.md](comparison.md).
+
 ```bash
 git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang

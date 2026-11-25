@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROUT playground — check an agent contract in the browser</title>
+  <meta name="description" content="PROUT checks an AI agent's declared effects and approval gates before anything runs. Load a contract, press Run, and see ALLOW, ASK, or BLOCK.">
+  <link rel="canonical" href="https://ryujihashimoto.github.io/prout-lang/playground/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PROUT playground — contracts for AI agents">
+  <meta property="og:description" content="Declare effects and approvals. Catch unsafe automations before they run. The check shows ALLOW, ASK, or BLOCK.">
+  <meta property="og:url" content="https://ryujihashimoto.github.io/prout-lang/playground/">
+  <meta property="og:image" content="https://ryujihashimoto.github.io/prout-lang/playground/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PROUT: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PROUT playground — contracts for AI agents">
+  <meta name="twitter:description" content="Declare effects and approvals. Catch unsafe automations before they run. The check shows ALLOW, ASK, or BLOCK.">
+  <meta name="twitter:image" content="https://ryujihashimoto.github.io/prout-lang/playground/og.png">
+  <meta name="twitter:image:alt" content="PROUT: contracts for AI agents. Declare effects and approvals. Catch unsafe automations before they run.">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #ddd6c8;
+      --paper: #f4f1ea;
+      --card: #fffcf7;
+      --green: #1f4d3a;
+      --allow: #e7f5ec;
+      --allow-ink: #145c32;
+      --ask: #f8efd4;
+      --ask-ink: #6d4e09;
+      --block: #fde8e4;
+      --block-ink: #8d2a1f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.5 "Segoe UI", ui-sans-serif, sans-serif;
+    }
+    a { color: var(--green); }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 64px; }
+    header h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.02em; }
+    header .tag { margin: 0 0 8px; font-size: 1.05rem; }
+    header .prevent { margin: 0; color: var(--muted); }
+    .explain, .tool { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 8px; margin-top: 20px; }
+    .explain h2, .tool h2 { font-size: 1.05rem; margin: 0 0 8px; }
+    pre, textarea, .mono {
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    pre {
+      background: #231f1b; color: #e7e1d5; padding: 14px; border-radius: 8px;
+      overflow: auto; white-space: pre;
+    }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+    .tabs button, button {
+      font: inherit; border-radius: 999px; border: 1px solid var(--line);
+      background: #fff; color: var(--ink); padding: 6px 12px; cursor: pointer;
+    }
+    .tabs button[aria-selected="true"] { background: var(--green); color: #fff; border-color: var(--green); }
+    button.primary { background: var(--green); color: #fff; border-color: var(--green); font-weight: 650; }
+    button:disabled { opacity: 0.55; cursor: progress; }
+    button:focus-visible, .tabs button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--green); outline-offset: 2px;
+    }
+    label { display: block; font-size: 0.92rem; margin: 8px 0; }
+    input[type="text"], select, textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+      color: var(--ink); padding: 8px 10px; font: inherit;
+    }
+    textarea { min-height: 280px; resize: vertical; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+    .row label { margin: 0; flex: 1 1 220px; }
+    #status { color: var(--muted); min-height: 1.5em; }
+    .banner { border-radius: 8px; padding: 10px 12px; font-weight: 650; margin: 8px 0; }
+    .ALLOW { background: var(--allow); color: var(--allow-ink); }
+    .ASK { background: var(--ask); color: var(--ask-ink); }
+    .BLOCK { background: var(--block); color: var(--block-ink); }
+    ul.verdicts { list-style: none; padding: 0; margin: 8px 0 16px; }
+    ul.verdicts li {
+      display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px;
+      border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px;
+      padding: 8px 10px; margin: 0 0 8px; background: #fff;
+    }
+    ul.verdicts li.ALLOW { border-left-color: var(--allow-ink); }
+    ul.verdicts li.ASK { border-left-color: var(--ask-ink); }
+    ul.verdicts li.BLOCK { border-left-color: var(--block-ink); }
+    .tag { font-weight: 750; letter-spacing: 0.04em; grid-row: 1 / span 2; align-self: center; }
+    li strong { grid-column: 2; }
+    li .reason { grid-column: 2; color: var(--ink); font-weight: 450; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+    th { color: var(--muted); font-weight: 600; }
+    .hash { font-size: 0.92rem; }
+    footer { margin-top: 28px; color: var(--muted); font-size: 0.92rem; }
+    noscript { display: block; margin-top: 8px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>PROUT playground</h1>
+    <p class="tag">Contracts for AI agents: declare effects and approvals, catch unsafe automations before they run.</p>
+    <p class="prevent">It stops an agent from emailing a customer, charging a card, changing a contract, or calling a host that is not allowlisted, before any of those calls run. The checker reads the contract. It does not run the agent.</p>
+  </header>
+
+  <section class="explain">
+    <h2>What a check looks like</h2>
+    <p>ALLOW means the declared effect does not need a person. ASK means an approval gate has to accept it before it runs. BLOCK means the checker rejected the declaration.</p>
+    <p>This contract drafts a reply for fictional ticket T-1042 at Harbor Lane Support, then emails the customer. The gate <code>approve_reply</code> is declared and never named on the task, so the send is blocked. Nothing here sends a live message.</p>
+    <p>The checker reports <strong>BLOCK</strong>: <code>E-POLICY</code> (line 35), task draft_reply: emit to an external party has no approval gate (emit(mail)).</p>
+    <details>
+      <summary>Example source, support reply with no gate</summary>
+      <pre id="static-example"># Same reply draft as support_reply.prout, with the task gate left off.
+# Expected: E-POLICY, emit to an external party has no approval gate.
+#   python3 prout.py check examples/agents/support_reply_broken.prout
+
+type Id
+type Ticket
+
+op tickets.read(ticket_id: Id) -> Ticket
+  doc "Read ticket T-1042 for Mina Patel"
+  eff read(tickets)
+  impl native
+
+op mail.send_reply(ticket: Ticket) -> Bool
+  doc "Send the reply to the customer with no approval"
+  eff emit(mail)
+  impl native
+
+policy
+  external emit(mail)
+
+agent support_reply
+  doc "Drafts replies and can send mail"
+  allow read(tickets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+gate approve_reply
+  doc "Declared, but the task never names it"
+  approver support_lead
+  before emit(mail)
+  on_approved mail.send_reply
+
+task draft_reply(ticket_id: Id) -> Bool
+  agent support_reply
+  doc "Read a ticket and email the customer without a gate"
+  trigger webhook "support-tickets"
+  eff read(tickets), emit(mail)
+  key ticket_id
+  retry 2 escalate support_lead
+  let ticket = tickets.read(ticket_id)
+  let sent = mail.send_reply(ticket)
+  return sent
+</pre>
+    </details>
+    <p>More contracts live in the repository under <code>examples/agents/</code> and <code>examples/ai_tasks.prout</code>. A comparison with Cedar, OPA, Dafny, Koka, and LLM guardrails is in <a href="../en/comparison.md">docs/en/comparison.md</a>. The five-minute tour is <a href="../en/agents-quickstart.md">docs/en/agents-quickstart.md</a>.</p>
+  </section>
+
+  <section class="tool" id="app">
+    <h2>Run a contract</h2>
+    <p>An example is already loaded. One Run shows the verdicts, the diagnostics, the AST hash, and the task plan. The page loads <code>prout.py</code> and <code>prout_api.py</code> from this site and runs them with <a href="https://pyodide.org/en/stable/usage/quickstart.html">Pyodide</a>. A link's hash is the editor text, compressed, so opening it restores the same check.</p>
+    <div class="tabs" role="tablist" aria-label="Examples">
+      <button type="button" role="tab" id="tab-reply-blocked" data-example="reply-blocked" aria-selected="true">Reply, blocked</button>
+      <button type="button" role="tab" id="tab-reply-gated" data-example="reply-gated">Reply, gated</button>
+      <button type="button" role="tab" id="tab-invoice" data-example="invoice">Invoice</button>
+      <button type="button" role="tab" id="tab-cancel" data-example="cancel">Cancel plan</button>
+      <button type="button" role="tab" id="tab-triage" data-example="triage">Issue triage</button>
+      <button type="button" role="tab" id="tab-import" data-example="import">Import tools</button>
+    </div>
+
+    <div id="check-panel">
+      <div class="row">
+        <label>Allow-net hosts
+          <input id="allow" type="text" spellcheck="false" placeholder="empty keeps stripe" autocomplete="off">
+        </label>
+        <button type="button" class="primary" id="run" disabled>Run</button>
+        <button type="button" id="copy-link">Copy link</button>
+      </div>
+      <p id="allow-help">Comma-separated host names. An empty field keeps the default allowlist, which is <code>stripe</code>. Issue triage sets this to <code>github</code>, and that replaces the default rather than adding to it.</p>
+      <label>Contract
+        <textarea id="editor" spellcheck="false" aria-label="PROUT source"></textarea>
+      </label>
+    </div>
+
+    <div id="import-panel" hidden>
+      <label>Tool list
+        <select id="import-kind" aria-label="Tool JSON kind">
+          <option value="mcp">MCP tools/list</option>
+          <option value="openai">OpenAI function tools</option>
+        </select>
+      </label>
+      <label>JSON
+        <textarea id="import-raw" spellcheck="false" aria-label="Tool JSON"></textarea>
+      </label>
+      <div class="row">
+        <button type="button" class="primary" id="import-run" disabled>Import</button>
+        <button type="button" id="import-check" disabled>Run check on these ops</button>
+      </div>
+      <pre id="import-out" hidden></pre>
+    </div>
+
+    <p id="status" role="status">Loading the checker…</p>
+    <div id="results" aria-live="polite" hidden>
+      <p id="summary" class="banner" hidden></p>
+      <ul id="verdicts" class="verdicts"></ul>
+      <h3>Diagnostics</h3>
+      <table>
+        <thead><tr><th>Code</th><th>Line</th><th>Message</th></tr></thead>
+        <tbody id="diagnostics"></tbody>
+      </table>
+      <h3>AST hash</h3>
+      <p id="hash" class="hash mono"></p>
+      <h3>Task plan</h3>
+      <pre id="plans"></pre>
+    </div>
+    <noscript>JavaScript runs the checker in this browser. The BLOCK result for the example above is already written out, so the page can be read without it.</noscript>
+  </section>
+
+  <footer>
+    <p>Developed by <a href="https://www.j-prout.co.jp/">J-PROUT Inc.</a></p>
+  </footer>
+</main>
+<script>
+const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/";
+const EXAMPLES = [
+  { id: "reply-blocked", label: "Reply, blocked", file: "agents/support_reply_broken.prout", allow: "" },
+  { id: "reply-gated", label: "Reply, gated", file: "agents/support_reply.prout", allow: "" },
+  { id: "invoice", label: "Invoice", file: "agents/invoice.prout", allow: "" },
+  { id: "cancel", label: "Cancel plan", file: "agents/subscription_cancel_broken.prout", allow: "" },
+  { id: "triage", label: "Issue triage", file: "agents/github_triage.prout", allow: "github" },
+];
+const TOOLS = {
+  mcp: "agents/tools/mcp_tools.json",
+  openai: "agents/tools/openai_tools.json",
+};
+
+const editor = document.getElementById("editor");
+const allow = document.getElementById("allow");
+const runBtn = document.getElementById("run");
+const statusEl = document.getElementById("status");
+const summaryEl = document.getElementById("summary");
+const verdictsEl = document.getElementById("verdicts");
+const diagnosticsEl = document.getElementById("diagnostics");
+const hashEl = document.getElementById("hash");
+const plansEl = document.getElementById("plans");
+const checkPanel = document.getElementById("check-panel");
+const importPanel = document.getElementById("import-panel");
+const importKind = document.getElementById("import-kind");
+const importRaw = document.getElementById("import-raw");
+const importRun = document.getElementById("import-run");
+const importCheck = document.getElementById("import-check");
+const importOut = document.getElementById("import-out");
+const staticExample = document.getElementById("static-example");
+
+const cache = new Map();
+let pyodide = null;
+let ready = false;
+let autoRun = false;
+let hashTimer = 0;
+let importedSource = "";
+
+function staticSource() {
+  const text = staticExample.textContent.replace(/^\n/, "");
+  return text.endsWith("\n") ? text : text + "\n";
+}
+
+function b64url(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
+}
+
+function b64urlDecode(text) {
+  const pad = text.length % 4 === 0 ? "" : "=".repeat(4 - (text.length % 4));
+  const bin = atob(text.replaceAll("-", "+").replaceAll("_", "/") + pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function encodeShare(source, allowNet, mode, kind) {
+  const json = JSON.stringify({ s: source, n: allowNet, m: mode, k: kind });
+  const stream = new Blob([new TextEncoder().encode(json)]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  return "z." + b64url(bytes);
+}
+
+async function decodeShare(token) {
+  const text = token.startsWith("#") ? token.slice(1) : token;
+  if (!text.startsWith("z.")) throw new Error("share link must start with z.");
+  const bytes = b64urlDecode(text.slice(2));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  const obj = JSON.parse(await new Response(stream).text());
+  if (typeof obj.s !== "string") throw new Error("share link is missing source");
+  return { s: obj.s, n: obj.n || "", m: obj.m || "check", k: obj.k || "" };
+}
+
+function looksLikePython(text) {
+  return text.includes("def ") && !text.includes("<html") && !text.includes("<!DOCTYPE");
+}
+
+async function fetchFirst(paths, accept) {
+  let last = "not found";
+  for (const path of paths) {
+    try {
+      const res = await fetch(path);
+      if (!res.ok) {
+        last = path + " returned " + res.status;
+        continue;
+      }
+      const text = await res.text();
+      if (accept(text)) return { path, text };
+      last = path + " was not the expected file";
+    } catch (err) {
+      last = path + " " + err;
+    }
+  }
+  throw new Error(last);
+}
+
+async function loadPythonFile(name) {
+  // runtime/prout.py ships under docs/ so GitHub Pages (source folder /docs)
+  // and `python -m http.server` in docs/ can load it.
+  // ../../prout.py is the same file at the repository root when the site root is the repo.
+  const found = await fetchFirst(["runtime/" + name, "../../" + name], looksLikePython);
+  return found;
+}
+
+async function loadSample(file) {
+  if (cache.has(file)) return cache.get(file);
+  const found = await fetchFirst(
+    ["samples/" + file, "../../examples/" + file],
+    (text) => text.trim().length > 0 && !text.includes("<!DOCTYPE")
+  );
+  cache.set(file, found.text.endsWith("\n") ? found.text : found.text + "\n");
+  return cache.get(file);
+}
+
+function showCheck() {
+  checkPanel.hidden = false;
+  importPanel.hidden = true;
+  document.getElementById("tab-import").setAttribute("aria-selected", "false");
+}
+
+function showImport() {
+  checkPanel.hidden = true;
+  importPanel.hidden = false;
+  for (const ex of EXAMPLES) {
+    document.getElementById("tab-" + ex.id).setAttribute("aria-selected", "false");
+  }
+  document.getElementById("tab-import").setAttribute("aria-selected", "true");
+}
+
+function highlightTabs() {
+  if (!importPanel.hidden) return;
+  const current = editor.value;
+  const allowNow = allow.value.trim();
+  for (const ex of EXAMPLES) {
+    const text = cache.get(ex.file);
+    const on = text !== undefined && text === current && ex.allow === allowNow;
+    document.getElementById("tab-" + ex.id).setAttribute("aria-selected", on ? "true" : "false");
+  }
+}
+
+function clearResults() {
+  summaryEl.hidden = true;
+  summaryEl.textContent = "";
+  verdictsEl.replaceChildren();
+  diagnosticsEl.replaceChildren();
+  hashEl.textContent = "";
+  plansEl.textContent = "";
+}
+
+function renderResult(data) {
+    document.getElementById("results").hidden = false;
+    summaryEl.hidden = false;
+  summaryEl.className = "banner " + data.summary.verdict;
+  summaryEl.textContent = data.summary.verdict + " — " + data.summary.reason;
+  verdictsEl.replaceChildren();
+  for (const row of data.verdicts) {
+    const li = document.createElement("li");
+    li.className = row.verdict;
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = row.verdict;
+    const title = document.createElement("strong");
+    title.textContent = row.kind + " " + row.name + " (line " + row.line + ")";
+    const reason = document.createElement("span");
+    reason.className = "reason";
+    reason.textContent = row.reason;
+    li.append(tag, title, reason);
+    verdictsEl.append(li);
+  }
+  diagnosticsEl.replaceChildren();
+  if (!data.diagnostics.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.textContent = "No diagnostics.";
+    tr.append(td);
+    diagnosticsEl.append(tr);
+  }
+  for (const item of data.diagnostics) {
+    const tr = document.createElement("tr");
+    for (const value of [item.code, String(item.line), item.message]) {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(td);
+    }
+    diagnosticsEl.append(tr);
+  }
+  if (data.ast_hash) {
+    hashEl.textContent = data.ast_hash + "\n" + data.audit_id;
+  } else {
+    hashEl.textContent = "No AST hash. The source did not parse.";
+  }
+  if (data.plans && data.plans.length) {
+    plansEl.textContent = data.plans.map((plan) => plan.text).join("\n");
+  } else {
+    plansEl.textContent = "No task plan.";
+  }
+  const errors = data.diagnostics.filter((item) => item.severity === "error").length;
+  const warnings = data.diagnostics.filter((item) => item.severity === "warning").length;
+  statusEl.textContent = errors + " error(s), " + warnings + " warning(s).";
+}
+
+async function bootPython() {
+  const files = {};
+  const loaded = [];
+  for (const name of ["prout.py", "prout_api.py", "prout_import.py"]) {
+    const found = await loadPythonFile(name);
+    files[name] = found.text;
+    loaded.push(found.path);
+  }
+  const glue = await fetchFirst(["glue.py"], looksLikePython);
+  pyodide = await loadPyodide({ indexURL: PYODIDE });
+  for (const [name, text] of Object.entries(files)) {
+    pyodide.FS.writeFile("/home/pyodide/" + name, text);
+  }
+  pyodide.FS.writeFile("/home/pyodide/glue.py", glue.text);
+  pyodide.runPython("import sys\nsys.path.insert(0, '/home/pyodide')\nimport glue\n");
+  ready = true;
+  runBtn.disabled = false;
+  importRun.disabled = false;
+  statusEl.textContent = "Checker loaded from " + loaded.join(", ") + ". Run to check the contract.";
+  statusEl.dataset.loaded = loaded.join(",");
+}
+
+async function runCheck() {
+  if (!ready) return;
+  runBtn.disabled = true;
+  statusEl.textContent = "Checking…";
+  try {
+    pyodide.globals.set("src", editor.value);
+    pyodide.globals.set("allow_net", allow.value.trim());
+    const raw = pyodide.runPython("glue.check_text(src, allow_net)");
+    renderResult(JSON.parse(raw));
+    await updateHash();
+  } catch (err) {
+    statusEl.textContent = "The checker failed: " + err;
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+async function runImport() {
+  if (!ready) return;
+  importRun.disabled = true;
+  statusEl.textContent = "Importing…";
+  try {
+    pyodide.globals.set("kind", importKind.value);
+    pyodide.globals.set("raw_json", importRaw.value);
+    const raw = pyodide.runPython("glue.import_text(kind, raw_json)");
+    const data = JSON.parse(raw);
+    importOut.hidden = false;
+    if (!data.ok) {
+      importOut.textContent = data.error;
+      importedSource = "";
+      importCheck.disabled = true;
+    } else {
+      importOut.textContent = data.source;
+      importedSource = data.source;
+      importCheck.disabled = false;
+    }
+    await updateHash();
+    statusEl.textContent = data.ok ? "Imported. Comments do not change the check." : "Import failed.";
+  } catch (err) {
+    statusEl.textContent = "The importer failed: " + err;
+  } finally {
+    importRun.disabled = false;
+  }
+}
+
+async function updateHash() {
+  const mode = importPanel.hidden ? "check" : "import";
+  const source = mode === "check" ? editor.value : importRaw.value;
+  const token = await encodeShare(source, allow.value.trim(), mode, importKind.value);
+  const next = "#" + token;
+  if (location.hash !== next) history.replaceState(null, "", next);
+}
+
+async function applyHash() {
+  if (!location.hash || location.hash === "#") return false;
+  try {
+    const data = await decodeShare(location.hash);
+    if (data.m === "import") {
+      showImport();
+      importKind.value = data.k === "openai" ? "openai" : "mcp";
+      importRaw.value = data.s;
+    } else {
+      showCheck();
+      editor.value = data.s;
+      allow.value = data.n;
+    }
+    autoRun = true;
+    return true;
+  } catch (err) {
+    statusEl.textContent = "This link could not be read (" + err.message + "). The default example is loaded.";
+    return false;
+  }
+}
+
+function scheduleHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => { updateHash().catch(() => {}); }, 400);
+}
+
+async function selectExample(ex) {
+  showCheck();
+  statusEl.textContent = "Loading " + ex.label + "…";
+  try {
+    editor.value = await loadSample(ex.file);
+  } catch (err) {
+    statusEl.textContent = "Could not load " + ex.label + ": " + err.message;
+    return;
+  }
+  allow.value = ex.allow;
+  clearResults();
+  highlightTabs();
+  statusEl.textContent = ex.label + " is loaded. Run to check it.";
+  await updateHash();
+}
+
+document.getElementById("tab-reply-blocked").addEventListener("click", () => selectExample(EXAMPLES[0]));
+document.getElementById("tab-reply-gated").addEventListener("click", () => selectExample(EXAMPLES[1]));
+document.getElementById("tab-invoice").addEventListener("click", () => selectExample(EXAMPLES[2]));
+document.getElementById("tab-cancel").addEventListener("click", () => selectExample(EXAMPLES[3]));
+document.getElementById("tab-triage").addEventListener("click", () => selectExample(EXAMPLES[4]));
+document.getElementById("tab-import").addEventListener("click", async () => {
+  showImport();
+  if (!importRaw.value.trim()) {
+    try {
+      importRaw.value = await loadSample(TOOLS[importKind.value]);
+    } catch (err) {
+      statusEl.textContent = "Could not load the sample tool list: " + err.message;
+    }
+  }
+  await updateHash();
+});
+importKind.addEventListener("change", async () => {
+  try {
+    importRaw.value = await loadSample(TOOLS[importKind.value]);
+    importOut.hidden = true;
+    importedSource = "";
+    importCheck.disabled = true;
+    await updateHash();
+  } catch (err) {
+    statusEl.textContent = "Could not load the sample tool list: " + err.message;
+  }
+});
+runBtn.addEventListener("click", () => runCheck());
+importRun.addEventListener("click", () => runImport());
+importCheck.addEventListener("click", async () => {
+  if (!importedSource) return;
+  showCheck();
+  editor.value = importedSource;
+  allow.value = "";
+  highlightTabs();
+  await runCheck();
+});
+document.getElementById("copy-link").addEventListener("click", async () => {
+  await updateHash();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    statusEl.textContent = "Link copied.";
+  } catch (err) {
+    statusEl.textContent = "The link is in the address bar.";
+  }
+});
+editor.addEventListener("input", () => { highlightTabs(); scheduleHash(); });
+allow.addEventListener("input", () => { highlightTabs(); scheduleHash(); });
+editor.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    runCheck();
+  }
+});
+
+cache.set(EXAMPLES[0].file, staticSource());
+editor.value = staticSource();
+
+const script = document.createElement("script");
+script.src = PYODIDE + "pyodide.js";
+script.onload = async () => {
+  const fromHash = await applyHash();
+  if (!fromHash) editor.value = cache.get(EXAMPLES[0].file);
+  highlightTabs();
+  try {
+    await bootPython();
+    if (autoRun) {
+      if (importPanel.hidden) await runCheck();
+      else await runImport();
+    }
+  } catch (err) {
+    statusEl.textContent = "Could not load the checker: " + err;
+  }
+};
+script.onerror = () => {
+  statusEl.textContent = "Could not load Pyodide from the public CDN.";
+};
+document.head.appendChild(script);
+window.addEventListener("hashchange", async () => {
+  const restored = await applyHash();
+  if (!restored || !ready) return;
+  if (importPanel.hidden) await runCheck();
+  else await runImport();
+});
+</script>
+</body>
+</html>

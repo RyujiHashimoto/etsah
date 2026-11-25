@@ -1,0 +1,44 @@
+# Same reply draft as support_reply.prout, with the task gate left off.
+# Expected: E-POLICY, emit to an external party has no approval gate.
+#   python3 prout.py check examples/agents/support_reply_broken.prout
+
+type Id
+type Ticket
+
+op tickets.read(ticket_id: Id) -> Ticket
+  doc "Read ticket T-1042 for Mina Patel"
+  eff read(tickets)
+  impl native
+
+op mail.send_reply(ticket: Ticket) -> Bool
+  doc "Send the reply to the customer with no approval"
+  eff emit(mail)
+  impl native
+
+policy
+  external emit(mail)
+
+agent support_reply
+  doc "Drafts replies and can send mail"
+  allow read(tickets), emit(mail)
+  budget run 0 period 0
+  limit net 0 hour
+  limit emit 20 hour
+  audit ast_hash
+
+gate approve_reply
+  doc "Declared, but the task never names it"
+  approver support_lead
+  before emit(mail)
+  on_approved mail.send_reply
+
+task draft_reply(ticket_id: Id) -> Bool
+  agent support_reply
+  doc "Read a ticket and email the customer without a gate"
+  trigger webhook "support-tickets"
+  eff read(tickets), emit(mail)
+  key ticket_id
+  retry 2 escalate support_lead
+  let ticket = tickets.read(ticket_id)
+  let sent = mail.send_reply(ticket)
+  return sent

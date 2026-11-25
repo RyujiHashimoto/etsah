@@ -1,0 +1,64 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "create_draft_reply",
+      "description": "Draft a support reply. Does not send it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"},
+          "tone": {"type": "string"}
+        },
+        "required": ["ticket_id", "tone"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "send_customer_email",
+      "description": "Send the drafted reply to the customer.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"}
+        },
+        "required": ["ticket_id"]
+      },
+      "annotations": {
+        "openWorldHint": true
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "pay_vendor",
+      "description": "Pay a vendor invoice for Example Goods.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"},
+          "amount": {"type": "integer"}
+        },
+        "required": ["invoice_id", "amount"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "post_github_comment",
+      "description": "Post a triage note on an issue in example-org/widget.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issue_id": {"type": "string"},
+          "body": {"type": "string"}
+        },
+        "required": ["issue_id", "body"]
+      }
+    }
+  }
+]
