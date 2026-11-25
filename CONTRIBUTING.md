@@ -1,6 +1,6 @@
-# Contributing to PROUT
+# Contributing to Etsah
 
-PROUT is a prototype of a language in which an AI writes, an AI verifies, and a human reads. The useful contributions are a **new pattern in the registry** and a **smaller, more general form of a pattern that already exists**.
+Etsah is a prototype of a language in which an AI writes, an AI verifies, and a human reads. The useful contributions are a **new pattern in the registry** and a **smaller, more general form of a pattern that already exists**.
 
 Questions go to [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues). Vulnerability reports follow [SECURITY.md](SECURITY.md). Conduct reports follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
@@ -10,7 +10,7 @@ The contract spec's original is [SPEC.md](SPEC.md) (Japanese). [SPEC.en.md](SPEC
 
 ## Coordination
 
-`Date`, `Decimal`, `agent` / `task`, information-flow labels, the MCP server, and the browser playground are on `main`. Change the checker in a pull request that also updates `SPEC.md` and `SPEC.en.md`. Do not restyle `prout.py` in a docs-only pull request.
+`Date`, `Decimal`, `agent` / `task`, information-flow labels, the MCP server, and the browser playground are on `main`. Change the checker in a pull request that also updates `SPEC.md` and `SPEC.en.md`. Do not restyle `etsah.py` in a docs-only pull request.
 
 ## Development
 
@@ -18,28 +18,28 @@ The contract spec's original is [SPEC.md](SPEC.md) (Japanese). [SPEC.en.md](SPEC
 git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang
 
-python3 prout.py check examples/refund_fixed.prout
-python3 prout.py check examples/ai_tasks.prout
+python3 etsah.py check examples/refund_fixed.etsah
+python3 etsah.py check examples/ai_tasks.etsah
 python3 render.py
 
 python3 -m unittest discover -s tests -v
 
 cd patterns
-python3 proutc.py index
-python3 proutc.py build examples/shop.prout
-python3 proutc.py build examples/expense.prout
-python3 proutc.py build bench/pc_lending.prout
-python3 proutc.py build examples/staffing.prout
-python3 proutc.py build examples/staffing_desk.prout
-python3 proutc.py build examples/ai_automation.prout
-python3 proutc.py build examples/ai_desk.prout
-python3 proutc.py bench
+python3 etsahc.py index
+python3 etsahc.py build examples/shop.etsah
+python3 etsahc.py build examples/expense.etsah
+python3 etsahc.py build bench/pc_lending.etsah
+python3 etsahc.py build examples/staffing.etsah
+python3 etsahc.py build examples/staffing_desk.etsah
+python3 etsahc.py build examples/ai_automation.etsah
+python3 etsahc.py build examples/ai_desk.etsah
+python3 etsahc.py bench
 python3 growth_report.py
 ```
 
 CI runs these commands. A green local run is usually a green CI run. Python 3.12, standard library only.
 
-`pip install .` exposes the `prout`, `proutc`, and `prout-mcp` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
+`pip install .` exposes the `etsah`, `etsahc`, and `etsah-mcp` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
 
 Optional local install, from the repository root:
 
@@ -56,9 +56,9 @@ A pattern is a JSON manifest, not code. Add `patterns/registry/<name>.json`, reg
 cd patterns
 cp registry/approval.json registry/my_pattern.json
 # Rewrite name, intent, tags, slots, and artifacts.
-python3 proutc.py index
-python3 proutc.py find "what you want"
-python3 proutc.py build examples/your_app.prout
+python3 etsahc.py index
+python3 etsahc.py find "what you want"
+python3 etsahc.py build examples/your_app.etsah
 ```
 
 Use fictional names in sample specs. Do not include personal contact details, customer data, or material from inside a company.
@@ -84,7 +84,7 @@ Add a pattern only when the same shape has appeared more than once. A one-off st
 3. `effects` match the artifacts that are actually produced.
 4. Expansion is deterministic: the same input yields the same output.
 5. At least two examples exist (one real app and one synthetic spec is enough).
-6. `python3 proutc.py bench` does not get worse.
+6. `python3 etsahc.py bench` does not get worse.
 7. A pattern with state transitions defines `states` and `transitions`. `on_approved` points at a `custom` block or at a pattern applied in the same spec. A hook that points at a pattern has arguments that match that pattern's slots and `auth.roles`.
 
 ### Versions
@@ -98,24 +98,24 @@ Add a pattern only when the same shape has appeared more than once. A one-off st
 Human review is required when an AI wrote the patch. The description includes:
 
 - The model, and when the patch was generated.
-- Pasted output of `proutc.py build` and `bench`.
+- Pasted output of `etsahc.py build` and `bench`.
 - The apps the pattern was extracted from, and why the shared part is shared.
 - What could not be generalized and stayed in `custom`.
 
 ## Changes to the contract language
 
-If a change alters the meaning of syntax, types, effects, or preconditions in `prout.py`, update `SPEC.md` and `SPEC.en.md` in the same pull request. A change that makes existing `.prout` files fail is a `major` change.
+If a change alters the meaning of syntax, types, effects, or preconditions in `etsah.py`, update `SPEC.md` and `SPEC.en.md` in the same pull request. A change that makes existing `.etsah` files fail is a `major` change.
 
 ## 日本語
 
 手順、レビュー基準、版の上げ方は英語の本文が正です。
 
 - テストは `python3 -m unittest discover -s tests -v`。依存パッケージはありません。
-- 新しいパターンは `patterns/registry/<name>.json` を足し、`python3 proutc.py index` で索引を更新して Pull Request にします。同じ形が二度以上出てから追加します。
+- 新しいパターンは `patterns/registry/<name>.json` を足し、`python3 etsahc.py index` で索引を更新して Pull Request にします。同じ形が二度以上出てから追加します。
 - AI が書いた Pull Request も、人間のレビューが必須です。
 - 質問は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
 - `oss@j-prout.co.jp` はオーナー確認前の仮アドレスです。確認されるまでは Issues を使ってください。
-- 検査器の意味を変えるときは `SPEC.md` と `SPEC.en.md` を同じ Pull Request で更新してください。ドキュメントだけの変更で `prout.py` を整形し直さないでください。
+- 検査器の意味を変えるときは `SPEC.md` と `SPEC.en.md` を同じ Pull Request で更新してください。ドキュメントだけの変更で `etsah.py` を整形し直さないでください。
 
 ## License
 

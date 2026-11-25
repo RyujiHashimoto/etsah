@@ -1,6 +1,6 @@
 # レジストリ：AIがパターンを見つける入口
 
-このディレクトリは、PROUT Patternsのパターン定義をJSONで保持する。AIはコードを読む前に `index.json` を読み、`intent` と `tags` で候補を絞り、必要なマニフェストだけを開く。
+このディレクトリは、Etsah Patternsのパターン定義をJSONで保持する。AIはコードを読む前に `index.json` を読み、`intent` と `tags` で候補を絞り、必要なマニフェストだけを開く。
 
 ## 探索の手順
 
@@ -11,14 +11,14 @@ cd patterns
 cat registry/index.json
 
 # 2. やりたいことで検索する（日本語でも英語でもよい）
-python3 proutc.py find "申請 承認"
-python3 proutc.py find "refund payment"
+python3 etsahc.py find "申請 承認"
+python3 etsahc.py find "refund payment"
 
 # 3. 候補のマニフェストを読む
 cat registry/approval.json
 
 # 4. 仕様に適用してビルドする
-python3 proutc.py build examples/expense.prout
+python3 etsahc.py build examples/expense.etsah
 ```
 
 `find` は `intent`、`tags`、`name`、スロット説明の一致を点数化する。上位3件と、必須スロット・任意スロット・効果を表示する。
@@ -50,8 +50,8 @@ python3 proutc.py build examples/expense.prout
 ```bash
 cp registry/approval.json registry/my_pattern.json
 # name, version, intent, tags, slots, artifacts, examples, provenance を編集
-python3 proutc.py index
-python3 proutc.py build examples/your_app.prout
+python3 etsahc.py index
+python3 etsahc.py build examples/your_app.etsah
 ```
 
 追加の基準とレビューは `../../CONTRIBUTING.md` を参照。
@@ -61,7 +61,7 @@ python3 proutc.py build examples/your_app.prout
 `index.json` は手で編集しない。マニフェストを変更したら次を実行する。
 
 ```bash
-python3 proutc.py index
+python3 etsahc.py index
 ```
 
 CIは索引がマニフェストと一致しているかを確認する。

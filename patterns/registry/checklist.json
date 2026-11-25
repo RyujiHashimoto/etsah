@@ -39,8 +39,8 @@
     }
   ],
   "examples": [
-    "examples/repair_desk.prout",
-    "examples/support_desk.prout"
+    "examples/repair_desk.etsah",
+    "examples/support_desk.etsah"
   ],
   "provenance": {
     "author": "OpenAI Codex",

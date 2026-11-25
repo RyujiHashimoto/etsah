@@ -1,9 +1,14 @@
-"""PROUT over MCP: a stdio checker and a guard proxy.
+"""Compatibility shim. Import etsah_mcp."""
+from __future__ import annotations
 
-The server speaks JSON-RPC 2.0 with the Python standard library. It does not
-import the official ``mcp`` package.
+import etsah_mcp as _mod
 
-Author: Ryuji Hashimoto (J-PROUT Inc.)
-"""
+__version__ = _mod.__version__
 
-__version__ = "0.1.0"
+
+def __getattr__(name: str):
+    return getattr(_mod, name)
+
+
+def __dir__() -> list[str]:
+    return sorted(set(dir(_mod)) | {"__version__"})

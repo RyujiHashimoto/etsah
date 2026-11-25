@@ -10,8 +10,8 @@ import sys
 import unittest
 
 import support  # noqa: F401
-from prout import ast_hash
-from proutc import DEFAULT_REGISTRY, find_patterns, load_registry
+from etsah import ast_hash
+from etsahc import DEFAULT_REGISTRY, find_patterns, load_registry
 from support import PATTERNS, check, codes, parse
 
 
@@ -89,11 +89,11 @@ class TestSpecContracts(unittest.TestCase):
     def test_find_command_shows_effects(self) -> None:
         """patterns/registry/README.md: 上位3件と、必須スロット・任意スロット・効果を表示する。
 
-        ``proutc find`` prints at most three matches, with required slots,
+        ``etsahc find`` prints at most three matches, with required slots,
         optional slots, effects, and tags.
         """
         proc = subprocess.run(
-            [sys.executable, str(PATTERNS / "proutc.py"), "find", "auth"],
+            [sys.executable, str(PATTERNS / "etsahc.py"), "find", "auth"],
             cwd=PATTERNS,
             capture_output=True,
             text=True,

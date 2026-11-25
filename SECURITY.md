@@ -1,6 +1,6 @@
 # Security policy
 
-PROUT is a local prototype: a contract checker and a pattern compiler. It does not run a hosted agent, and it does not hold customer data.
+Etsah is a local prototype: a contract checker and a pattern compiler. It does not run a hosted agent, and it does not hold customer data.
 
 ## Reporting
 
@@ -16,8 +16,8 @@ There is no bug bounty.
 
 ## What to include
 
-- The commit or version you ran, and the command (`prout check`, `proutc build`, or a test).
-- Which component is affected: the contract checker (`prout.py`), the pattern compiler (`patterns/proutc.py`), or generated HTML.
+- The commit or version you ran, and the command (`etsah check`, `etsahc build`, or a test).
+- Which component is affected: the contract checker (`etsah.py`), the pattern compiler (`patterns/etsahc.py`), or generated HTML.
 - The impact: for example, a check that accepts a spec the design says must fail, or a demo page that treats untrusted spec text as HTML in an unexpected way.
 - Whether the behavior is on `main` or only on an open pull request.
 
@@ -25,7 +25,7 @@ There is no bug bounty.
 
 In scope: this repository's checker, pattern compiler, and the HTML they generate.
 
-Out of scope: applications people build with PROUT, third-party services named in sample specs (they are fictional stand-ins), and vulnerabilities in dependencies. The prototype depends only on the Python standard library.
+Out of scope: applications people build with Etsah, third-party services named in sample specs (they are fictional stand-ins), and vulnerabilities in dependencies. The prototype depends only on the Python standard library.
 
 ## Supported versions
 

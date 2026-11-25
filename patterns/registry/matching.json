@@ -44,13 +44,13 @@
     {"path": "lib/matching/suggest.ts", "kind": "TS", "lines": 40, "desc": "候補抽出。スキルの一致判定は実行時"},
     {"path": "tests/matches.test.ts", "kind": "TEST", "lines": 40, "desc": "スキル欄が揃っているかのテスト"}
   ],
-  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "examples": ["examples/staffing.etsah", "examples/staffing_desk.etsah"],
   "notes": [
     "検査するのはフィールドの存在だけ。スキル集合の包含は、契約層がコレクション契約を実行時ガードにしているため、ここでは証明しない。",
     "スキル欄の型は String を想定する。複数値の型は無い。"
   ],
   "provenance": {
-    "author": "PROUT staffing prototype",
+    "author": "Etsah staffing prototype",
     "date": "2026-11-21",
     "extracted_from": ["staffing", "staffing_desk"],
     "note": "スタッフと案件をスキル欄で結ぶ器。中身の一致は実行時に残す。"

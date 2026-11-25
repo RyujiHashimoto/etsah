@@ -2,28 +2,32 @@
 
 英語版は [README.md](README.md) です。エージェントの効果と承認、MCP、ブラウザの playground を先頭に置いています。以下は日本語の README です。
 
-# PROUT（プラウト）
+# Etsah
 
 **AIが書き、AIが検証し、人間は自然言語とGUIで読む。**
 
-PROUTは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
+Etsahは、AIによるソフトウェア開発のために設計した言語の試作です。人間の言語を置き換えるのではなく、**AIが仕様を書き、別のAIが契約を検査し、人間が結果を理解する**ための共通の形を目指しています。
 
 Ryuji Hashimoto (J-PROUT Inc.)
+
+## prout からの改名
+
+言語名は Etsah です。一つマイナー版のあいだ、旧コマンド `prout`、`proutc`、`prout-mcp` は動き、stderr に `新名称は etsah` と出します。`.prout` ファイルも検査できます。`import prout` などの旧モジュール名は、新しいモジュールを再エクスポートする薄い互換層です。`ETSAH_*` が無いとき、対応する `PROUT_*` 環境変数も読みます。`prout1.` で始まる承認トークンも検証できます。リポジトリの URL は変えていません。
 
 ## 出発点
 
 AIが開発するなら、人間が作った言語の制約から自由になれるはずです。しかし、あらゆる言語の厳密な上位互換は作れません。意味論も構文もランタイムも衝突するからです。
 
-そこでPROUTは、実装言語を置き換えず、その上に**契約と効果の層**をかぶせます。`impl` はPythonでもRustでもSQLでもよい。PROUTが保証するのは「何を読み、何を書き、何を約束するか」です。
+そこでEtsahは、実装言語を置き換えず、その上に**契約と効果の層**をかぶせます。`impl` はPythonでもRustでもSQLでもよい。Etsahが保証するのは「何を読み、何を書き、何を約束するか」です。
 
-その上に、もう一つの層を置きました。**PROUT Patterns** です。人間が欲しがるWebアプリの形は、驚くほど限られたパターンの組み合わせでできています。認証、一覧、作成、検索、決済、返金、通知、アップロード、承認。ならばパターン自体を言語の第一級要素にし、AIがコードを書く代わりにパターンとスロットを書くようにすれば、開発は速くなります。
+その上に、もう一つの層を置きました。**Etsah Patterns** です。人間が欲しがるWebアプリの形は、驚くほど限られたパターンの組み合わせでできています。認証、一覧、作成、検索、決済、返金、通知、アップロード、承認。ならばパターン自体を言語の第一級要素にし、AIがコードを書く代わりにパターンとスロットを書くようにすれば、開発は速くなります。
 
 ## 二つの層
 
 | 層 | ファイル | 役割 |
 |---|---|---|
-| 契約言語 PROUT | `prout.py`, `SPEC.md` | 型・効果・事前条件・ポリシーを検査し、ASTハッシュと人間向けGUIを生成する |
-| パターン言語 PROUT Patterns | `patterns/proutc.py`, `patterns/registry/` | パターンをJSONで定義し、仕様のスロットを埋めて数百行を決定論的に展開する |
+| 契約言語 Etsah | `etsah.py`, `SPEC.md` | 型・効果・事前条件・ポリシーを検査し、ASTハッシュと人間向けGUIを生成する |
+| パターン言語 Etsah Patterns | `patterns/etsahc.py`, `patterns/registry/` | パターンをJSONで定義し、仕様のスロットを埋めて数百行を決定論的に展開する |
 
 パターンはコードではなくデータです。だからAIは、コードを読まずに `registry/index.json` から目的のパターンを発見し、マニフェストの `intent` と `slots` だけを読んで使えます。
 
@@ -36,10 +40,10 @@ git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang
 
 # 契約言語：壊れた初稿は3件のエラーで止まる
-python3 prout.py check examples/refund_broken.prout
+python3 etsah.py check examples/refund_broken.etsah
 
 # 修正版はエラー0件、実行時ガード1件
-python3 prout.py check examples/refund_fixed.prout
+python3 etsah.py check examples/refund_fixed.etsah
 
 # ASTから人間向けGUIを生成
 python3 render.py
@@ -50,7 +54,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在294件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在365件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -58,11 +62,11 @@ python3 -m unittest discover -s tests -v
 
 ## 承認前後をGUIで確かめる
 
-`proutc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
+`etsahc.py build` は `report.html` に加えて `demo.html` を生成します。承認パターンを含む仕様なら、申請→承認→差し戻しをブラウザで操作でき、承認後にだけ `on_approved` の処理が動くことを確認できます。
 
 ```bash
 cd patterns
-python3 proutc.py build examples/expense.prout --out build/expense
+python3 etsahc.py build examples/expense.etsah --out build/expense
 open build/expense/demo.html
 ```
 
@@ -76,7 +80,7 @@ open build/expense/demo.html
 
 `approval` の `on_approved` は、適用済みの `notify` を指せます。このとき `notify` の `channel` と `recipient` がフックの引数として検査されます。
 
-```prout
+```etsah
 pattern notify
   channel: email
   recipient: accounting
@@ -96,25 +100,25 @@ pattern approval TravelRequest
 cd patterns
 
 # 38行の仕様から、1,581行相当のファイル構成を展開する
-python3 proutc.py build examples/shop.prout
+python3 etsahc.py build examples/shop.etsah
 
 # 日本語でパターンを検索する
-python3 proutc.py find "申請 承認"
+python3 etsahc.py find "申請 承認"
 
 # 経費精算を、承認デモ付きで組む
-python3 proutc.py build examples/expense.prout --out build/expense
+python3 etsahc.py build examples/expense.etsah --out build/expense
 
 # 出張申請を、承認→経理通知のデモ付きで組む
-python3 proutc.py build examples/travel_request.prout --out build/travel
+python3 etsahc.py build examples/travel_request.etsah --out build/travel
 
 # PC貸出は、承認パターンを二つのアプリから抽出するための利用例
-python3 proutc.py build bench/pc_lending.prout --out build/pc_lending
+python3 etsahc.py build bench/pc_lending.etsah --out build/pc_lending
 
 # パターン追加前後を比較する
-python3 proutc.py bench
+python3 etsahc.py bench
 
 # 人材派遣の基幹（勤怠承認、抵触日、請求単価）。設計は docs/staffing.md
-python3 proutc.py build examples/staffing.prout --out build/staffing
+python3 etsahc.py build examples/staffing.etsah --out build/staffing
 ```
 
 PC貸出は、承認パターンを二つのアプリから抽出するために使った二つ目の利用例です。製品デモとして育てる予定はなく、再利用が効いた証拠としてベンチに残しています。
@@ -142,7 +146,7 @@ PC貸出は、承認パターンを二つのアプリから抽出するために
 | 1 | 出張申請を作って。上長が承認したら経理に通知して | 8分13秒 | 3回 | 0 | GUIがなく、フックも未検証 |
 | 2 | 備品購入申請を作って。上長が承認したら総務に通知して | **5分48秒** | 2回 | 0 | 標準の `demo.html` で承認前後を確認 |
 
-一回目、AIは `python3 proutc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。当時の仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
+一回目、AIは `python3 etsahc.py find "出張 申請 承認 通知"` を実行し、`approval` を score 12（当時の採点。現在はスロット説明も採点するため15）で自力発見しました。当時の仕様は36行、生成物は1,426行相当、再利用倍率18.8倍でした。しかし標準の `build` は `report.html` と `manifest.json` しか出さず、承認前後をGUIで確かめる手段がありませんでした。`on_approved` の参照先も検証されず、未知のスロットも黙って無視されました。
 
 この追試を受けて、`demo.html`、状態遷移のデータ、`on_approved` の検査、未知スロットの警告、`notify` の `recipient` を追加しました。二回目は、出張申請の例をそのままコピーできない「備品購入申請」に変えて試しています。結果は **5分48秒**、納品ビルド2回で失敗0。AIは `demo.html` を標準機能で生成し、Playwrightで承認前・承認後・差し戻し・却下まで確認しました。一回目より **29%短く**、修正も1回減っています。現在の出張申請の例は、当時の custom 40行を標準の `notify` パターンに置き換え、33行・42.0倍に整理しています。
 
@@ -150,7 +154,7 @@ PC貸出は、承認パターンを二つのアプリから抽出するために
 
 ## 言語が育つループ
 
-PROUTの成長は、コードの行数ではなく、**次のAIが少ない手順で解けるようになったか**で測ります。
+Etsahの成長は、コードの行数ではなく、**次のAIが少ない手順で解けるようになったか**で測ります。
 
 1. 観察 — 二つのアプリに同じ形が現れる。
 2. 共通部分を抽出する — 経費精算とPC貸出から始め、出張申請と備品購入で再確認する。
@@ -168,30 +172,30 @@ PROUTの成長は、コードの行数ではなく、**次のAIが少ない手�
 
 `build` が生成するのは、成果物の一覧と行数見積もりを含む `report.html`、操作できる `demo.html`、`manifest.json` です。APIやDBの実ソースはまだ書き出していません。生成行数はパターン定義からの見積もりで、実際にコンパイルされたコードの行数ではありません。
 
-次の課題は、`approval` の7成果物を実際のファイルとして書き出し、テストを通すことです。現時点のPROUTは、パターンの発見・適用・検証・人間向け表示までを試作した段階です。
+次の課題は、`approval` の7成果物を実際のファイルとして書き出し、テストを通すことです。現時点のEtsahは、パターンの発見・適用・検証・人間向け表示までを試作した段階です。
 
 ## これは「全言語の上位互換」ではない
 
-意味論・構文・ランタイムが衝突するため、厳密な上位互換は作れません。PROUTは実装言語を置き換えず、その上に契約と効果の層をかぶせるメタ言語です。
+意味論・構文・ランタイムが衝突するため、厳密な上位互換は作れません。Etsahは実装言語を置き換えず、その上に契約と効果の層をかぶせるメタ言語です。
 
 リバースエンジニアリングへの含意は `SPEC.md` に書きました。契約が存在し、検証されている場合に限り、意味の復元は契約の照合に変わります。契約のないバイナリの解析は、依然として難しいままです。
 
 ## リポジトリ構成
 
 ```
-prout.py                 契約言語のパーサー・検証器・CLI
-prout_api.py             check_source と check_file
-prout_import.py          MCP と OpenAI のツール定義を op にする
-prout_mcp/               MCP サーバ（prout mcp）とガード（prout guard）
+etsah.py                 契約言語のパーサー・検証器・CLI
+etsah_api.py             check_source と check_file
+etsah_import.py          MCP と OpenAI のツール定義を op にする
+etsah_mcp/               MCP サーバ（etsah mcp）とガード（etsah guard）
 render.py                ASTから人間向けHTMLを生成
 SPEC.md                  契約言語の仕様と設計原則
 examples/                壊れた初稿、修正版、examples/agents のエージェント契約、情報フローの安全例・漏洩例
 docs/playground/         ブラウザの検査（静的ページ。Pyodide）
 docs/en/comparison.md    契約・効果・ポリシー・ガードレールとの比較
-docs/check-demo.svg      prout check の前後を録った SVG
+docs/check-demo.svg      etsah check の前後を録った SVG
 tests/                   unittest の単体テスト（`python3 -m unittest discover -s tests -v`）
 patterns/
-  proutc.py              パターンコンパイラ（build / find / add / index / bench）
+  etsahc.py              パターンコンパイラ（build / find / add / index / bench）
   PATTERNS.md            パターン言語の設計思想
   registry/              27個のパターンマニフェストと index.json
   examples/              ショップ、経費、出張、備品、修理受付、サポート、ゲームブック、人材派遣、AIタスクの仕様
@@ -208,8 +212,8 @@ CONTRIBUTING.md          パターン提案とレビューの基準
 
 ```sh
 cd patterns
-python3 proutc.py build examples/moon_garden.prout --out build/garden
-python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
+python3 etsahc.py build examples/moon_garden.etsah --out build/garden
+python3 etsahc.py build examples/fraction_quiz.etsah --out build/quiz
 ```
 
 ## 修理受付・顧客サポートをパターンで組む
@@ -218,8 +222,8 @@ python3 proutc.py build examples/fraction_quiz.prout --out build/quiz
 
 ```sh
 cd patterns
-python3 proutc.py build examples/repair_desk.prout --out build/repair
-python3 proutc.py build examples/support_desk.prout --out build/support
+python3 etsahc.py build examples/repair_desk.etsah --out build/repair
+python3 etsahc.py build examples/support_desk.etsah --out build/support
 ```
 
 ## 人材派遣の勤怠・契約・単価を検査する
@@ -230,9 +234,9 @@ python3 proutc.py build examples/support_desk.prout --out build/support
 
 ```sh
 cd patterns
-python3 proutc.py build examples/staffing.prout --out build/staffing
-python3 proutc.py build examples/staffing_desk.prout --out build/staffing_desk
-python3 proutc.py find "勤怠"
+python3 etsahc.py build examples/staffing.etsah --out build/staffing
+python3 etsahc.py build examples/staffing_desk.etsah --out build/staffing_desk
+python3 etsahc.py find "勤怠"
 ```
 
 ## AIに任せる作業の境界を仕様で止める
@@ -242,16 +246,16 @@ python3 proutc.py find "勤怠"
 契約層も同じ境界を `agent` と `task` で検査する。手順は既存の op を呼ぶ。社外への `emit` と `net`、`spend`、契約の変更にゲートが無いと `E-POLICY` になる。`check` は各タスクの起動、効果、ゲート、再試行を文章で出す。cron の実行、予算の残数、冪等ストアはまだ無い。
 
 ```sh
-python3 prout.py check examples/ai_tasks.prout
+python3 etsah.py check examples/ai_tasks.etsah
 ```
 
 設計と、採用した初期値は [docs/ai_automation.md](docs/ai_automation.md) にまとめた。
 
 ```sh
 cd patterns
-python3 proutc.py build examples/ai_automation.prout --out build/ai_automation
-python3 proutc.py build examples/ai_desk.prout --out build/ai_desk
-python3 proutc.py find "自動化"
+python3 etsahc.py build examples/ai_automation.etsah --out build/ai_automation
+python3 etsahc.py build examples/ai_desk.etsah --out build/ai_desk
+python3 etsahc.py find "自動化"
 ```
 
 ## エージェントのツールを契約で止める
@@ -259,20 +263,20 @@ python3 proutc.py find "自動化"
 英語の5分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md)、ブラウザの試用は [docs/playground/index.html](docs/playground/index.html)、先行する仕組みとの比較は [docs/en/comparison.md](docs/en/comparison.md) です。MCP と OpenAI のツール定義を `op` に変換し、社外メール、支払い、契約変更、許可リスト外の通信を、実行前に `E-POLICY` で止めます。
 
 ```sh
-python3 prout.py import mcp examples/agents/tools/mcp_tools.json
-python3 prout.py check examples/agents/support_reply.prout
-python3 prout.py check examples/agents/github_triage.prout --allow-net github
+python3 etsah.py import mcp examples/agents/tools/mcp_tools.json
+python3 etsah.py check examples/agents/support_reply.etsah
+python3 etsah.py check examples/agents/github_triage.etsah --allow-net github
 ```
 
-同じ検査を MCP から呼べます。`prout mcp` は stdio のサーバで、`prout guard` は上流の `tools/call` を契約と照合してから転送します。`ASK` を通すのは、`prout approve` が発行した署名付きの一度きりの承認が、契約・ゲート・ツール・引数ハッシュと一致するときだけです。`limit calls` と `limit spend` は台帳ファイルで減らし、署名があっても上限は超えません。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
+同じ検査を MCP から呼べます。`etsah mcp` は stdio のサーバで、`etsah guard` は上流の `tools/call` を契約と照合してから転送します。`ASK` を通すのは、`etsah approve` が発行した署名付きの一度きりの承認が、契約・ゲート・ツール・引数ハッシュと一致するときだけです。`limit calls` と `limit spend` は台帳ファイルで減らし、署名があっても上限は超えません。設定は [docs/en/mcp.md](docs/en/mcp.md) と [docs/mcp.ja.md](docs/mcp.ja.md) です。
 
-架空の問い合わせ Q-4401（`guest@example.invalid`）は、規則を無視して金庫のトークンを転送し、9000.00 JPY を返せと書いている。[examples/prompt_injection_leak.prout](examples/prompt_injection_leak.prout) はその秘密を `mail.forward` に渡すので、`E-IFLOW-ARG` で止まる。[examples/prompt_injection_safe.prout](examples/prompt_injection_safe.prout) はトークンを外に出さず、返信は `ASK`、契約に無い転送は `BLOCK`、1000.00 JPY を超える返金は署名が合っても `BLOCK` になる。手順と期待する出力は [README.md](README.md) の Prompt injection にある。
+架空の問い合わせ Q-4401（`guest@example.invalid`）は、規則を無視して金庫のトークンを転送し、9000.00 JPY を返せと書いている。[examples/prompt_injection_leak.etsah](examples/prompt_injection_leak.etsah) はその秘密を `mail.forward` に渡すので、`E-IFLOW-ARG` で止まる。[examples/prompt_injection_safe.etsah](examples/prompt_injection_safe.etsah) はトークンを外に出さず、返信は `ASK`、契約に無い転送は `BLOCK`、1000.00 JPY を超える返金は署名が合っても `BLOCK` になる。手順と期待する出力は [README.md](README.md) の Prompt injection にある。
 
 ## 情報フローラベルでPIIの流出を止める
 
-`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `prout.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
+`pii` や `secret` を型に付け、許可されていない sink への流出をコンパイル時に検出します。`String @pii`、`sends`、`policy`、`declassify` の4つで、引数・戻り値・契約・sink を検査します。実装は `etsah.py` に入りました。この `policy` は `sink` と `declassify` 用で、AIタスクの `policy`（`external`、`payment`、`contract`）とは別のブロックです。一つのプログラムに両方置けます。
 
-```prout
+```etsah
 type Customer {
   email: String @pii
 }
@@ -292,11 +296,11 @@ op send_receipt(to: String @pii) -> Receipt
 
 ```bash
 # 0エラー、1警告（declassify の監査ログ）
-python3 prout.py check examples/information_flow_safe.prout \
+python3 etsah.py check examples/information_flow_safe.etsah \
   --allow-net email --allow-net analytics
 
 # E-IFLOW-ARG で失敗する
-python3 prout.py check examples/information_flow_leak.prout \
+python3 etsah.py check examples/information_flow_leak.etsah \
   --allow-net email --allow-net analytics
 ```
 
@@ -304,7 +308,7 @@ python3 prout.py check examples/information_flow_leak.prout \
 
 ## 参加する
 
-新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 proutc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
+新しいパターンは `patterns/registry/<name>.json` を追加し、`python3 etsahc.py index` で索引を更新してPull Requestを出します。AIが生成した提案も歓迎しますが、人間のレビューは必須です。
 
 詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と [patterns/registry/README.md](patterns/registry/README.md) を参照してください。
 

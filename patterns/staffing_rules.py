@@ -5,7 +5,7 @@ not read live timesheets or stored contracts. `runtime_checks` describes the
 checks the generated program must run later.
 
 Date math uses `datetime` from the standard library. This module does not
-import `prout.py`. The numbers below are the general statutory ceilings used
+import `etsah.py`. The numbers below are the general statutory ceilings used
 as defaults and as maxima. They are not a legal opinion. A 社労士 has to
 confirm them, including industry exceptions this module does not model.
 """
@@ -69,7 +69,7 @@ def parse_date(value: str) -> Optional[date]:
 
 
 def parse_duration(value: str) -> Optional[Decimal]:
-    """Hours as a decimal (`7.5`) or a clock (`7h30m`). Same grammar as proutc."""
+    """Hours as a decimal (`7.5`) or a clock (`7h30m`). Same grammar as etsahc."""
     value = value.strip()
     clock = _CLOCK.fullmatch(value)
     if clock:

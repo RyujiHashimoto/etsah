@@ -88,7 +88,7 @@
     {"path": "app/(admin)/overtime-agreements/page.tsx", "kind": "UI", "lines": 60, "desc": "協定の上限と警告閾値の確認画面"},
     {"path": "tests/overtime-agreements.test.ts", "kind": "TEST", "lines": 50, "desc": "法定上限を超える設定値を拒否するテスト"}
   ],
-  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout", "examples/staffing_limits.prout"],
+  "examples": ["examples/staffing.etsah", "examples/staffing_desk.etsah", "examples/staffing_limits.etsah"],
   "notes": [
     "数値は協定のスロットである。既定値と、それを超えたらエラーにする天井は、労基法36条3項から6項の一般則（月45時間、年360時間、特別条項は年720時間、時間外+休日は月100時間未満、2〜6か月平均80時間、月45時間超は年6回）に合わせてある。",
     "変形労働時間制の42時間・320時間、自動車運転業務、医師、研究開発、災害時の建設事業はモデルしていない。天井を超える設定はエラーになる。社労士の確認が要る。",
@@ -96,7 +96,7 @@
     "時間外のある timesheet に、その勤怠を timesheet スロットで指す協定が無いとエラーになる。"
   ],
   "provenance": {
-    "author": "PROUT staffing prototype",
+    "author": "Etsah staffing prototype",
     "date": "2026-11-23",
     "extracted_from": ["staffing", "staffing_desk", "staffing_limits"],
     "note": "36協定の上限を設定スロットにし、一般則の天井と、警告と硬停止の違いを仕様時に要求する。"

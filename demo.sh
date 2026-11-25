@@ -5,13 +5,13 @@ cd "$(dirname "$0")"
 echo "=============================================="
 echo "1. AIの初稿（意図的に壊してある）"
 echo "=============================================="
-python3 prout.py check examples/refund_broken.prout || true
+python3 etsah.py check examples/refund_broken.etsah || true
 
 echo
 echo "=============================================="
 echo "2. 検証器の指摘を受けて修正した版"
 echo "=============================================="
-python3 prout.py check examples/refund_fixed.prout
+python3 etsah.py check examples/refund_fixed.etsah
 
 echo
 echo "=============================================="

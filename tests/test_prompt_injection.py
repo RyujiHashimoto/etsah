@@ -9,15 +9,15 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_api import check_file
-from prout_mcp.approval import hash_arguments, sign_payload
+from etsah_api import check_file
+from etsah_mcp.approval import hash_arguments, sign_payload
 from test_guard import GuardProcess, _audit, _logged_tools
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
 KEY = "example-harbor-lane-key"
-SAFE = EXAMPLES / "prompt_injection_safe.prout"
-LEAK = EXAMPLES / "prompt_injection_leak.prout"
+SAFE = EXAMPLES / "prompt_injection_safe.etsah"
+LEAK = EXAMPLES / "prompt_injection_leak.etsah"
 
 
 class PromptInjectionTests(unittest.TestCase):

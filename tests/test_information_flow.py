@@ -522,14 +522,14 @@ class TestInference(unittest.TestCase):
 class TestHashes(unittest.TestCase):
     def test_hash_unchanged_without_labels(self) -> None:
         from support import parse
-        from prout import ast_hash
+        from etsah import ast_hash
 
-        text = (ROOT / "examples" / "refund_fixed.prout").read_text(encoding="utf-8")
+        text = (ROOT / "examples" / "refund_fixed.etsah").read_text(encoding="utf-8")
         self.assertEqual(ast_hash(parse(text)), "bae8501e8b3f")
 
     def test_label_order_irrelevant(self) -> None:
         from support import parse
-        from prout import ast_hash
+        from etsah import ast_hash
 
         a = parse(
             """
@@ -551,7 +551,7 @@ class TestHashes(unittest.TestCase):
 
     def test_policy_order_irrelevant(self) -> None:
         from support import parse
-        from prout import ast_hash
+        from etsah import ast_hash
 
         a = parse(
             """
@@ -589,7 +589,7 @@ class TestHashes(unittest.TestCase):
 class TestSerialization(unittest.TestCase):
     def test_ast_contains_labels_and_policy(self) -> None:
         from support import parse
-        from prout import program_to_dict
+        from etsah import program_to_dict
 
         program = parse(
             """
@@ -614,7 +614,7 @@ class TestSerialization(unittest.TestCase):
 
     def test_unlabeled_ast_omits_new_keys(self) -> None:
         from support import parse
-        from prout import program_to_dict
+        from etsah import program_to_dict
 
         data = program_to_dict(
             parse(

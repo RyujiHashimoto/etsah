@@ -19,8 +19,8 @@ Point at a spec, a pattern, or a section of SPEC.md / SPEC.en.md.
 
 ## Scope
 
-- [ ] Contract layer (`prout.py`). Update SPEC.md and SPEC.en.md in the same pull request.
-- [ ] Pattern layer (`patterns/proutc.py`). `ai_task` and `approval_gate` are already in the registry.
+- [ ] Contract layer (`etsah.py`). Update SPEC.md and SPEC.en.md in the same pull request.
+- [ ] Pattern layer (`patterns/etsahc.py`). `ai_task` and `approval_gate` are already in the registry.
 - [ ] Docs or examples only
 
 ## Sample

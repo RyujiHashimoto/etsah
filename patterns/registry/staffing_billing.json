@@ -62,7 +62,7 @@
     {"path": "lib/billing/rates.ts", "kind": "TS", "lines": 45, "desc": "請求単価と支払単価の比較"},
     {"path": "tests/billing.test.ts", "kind": "TEST", "lines": 55, "desc": "単価の逆転を拒否するテスト"}
   ],
-  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout"],
+  "examples": ["examples/staffing.etsah", "examples/staffing_desk.etsah"],
   "notes": [
     "timesheet パターンが同じ仕様に無いとエラーにする。承認スロットの無い勤怠は timesheet 側が拒否する。",
     "Rate は非負の十進数。契約層の Money は整数で、金額リテラルを持たない。",
@@ -70,7 +70,7 @@
     "同一労働同一賃金の検査ではない。比べているのは請求単価と支払単価だけである。"
   ],
   "provenance": {
-    "author": "PROUT staffing prototype",
+    "author": "Etsah staffing prototype",
     "date": "2026-11-21",
     "extracted_from": ["staffing", "staffing_desk"],
     "note": "請求と給与を一つのパターンにし、単価の逆転と勤怠承認の欠落を仕様時に止める。"

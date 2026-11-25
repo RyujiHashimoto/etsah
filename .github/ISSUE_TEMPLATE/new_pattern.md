@@ -32,7 +32,7 @@ Name two specs or apps where the shape appeared. Fictional names only. No custom
 ## Examples
 
 - [ ] `patterns/registry/<name>.json`
-- [ ] `python3 proutc.py index` regenerates `index.json` with no hand edits
+- [ ] `python3 etsahc.py index` regenerates `index.json` with no hand edits
 - [ ] Two specs build
-- [ ] `python3 proutc.py bench` is no worse
+- [ ] `python3 etsahc.py bench` is no worse
 - [ ] Tags include English and Japanese

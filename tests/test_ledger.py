@@ -14,10 +14,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import support  # noqa: F401
-from prout import Checker, Parser
-from prout_mcp.approval import hash_arguments, sign_payload
-from prout_mcp.decide import load_contract
-from prout_mcp.ledger import reserve
+from etsah import Checker, Parser
+from etsah_mcp.approval import hash_arguments, sign_payload
+from etsah_mcp.decide import load_contract
+from etsah_mcp.ledger import reserve
 from test_guard import GuardProcess, _audit
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -168,7 +168,7 @@ class StaticLimitTests(unittest.TestCase):
         self.assertFalse(any(item.severity == "error" for item in diags))
 
     def test_declared_cap_and_a_field_amount_are_quiet(self) -> None:
-        diags = Checker(Parser((AGENTS / "invoice.prout").read_text(encoding="utf-8")).parse()).check()
+        diags = Checker(Parser((AGENTS / "invoice.etsah").read_text(encoding="utf-8")).parse()).check()
         self.assertEqual(diags, [])
 
     def test_currency_mismatch_and_a_task_over_the_agent_are_errors(self) -> None:
@@ -225,7 +225,7 @@ class StaticLimitTests(unittest.TestCase):
 
 class GuardLedgerTests(unittest.TestCase):
     def test_guard_blocks_over_the_cap_even_with_a_fresh_approval(self) -> None:
-        loaded = load_contract((AGENTS / "invoice.prout").read_text(encoding="utf-8"))
+        loaded = load_contract((AGENTS / "invoice.etsah").read_text(encoding="utf-8"))
         arguments = {"invoice": {"amount": "4000.00"}}
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -236,7 +236,7 @@ class GuardLedgerTests(unittest.TestCase):
             first_token, first_payload = _charge_token(loaded.audit_id, arguments, "a" * 32, "b" * 32)
             log_path = root / "calls.jsonl"
             guard = GuardProcess(
-                AGENTS / "invoice.prout",
+                AGENTS / "invoice.etsah",
                 log_path,
                 extra=[
                     "--approval-key-file",
@@ -265,7 +265,7 @@ class GuardLedgerTests(unittest.TestCase):
             second_token, second_payload = _charge_token(loaded.audit_id, arguments, "c" * 32, "d" * 32)
             second_log = root / "second.jsonl"
             second = GuardProcess(
-                AGENTS / "invoice.prout",
+                AGENTS / "invoice.etsah",
                 second_log,
                 extra=[
                     "--approval-key-file",
@@ -293,7 +293,7 @@ class GuardLedgerTests(unittest.TestCase):
             self.assertNotIn(KEY, stored)
 
     def test_unreadable_amount_does_not_spend_the_approval(self) -> None:
-        loaded = load_contract((AGENTS / "invoice.prout").read_text(encoding="utf-8"))
+        loaded = load_contract((AGENTS / "invoice.etsah").read_text(encoding="utf-8"))
         arguments = {"invoice": {"amount": "100.00"}}
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -302,11 +302,11 @@ class GuardLedgerTests(unittest.TestCase):
             nonce_path = root / "nonces.json"
             ledger_path = root / "ledger.json"
             token, payload = _charge_token(loaded.audit_id, arguments, "e" * 32, "f" * 32)
-            guard = GuardProcess(AGENTS / "invoice.prout", root / "calls.jsonl", env_extra={
-                "PROUT_APPROVAL_KEY": KEY,
-                "PROUT_APPROVAL_NONCE_FILE": str(nonce_path),
-                "PROUT_LEDGER_FILE": str(ledger_path),
-                "PROUT_APPROVAL_TOKEN": token,
+            guard = GuardProcess(AGENTS / "invoice.etsah", root / "calls.jsonl", env_extra={
+                "ETSAH_APPROVAL_KEY": KEY,
+                "ETSAH_APPROVAL_NONCE_FILE": str(nonce_path),
+                "ETSAH_LEDGER_FILE": str(ledger_path),
+                "ETSAH_APPROVAL_TOKEN": token,
             })
             try:
                 _init(guard)

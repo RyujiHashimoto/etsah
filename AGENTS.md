@@ -1,6 +1,6 @@
 # AGENTS.md
 
-PROUT is a **contract language (a DSL) for AI agents**. You declare
+Etsah is a **contract language (a DSL) for AI agents**. You declare
 effects (`read`, `write`, `net`, `spend`, `emit`), budgets, and approval
 gates; a deterministic checker rejects unsafe automations before they
 run. It is a language with a small toolchain around it, not a
@@ -10,9 +10,9 @@ Author: Ryuji Hashimoto (J-PROUT Inc.)
 License: MIT (see `LICENSE`)
 Repository: https://github.com/RyujiHashimoto/prout-lang
 
-A rename to Etsah is planned in a separate change; this tree uses `python3 prout.py`, the `.prout` extension, and the `prout-mcp` console script.
+The language is Etsah. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and write a deprecation warning to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. The repository URL stays https://github.com/RyujiHashimoto/prout-lang.
 
-`python3 -m unittest discover -s tests` reports 355 tests, all passing, on Python 3.12.
+`python3 -m unittest discover -s tests` reports 365 tests, all passing, on Python 3.12.
 
 ## Build, test, and run
 
@@ -26,16 +26,16 @@ cd prout-lang
 
 python3 -m unittest discover -s tests
 
-python3 prout.py check examples/refund_fixed.prout
-python3 prout.py check examples/ai_tasks.prout
-python3 prout.py check examples/agents/support_reply.prout
-python3 prout.py check examples/information_flow_safe.prout \
+python3 etsah.py check examples/refund_fixed.etsah
+python3 etsah.py check examples/ai_tasks.etsah
+python3 etsah.py check examples/agents/support_reply.etsah
+python3 etsah.py check examples/information_flow_safe.etsah \
   --allow-net email --allow-net analytics
 
-python3 prout.py ast examples/refund_fixed.prout
+python3 etsah.py ast examples/refund_fixed.etsah
 
-python3 prout.py import mcp examples/agents/tools/mcp_tools.json
-python3 prout.py import openai examples/agents/tools/openai_tools.json
+python3 etsah.py import mcp examples/agents/tools/mcp_tools.json
+python3 etsah.py import openai examples/agents/tools/openai_tools.json
 
 python3 render.py
 ```
@@ -45,23 +45,23 @@ and `--json`. A file with no errors exits 0, including when the only
 findings are warnings. A file with errors exits 1. A parse failure
 exits 2. `import` also exits 2 when the tool list cannot be read.
 
-Subcommands of `python3 prout.py` are `check`, `ast`, `import`
+Subcommands of `python3 etsah.py` are `check`, `ast`, `import`
 (`mcp` or `openai`), `mcp`, `guard`, and `approve`.
 
-`python3 prout.py mcp` is the stdio MCP server. It speaks
+`python3 etsah.py mcp` is the stdio MCP server. It speaks
 newline-delimited JSON-RPC and returns when stdin closes. The same
-server is the `prout-mcp` console script after a local install. Tool
+server is the `etsah-mcp` console script after a local install. Tool
 names and the guard are documented in `docs/en/mcp.md` and
 `docs/mcp.ja.md`.
 
-`python3 prout.py approve` issues one signed, expiring, one-time
+`python3 etsah.py approve` issues one signed, expiring, one-time
 approval for an `ASK` tool call. The HMAC key comes from the
-environment (`PROUT_APPROVAL_KEY`) or from `--approval-key-file`. Do
+environment (`ETSAH_APPROVAL_KEY`) or from `--approval-key-file`. Do
 not put a key on the command line, and do not commit a key. Details
 are in `docs/en/mcp.md`.
 
-`prout guard` counts `limit calls` and `limit spend` in
-`PROUT_LEDGER_FILE` or `--ledger-file`. A call past the cap is blocked
+`etsah guard` counts `limit calls` and `limit spend` in
+`ETSAH_LEDGER_FILE` or `--ledger-file`. A call past the cap is blocked
 even when a signed approval is present. The integer-yen `budget` is
 still only a static ceiling.
 
@@ -72,16 +72,16 @@ Pattern layer, from `patterns/` (this is also what CI runs):
 
 ```bash
 cd patterns
-python3 proutc.py index
-python3 proutc.py find "申請 承認"
-python3 proutc.py build examples/shop.prout
-python3 proutc.py build examples/expense.prout
-python3 proutc.py build examples/ai_automation.prout
-python3 proutc.py bench
+python3 etsahc.py index
+python3 etsahc.py find "申請 承認"
+python3 etsahc.py build examples/shop.etsah
+python3 etsahc.py build examples/expense.etsah
+python3 etsahc.py build examples/ai_automation.etsah
+python3 etsahc.py bench
 python3 growth_report.py
 ```
 
-`proutc.py` subcommands are `build`, `find`, `add`, `index`, and
+`etsahc.py` subcommands are `build`, `find`, `add`, `index`, and
 `bench`. After `index`, `registry/index.json` must match the manifests;
 CI fails if that file is stale. Generated files under `patterns/build/`
 are gitignored. The registry has 27 manifests.
@@ -92,15 +92,14 @@ the package:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install .
-.venv/bin/prout check examples/agents/support_reply.prout
+.venv/bin/etsah check examples/agents/support_reply.etsah
 ```
 
-`pyproject.toml` also declares `proutc` and `prout-mcp`. `prout-mcp` is
-the stdio server and returns when stdin closes. The installed `proutc`
-script does not start on this tree: `patterns/proutc.py` imports
-`staffing_rules` from the `patterns/` directory, and that module is not
-part of the installed package. Run `python3 proutc.py` from `patterns/`
-instead.
+`pyproject.toml` also declares `etsahc` and `etsah-mcp`. `etsah-mcp` is
+the stdio server and returns when stdin closes. Installed `etsahc`
+imports `staffing_rules` from the package. `python3 etsahc.py` from
+`patterns/` still imports that module as a neighbor. `proutc` remains
+for one minor version and warns.
 
 How to add a pattern, the review bar, and versioning are in
 [CONTRIBUTING.md](CONTRIBUTING.md). Vulnerability reports follow
@@ -125,12 +124,12 @@ How to add a pattern, the review bar, and versioning are in
 2. **MIT license.** Contributions are accepted under the MIT license.
    Credit the author only as **Ryuji Hashimoto (J-PROUT Inc.)**. Do not
    add personal contact details, phone numbers, or private addresses.
-3. **Do not refactor the validator in `prout.py`.** Do not rewrite or
+3. **Do not refactor the validator in `etsah.py`.** Do not rewrite or
    restructure the checker, parser, or lexer for cleanliness. Keep
-   changes to `prout.py` as small as the task requires. If a change
+   changes to `etsah.py` as small as the task requires. If a change
    alters the meaning of syntax, types, effects, or preconditions,
    update `SPEC.md` and `SPEC.en.md` in the same pull request. A change
-   that makes existing `.prout` files fail is a major change.
+   that makes existing `.etsah` files fail is a major change.
 4. **Sample data is fictional.** Examples, tests, and screenshots must
    use invented names, tickets, amounts, and dates. Do not commit real
    customer data, real personal data, or live credentials.
@@ -146,11 +145,11 @@ How to add a pattern, the review bar, and versioning are in
   stdlib `unittest`. Tests must run under
   `python3 -m unittest discover -s tests` with no extra packages.
 - Contract and pattern source: **2-space indent**, as in
-  `examples/ai_tasks.prout` and the other files under `examples/` and
+  `examples/ai_tasks.etsah` and the other files under `examples/` and
   `patterns/examples/`.
 - Match the surrounding file. Prefer a new test or example over a
   comment that restates the code.
-- Reuse a diagnostic code that already exists in `prout.py` and
+- Reuse a diagnostic code that already exists in `etsah.py` and
   `SPEC.md` when the meaning matches (`E-POLICY`, `E-EFF`, `E-PRE`,
   `E-TYPE`, `E-FLOW`, `E-IFLOW-ARG`, `E-IFLOW-CONTRACT`, `E-IFLOW-RET`,
   `E-IFLOW-SINK`, and the others defined there). Do not invent a synonym.
@@ -159,10 +158,10 @@ How to add a pattern, the review bar, and versioning are in
 
 1. Add a pair when you are showing a check: a broken file that must
    fail, and a fixed file that must pass, following
-   `examples/refund_broken.prout` / `examples/refund_fixed.prout` and
-   `examples/agents/support_reply_broken.prout` /
-   `examples/agents/support_reply.prout`.
-2. Use the `.prout` extension.
+   `examples/refund_broken.etsah` / `examples/refund_fixed.etsah` and
+   `examples/agents/support_reply_broken.etsah` /
+   `examples/agents/support_reply.etsah`.
+2. Use the `.etsah` extension.
 3. Keep the data fictional. Stay inside the documented effects:
    `read`, `write`, `net`, `spend`, `emit`.
 4. Wire the new files into CI if they are part of the public contract
@@ -184,15 +183,15 @@ How to add a pattern, the review bar, and versioning are in
    python3 -m unittest discover -s tests
    ```
 
-5. If you change a pattern manifest, also run `python3 proutc.py index`
+5. If you change a pattern manifest, also run `python3 etsahc.py index`
    from `patterns/` and include the updated `registry/index.json`.
 
 ## Adding a pattern
 
 Patterns are JSON manifests in `patterns/registry/`, not code. Follow
 [CONTRIBUTING.md](CONTRIBUTING.md): add `patterns/registry/<name>.json`,
-regenerate `index.json`, and make sure `python3 proutc.py build` and
-`python3 proutc.py bench` still pass. Add a pattern only when the same
+regenerate `index.json`, and make sure `python3 etsahc.py build` and
+`python3 etsahc.py bench` still pass. Add a pattern only when the same
 shape has appeared at least twice. Review checks (intent, slots,
 effects, determinism, examples, bench, hook arguments) are in
 `CONTRIBUTING.md`.
@@ -207,10 +206,10 @@ the task requires.
 - Open a branch and a pull request, as above. In the pull request body,
   include: the model you used and the time you generated the change
   (timezone Asia/Tokyo); the exact commands you ran and their output
-  (`python3 -m unittest discover -s tests`, plus `proutc.py build` and
+  (`python3 -m unittest discover -s tests`, plus `etsahc.py build` and
   `bench` when you touch the pattern layer); what you changed and why;
   and any part you left as `custom` rather than a new pattern.
-- Do not start a broad cleanup of `prout.py`. If you are unsure whether
+- Do not start a broad cleanup of `etsah.py`. If you are unsure whether
   a change is a refactor of the validator, stop and describe the change
   in the pull request instead of applying it.
 - AI contributors are welcome and stand on equal footing with human
@@ -222,12 +221,12 @@ the task requires.
 
 Present on `main`:
 
-- `pyproject.toml`. After a local `pip install .`, `prout` and
-  `prout-mcp` run. Run the pattern compiler as `python3 proutc.py`
+- `pyproject.toml`. After a local `pip install .`, `etsah` and
+  `etsah-mcp` run. Run the pattern compiler as `python3 etsahc.py`
   from `patterns/` (see above)
-- An MCP stdio server (`python3 prout.py mcp`), a guard
-  (`python3 prout.py guard`), and signed one-time approvals
-  (`python3 prout.py approve`)
+- An MCP stdio server (`python3 etsah.py mcp`), a guard
+  (`python3 etsah.py guard`), and signed one-time approvals
+  (`python3 etsah.py approve`)
 - A static browser playground at `docs/playground/index.html`
 - 27 pattern manifests under `patterns/registry/`
 

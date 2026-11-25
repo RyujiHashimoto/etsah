@@ -119,7 +119,7 @@
     {"path": "lib/dispatch/term.ts", "kind": "TS", "lines": 40, "desc": "開始日、終了日、抵触日の比較"},
     {"path": "tests/dispatch-contracts.test.ts", "kind": "TEST", "lines": 60, "desc": "抵触日と例外スロットのテスト"}
   ],
-  "examples": ["examples/staffing.prout", "examples/staffing_desk.prout", "examples/staffing_limits.prout"],
+  "examples": ["examples/staffing.etsah", "examples/staffing_desk.etsah", "examples/staffing_limits.etsah"],
   "notes": [
     "抵触日は、同じ派遣先事業所（office）または同じ人と組織単位（person + org_unit）の最も早い開始日に3年を足した日（その期間の翌日）として計算する。2月29日で応当日が無い年は3月1日。過去の span との空白が3か月を超える（3か月+1日）と起算をリセットする。",
     "conflict_date は派遣先が通知した日のまま必須。計算値と違えば W-POLICY で、通知値は上書きしない。終了日が計算値より後で、かつ通知値より前なら E-POLICY。計算値と通知値が同じときは、従来の end_date <= conflict_date だけが終了日を見る。",
@@ -127,7 +127,7 @@
     "exempt が indefinite、age60、day_limited、leave_substitute のとき、抵触日超過はエラーではなく警告になる。警告は法令意見ではない。day_limited と leave_substitute は日数や休業を確認しない。有期プロジェクトはフラグにしていない。"
   ],
   "provenance": {
-    "author": "PROUT staffing prototype",
+    "author": "Etsah staffing prototype",
     "date": "2026-11-23",
     "extracted_from": ["staffing", "staffing_desk", "staffing_limits"],
     "note": "個別契約と就業条件。通知された抵触日に加え、仕様に書かれた span から3年後の抵触日を計算する。"

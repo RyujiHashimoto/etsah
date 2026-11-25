@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401
-from prout_mcp.approval import (
+from etsah_mcp.approval import (
     ApprovalError,
     _b64d,
     _b64e,
@@ -30,7 +30,7 @@ from prout_mcp.approval import (
     sign_payload,
     verify_token,
 )
-from prout_mcp.decide import gates_for_tool, load_contract
+from etsah_mcp.decide import gates_for_tool, load_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "examples" / "agents"
@@ -39,7 +39,7 @@ KEY_BYTES = KEY.encode("utf-8")
 
 
 def _contract() -> str:
-    return (AGENTS / "support_reply.prout").read_text(encoding="utf-8")
+    return (AGENTS / "support_reply.etsah").read_text(encoding="utf-8")
 
 
 def _loaded():
@@ -124,13 +124,13 @@ class TokenTests(unittest.TestCase):
             verify_token(token, b"other-example-key")
         self.assertEqual(str(caught.exception), "bad signature")
         payload, mac = token.split(".")[1:]
-        mutated = "prout1." + ("A" if payload[0] != "A" else "B") + payload[1:] + "." + mac
+        mutated = "etsah1." + ("A" if payload[0] != "A" else "B") + payload[1:] + "." + mac
         with self.assertRaises(ApprovalError) as caught:
             verify_token(mutated, KEY_BYTES)
         self.assertEqual(str(caught.exception), "bad signature")
 
     def test_malformed_tokens_are_rejected(self) -> None:
-        for token in ("example-approval", "prout1.abc", "prout1.@@@.@@@", "", "prout1.."):
+        for token in ("example-approval", "etsah1.abc", "etsah1.@@@.@@@", "", "etsah1.."):
             with self.assertRaises(ApprovalError) as caught:
                 verify_token(token, KEY_BYTES)
             self.assertEqual(str(caught.exception), "malformed approval")
@@ -141,7 +141,7 @@ class TokenTests(unittest.TestCase):
         mac = hmac.new(KEY_BYTES, body, hashlib.sha256).digest()
         import base64
 
-        token = "prout1." + base64.urlsafe_b64encode(body).rstrip(b"=").decode("ascii")
+        token = "etsah1." + base64.urlsafe_b64encode(body).rstrip(b"=").decode("ascii")
         token += "." + base64.urlsafe_b64encode(mac).rstrip(b"=").decode("ascii")
         with self.assertRaises(ApprovalError) as caught:
             verify_token(token, KEY_BYTES)
@@ -279,7 +279,7 @@ class KeyTests(unittest.TestCase):
             path = Path(tmp) / "approval.key"
             path.write_bytes(b"\xef\xbb\xbf" + KEY_BYTES + b"\n")
             self.assertEqual(load_key(str(path), {}), KEY_BYTES)
-            self.assertEqual(load_key(None, {"PROUT_APPROVAL_KEY": KEY}), KEY_BYTES)
+            self.assertEqual(load_key(None, {"ETSAH_APPROVAL_KEY": KEY}), KEY_BYTES)
 
     def test_empty_multiline_and_two_sources_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -295,7 +295,7 @@ class KeyTests(unittest.TestCase):
             self.assertEqual(str(caught.exception), "approval key must be a single line")
             self.assertNotIn(KEY, str(caught.exception))
             with self.assertRaises(ApprovalError) as caught:
-                load_key(str(empty), {"PROUT_APPROVAL_KEY": KEY})
+                load_key(str(empty), {"ETSAH_APPROVAL_KEY": KEY})
             self.assertEqual(str(caught.exception), "set only one approval key source")
             self.assertNotIn(KEY, str(caught.exception))
 
@@ -313,7 +313,7 @@ class IssueTests(unittest.TestCase):
     def test_issue_binds_the_contract_gate_and_approver(self) -> None:
         loaded = _loaded()
         issued = issue_approval(
-            contract=str(AGENTS / "support_reply.prout"),
+            contract=str(AGENTS / "support_reply.etsah"),
             gate="approve_reply",
             op="mail.send_reply",
             approver_id="support_lead",
@@ -336,7 +336,7 @@ class IssueTests(unittest.TestCase):
     def test_issue_refuses_a_broken_contract_and_a_wrong_approver(self) -> None:
         with self.assertRaises(ApprovalError) as caught:
             issue_approval(
-                contract=str(AGENTS / "support_reply_broken.prout"),
+                contract=str(AGENTS / "support_reply_broken.etsah"),
                 gate="approve_reply",
                 op="mail.send_reply",
                 approver_id="support_lead",
@@ -347,7 +347,7 @@ class IssueTests(unittest.TestCase):
         self.assertEqual(str(caught.exception), "the contract check failed")
         with self.assertRaises(ApprovalError) as caught:
             issue_approval(
-                contract=str(AGENTS / "support_reply.prout"),
+                contract=str(AGENTS / "support_reply.etsah"),
                 gate="approve_reply",
                 op="mail.send_reply",
                 approver_id="office_admin",
@@ -358,7 +358,7 @@ class IssueTests(unittest.TestCase):
         self.assertEqual(str(caught.exception), "approver does not match the gate")
         with self.assertRaises(ApprovalError) as caught:
             issue_approval(
-                contract=str(AGENTS / "support_reply.prout"),
+                contract=str(AGENTS / "support_reply.etsah"),
                 gate="approve_reply",
                 op="payments.charge",
                 approver_id="support_lead",
@@ -377,9 +377,9 @@ class IssueTests(unittest.TestCase):
 class LegacyFlagTests(unittest.TestCase):
     def test_only_the_explicit_value_enables_the_deprecated_check(self) -> None:
         self.assertFalse(legacy_enabled(False, {}))
-        self.assertFalse(legacy_enabled(False, {"PROUT_ALLOW_LEGACY_APPROVAL_TOKEN": "true"}))
-        self.assertFalse(legacy_enabled(False, {"PROUT_ALLOW_LEGACY_APPROVAL_TOKEN": "0"}))
-        self.assertTrue(legacy_enabled(False, {"PROUT_ALLOW_LEGACY_APPROVAL_TOKEN": "1"}))
+        self.assertFalse(legacy_enabled(False, {"ETSAH_ALLOW_LEGACY_APPROVAL_TOKEN": "true"}))
+        self.assertFalse(legacy_enabled(False, {"ETSAH_ALLOW_LEGACY_APPROVAL_TOKEN": "0"}))
+        self.assertTrue(legacy_enabled(False, {"ETSAH_ALLOW_LEGACY_APPROVAL_TOKEN": "1"}))
         self.assertTrue(legacy_enabled(True, {}))
 
 
@@ -387,6 +387,11 @@ class CliTests(unittest.TestCase):
     def _env(self, **extra: str) -> dict[str, str]:
         env = os.environ.copy()
         for name in (
+            "ETSAH_APPROVAL_TOKEN",
+            "ETSAH_APPROVAL_KEY",
+            "ETSAH_APPROVAL_KEY_FILE",
+            "ETSAH_APPROVAL_NONCE_FILE",
+            "ETSAH_ALLOW_LEGACY_APPROVAL_TOKEN",
             "PROUT_APPROVAL_TOKEN",
             "PROUT_APPROVAL_KEY",
             "PROUT_APPROVAL_KEY_FILE",
@@ -401,10 +406,10 @@ class CliTests(unittest.TestCase):
         proc = subprocess.run(
             [
                 sys.executable,
-                str(ROOT / "prout.py"),
+                str(ROOT / "etsah.py"),
                 "approve",
                 "--contract",
-                str(AGENTS / "support_reply.prout"),
+                str(AGENTS / "support_reply.etsah"),
                 "--gate",
                 "approve_reply",
                 "--op",
@@ -417,14 +422,14 @@ class CliTests(unittest.TestCase):
                 "300",
             ],
             cwd=ROOT,
-            env=self._env(PROUT_APPROVAL_KEY=KEY),
+            env=self._env(ETSAH_APPROVAL_KEY=KEY),
             capture_output=True,
             text=True,
             check=False,
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         token = proc.stdout.strip()
-        self.assertTrue(token.startswith("prout1."))
+        self.assertTrue(token.startswith("etsah1."))
         self.assertNotIn(token, proc.stderr)
         self.assertNotIn(KEY, proc.stderr)
         self.assertIn("approver_id: support_lead", proc.stderr)
@@ -436,10 +441,10 @@ class CliTests(unittest.TestCase):
         proc = subprocess.run(
             [
                 sys.executable,
-                str(ROOT / "prout.py"),
+                str(ROOT / "etsah.py"),
                 "approve",
                 "--contract",
-                str(AGENTS / "support_reply.prout"),
+                str(AGENTS / "support_reply.etsah"),
                 "--gate",
                 "approve_reply",
                 "--op",
@@ -453,7 +458,7 @@ class CliTests(unittest.TestCase):
                 "--json",
             ],
             cwd=ROOT,
-            env=self._env(PROUT_APPROVAL_KEY=KEY),
+            env=self._env(ETSAH_APPROVAL_KEY=KEY),
             capture_output=True,
             text=True,
             check=False,
@@ -466,10 +471,10 @@ class CliTests(unittest.TestCase):
         rejected = subprocess.run(
             [
                 sys.executable,
-                str(ROOT / "prout.py"),
+                str(ROOT / "etsah.py"),
                 "approve",
                 "--contract",
-                str(AGENTS / "support_reply.prout"),
+                str(AGENTS / "support_reply.etsah"),
                 "--gate",
                 "approve_reply",
                 "--op",
@@ -482,7 +487,7 @@ class CliTests(unittest.TestCase):
                 "60",
             ],
             cwd=ROOT,
-            env=self._env(PROUT_APPROVAL_KEY=KEY),
+            env=self._env(ETSAH_APPROVAL_KEY=KEY),
             capture_output=True,
             text=True,
             check=False,

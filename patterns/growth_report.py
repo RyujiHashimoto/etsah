@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Render the PROUT Patterns growth report.
+Render the Etsah Patterns growth report.
 
 The report tells one story: two concrete apps (expense, PC lending) share an
 approval workflow. The workflow is extracted into a pattern, published in the
@@ -12,7 +12,7 @@ from __future__ import annotations
 import html
 from pathlib import Path
 
-from proutc import (
+from etsahc import (
     DEFAULT_REGISTRY,
     bench_rows,
     find_patterns,
@@ -175,12 +175,12 @@ def main() -> None:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PROUT Patterns — 言語が育つループ</title>
+<title>Etsah Patterns — 言語が育つループ</title>
 <style>{css}</style>
 </head>
 <body>
 <div class="wrap">
-  <div class="kicker">PROUT PATTERNS / GROWTH REPORT</div>
+  <div class="kicker">Etsah PATTERNS / GROWTH REPORT</div>
   <h1>言語が育つループ</h1>
   <p class="lead">経費精算とPC貸出から「申請 → 承認 → 差し戻し」を抽出し、次のAIが短い仕様で再利用できるか。パターンをコードからデータへ移し、発見・使用・改良の一周を試作した。</p>
 
@@ -249,7 +249,7 @@ def main() -> None:
   <div class="panel">
     <h2>発見テスト：元の会話を読まずに使えるか</h2>
     <p style="font-size:12.5px;color:var(--muted);">別のAIには、レジストリの <code>index.json</code> と新しい依頼だけを渡す。ここでは「申請 承認」で検索した結果を示す。</p>
-    <div class="query"><span>$</span><code>proutc find "申請 承認"</code></div>
+    <div class="query"><span>$</span><code>etsahc find "申請 承認"</code></div>
     <div class="result">
       <div class="result-head"><span class="result-name">{esc(match.name)} v{esc(match.version)}</span><span class="result-score">score {score}</span></div>
       <p>{esc(match.intent)}</p>
@@ -271,9 +271,9 @@ def main() -> None:
     <h2>改良の取り込み</h2>
     <div class="flow">
       <div class="flow-step"><div class="n">1</div><div class="body"><strong>提案</strong> — AIが新しいパターン、または既存パターンの修正をPull Requestで出す。</div></div>
-      <div class="flow-step"><div class="n">2</div><div class="body"><strong>検証</strong> — CIが全サンプルと <code>proutc bench</code> を実行し、既存アプリへの影響を確認する。</div></div>
+      <div class="flow-step"><div class="n">2</div><div class="body"><strong>検証</strong> — CIが全サンプルと <code>etsahc bench</code> を実行し、既存アプリへの影響を確認する。</div></div>
       <div class="flow-step"><div class="n">3</div><div class="body"><strong>レビュー</strong> — 人間はスロットと効果の差分だけを見る。生成物は読まない。</div></div>
-      <div class="flow-step"><div class="n">4</div><div class="body"><strong>取り込み</strong> — バージョンを上げ、<code>proutc index</code> で <code>index.json</code> を更新する。</div></div>
+      <div class="flow-step"><div class="n">4</div><div class="body"><strong>取り込み</strong> — バージョンを上げ、<code>etsahc index</code> で <code>index.json</code> を更新する。</div></div>
     </div>
     <div class="codeblock"><pre>name: validate-patterns
 on: [pull_request]
@@ -284,11 +284,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {{ python-version: "3.12" }}
-      - run: python3 prout.py check examples/refund_fixed.prout
-      - run: cd patterns && python3 proutc.py index
-      - run: cd patterns && python3 proutc.py build examples/shop.prout
-      - run: cd patterns && python3 proutc.py build examples/expense.prout
-      - run: cd patterns && python3 proutc.py bench</pre></div>
+      - run: python3 etsah.py check examples/refund_fixed.etsah
+      - run: cd patterns && python3 etsahc.py index
+      - run: cd patterns && python3 etsahc.py build examples/shop.etsah
+      - run: cd patterns && python3 etsahc.py build examples/expense.etsah
+      - run: cd patterns && python3 etsahc.py bench</pre></div>
   </div>
 
   <div class="panel">
@@ -298,7 +298,7 @@ jobs:
   </div>
 
   <div class="footer">
-    <span>PROUT Patterns v0.2 — 言語が育つループ</span>
+    <span>Etsah Patterns v0.2 — 言語が育つループ</span>
     <span>Author: 橋元 龍二 (Ryuji Hashimoto)</span>
     <span class="hash">registry {len(registry)} patterns</span>
   </div>
