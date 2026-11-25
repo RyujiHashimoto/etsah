@@ -20,6 +20,8 @@ from pathlib import Path
 import support  # noqa: F401
 from prout_mcp.approval import (
     ApprovalError,
+    _b64d,
+    _b64e,
     authorize,
     hash_arguments,
     issue_approval,
@@ -107,7 +109,10 @@ class TokenTests(unittest.TestCase):
         approval = verify_token(token, KEY_BYTES)
         self.assertEqual(approval.approver_id, "support_lead")
         self.assertEqual(approval.op, "mail.send_reply")
-        flipped = token[:-1] + ("A" if token[-1] != "A" else "B")
+        parts = token.split(".")
+        mac = bytearray(_b64d(parts[2]))
+        mac[0] ^= 0x01
+        flipped = ".".join((parts[0], parts[1], _b64e(bytes(mac))))
         with self.assertRaises(ApprovalError) as caught:
             verify_token(flipped, KEY_BYTES)
         self.assertEqual(str(caught.exception), "bad signature")

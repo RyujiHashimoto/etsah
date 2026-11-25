@@ -2,7 +2,7 @@
 
 > PROUT is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
 
-Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (341 tests, all passing, on `main` at `c1c6166`).
+Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (353 tests, all passing).
 
 Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `prout.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
 
@@ -15,11 +15,11 @@ Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor t
 - [SPEC.en.md](SPEC.en.md): English translation of `SPEC.md`.
 - [CONTRIBUTING.md](CONTRIBUTING.md): How to add a pattern manifest, review criteria, and versioning.
 - [docs/information-flow.md](docs/information-flow.md): Information-flow labels, sinks, and `declassify`.
-- [docs/ai_automation.md](docs/ai_automation.md): Design notes for `agent` / `task` / `gate` / `policy`. Checking is static. Cron, budget counters, and an idempotency store are not implemented.
+- [docs/ai_automation.md](docs/ai_automation.md): Design notes for `agent` / `task` / `gate` / `policy`. The checker is static. `prout guard` counts `limit calls` and `limit spend`. Cron, the integer-yen budget counter, and an idempotency store are not implemented.
 - [docs/staffing.md](docs/staffing.md): Staffing-domain contracts (timesheets, assignment limits, billing rates). Sample data is fictional.
 - [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md): Five-minute agent check.
 - [docs/en/comparison.md](docs/en/comparison.md): How this differs from a Cedar or OPA policy plus a wrapper.
-- [docs/en/mcp.md](docs/en/mcp.md): MCP stdio server (`python3 prout.py mcp`), guard (`python3 prout.py guard`), and signed one-time approvals (`python3 prout.py approve`).
+- [docs/en/mcp.md](docs/en/mcp.md): MCP stdio server (`python3 prout.py mcp`), guard (`python3 prout.py guard`), signed one-time approvals (`python3 prout.py approve`), and the call/spend ledger.
 - [docs/mcp.ja.md](docs/mcp.ja.md): Japanese version of the MCP guide.
 - [docs/playground/index.html](docs/playground/index.html): Static browser checker. The repository does not enable GitHub Pages by itself.
 - [SECURITY.md](SECURITY.md): How to report a vulnerability.
