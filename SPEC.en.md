@@ -129,7 +129,9 @@ Whether a `net` target is on the allow list (default `stripe`) is still the op p
 
 The information-flow `policy` (`sink` and `declassify`) and the task `policy` (`external`, `payment`, `contract`) share a declaration name and are distinguished by the lines inside. One block cannot hold both. A program may contain one information-flow `policy` and one task `policy`.
 
-When a program has a task, `check` prints the trigger, effects, gate, retry, key, and budget in prose. `check --json` keeps `hash`, `diagnostics`, and, when there are tasks, `audit_id` and `plan`. It also adds `manifest`: `hash`, `audit_id` when there are tasks, and each agent's `allow` list, integer-yen `budget_run` and `budget_period`, `limit_net` and `limit_emit`, `call_limit` and `spend_limit` when declared, and the gate names its tasks name. Agents, `allow` entries, and gate names are in name order, so the same source yields the same bytes. `signature` is always `null`. The field does not sign anything and does not read a key.
+When a program has a task, `check` prints the trigger, effects, gate, retry, key, and budget in prose. The exit code is 0 when there is no error (warnings still exit 0), 1 when there is at least one error, and 2 when the file does not parse.
+
+`check --json` prints one object. `hash` (the first 12 hex digits of the normalized AST's SHA-256) and `diagnostics` are always present. Each diagnostic has `code`, `severity`, `line`, and `message`, plus `fix`, `detail`, and `context` only when set. When the program has tasks, the object also has `audit_id` (64 hex digits) and `plan` (human-readable lines). `manifest` carries `hash`, `audit_id` when there are tasks, and each agent's `allow` list, integer-yen `budget_run` and `budget_period`, `limit_net` and `limit_emit`, `call_limit` and `spend_limit` when declared, and the gate names its tasks name. Agents, `allow` entries, and gate names are in name order, so the same source yields the same bytes. `signature` is always `null`. The field does not sign anything and does not read a key.
 
 ### Expressions
 

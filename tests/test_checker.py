@@ -573,6 +573,39 @@ class TestCli(unittest.TestCase):
         self.assertEqual(broken.returncode, 2, broken.stderr)
         self.assertIn("line", broken.stderr)
 
+    def test_ai_task_examples_pin_check_json_keys(self) -> None:
+        passing = subprocess.run(
+            [sys.executable, str(ROOT / "etsah.py"), "check", "--json", str(ROOT / "examples" / "ai_tasks.etsah")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(passing.returncode, 0, passing.stdout + passing.stderr)
+        ok = json.loads(passing.stdout)
+        self.assertEqual(set(ok), {"hash", "diagnostics", "audit_id", "plan", "manifest"})
+        self.assertEqual(len(ok["hash"]), 12)
+        self.assertEqual(len(ok["audit_id"]), 64)
+        self.assertIsInstance(ok["plan"], list)
+        self.assertTrue(ok["plan"])
+        self.assertEqual(ok["diagnostics"], [])
+
+        failing = subprocess.run(
+            [sys.executable, str(ROOT / "etsah.py"), "check", "--json", str(ROOT / "examples" / "ai_tasks_broken.etsah")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(failing.returncode, 1, failing.stdout + failing.stderr)
+        bad = json.loads(failing.stdout)
+        self.assertEqual(set(bad), {"hash", "diagnostics", "audit_id", "plan", "manifest"})
+        errors = [item for item in bad["diagnostics"] if item["severity"] == "error"]
+        self.assertTrue(errors)
+        self.assertTrue(all(item["code"] == "E-POLICY" for item in errors))
+        allowed = {"code", "severity", "line", "message", "fix", "detail", "context"}
+        for item in bad["diagnostics"]:
+            self.assertTrue({"code", "severity", "line", "message"} <= set(item))
+            self.assertTrue(set(item) <= allowed)
+
     def test_ast_command_prints_canonical_json(self) -> None:
         proc = self._run(
             """
