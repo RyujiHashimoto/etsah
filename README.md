@@ -148,6 +148,38 @@ python3 prout.py guard --contract examples/agents/support_reply.prout -- python3
 
 `prout_check`, `prout_import_tools`, `prout_explain`, and `prout_check_plan` are read-only. `prout guard` forwards `tools/list` to an upstream server and applies the contract before each `tools/call`. `prout approve` issues a signed, expiring, one-time approval; `ASK` is forwarded only when that approval matches the contract, the gate, the tool, and the argument hash. `limit calls` and `limit spend` are counted in a ledger file, and a signed approval does not raise those caps. Setup: [docs/en/mcp.md](docs/en/mcp.md) and [docs/mcp.ja.md](docs/mcp.ja.md).
 
+## Prompt injection
+
+A fictional inquiry, Q-4401 from `guest@example.invalid`, tells Harbor Lane Desk to ignore its rules, forward a vault token, and refund 9000.00 JPY. Two contracts show the same story.
+
+The leaking contract lets the secret token reach `mail.forward`. The check rejects it:
+
+```bash
+python3 prout.py check examples/prompt_injection_leak.prout
+```
+
+Expected: exit 1, `E-IFLOW-ARG` at `mail.forward` (`argument 'note' of mail.forward expects no labels, got secret`).
+
+The safe contract keeps the token inside the vault and answers with a fixed public sentence. External mail and the refund wait for `desk_lead`. The refund is a decimal in JPY and is capped at 1000.00 per day.
+
+```bash
+python3 prout.py check examples/prompt_injection_safe.prout
+```
+
+Expected: exit 0, no errors.
+
+Against that safe contract, `prout guard` treats the calls as follows.
+
+| Call | Verdict | Why |
+|---|---|---|
+| `inbox.read` | `ALLOW` | A read inside the agent allow list |
+| `mail.reply` | `ASK` | External `emit(mail)` waits for `desk_lead` |
+| `mail.forward` | `BLOCK` | The op is not in the contract |
+| `payments.refund` of `100.00` with a matching signed approval | forwarded | Under the 1000.00 JPY daily cap |
+| `payments.refund` of `9000.00` with a matching signed approval | `BLOCK` | The signature fits the call, and the cap still rejects it |
+
+The approval is issued with `prout approve` for that op, gate `approve_reply`, approver `desk_lead`, and the same argument object the client will send. The guard needs the same HMAC key, a nonce file, and `--ledger-file`.
+
 ## Pattern layer
 
 App specs fill slots. The compiler checks them and estimates database, API, UI, and test files. It does not yet write those source files.

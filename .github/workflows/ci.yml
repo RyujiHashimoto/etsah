@@ -98,6 +98,13 @@ jobs:
           fi
           grep -q "E-IFLOW-ARG" /tmp/iflow-leak.txt
           grep -q "track_event" /tmp/iflow-leak.txt
+          python3 prout.py check examples/prompt_injection_safe.prout
+          if python3 prout.py check examples/prompt_injection_leak.prout > /tmp/injection-leak.txt 2>&1; then
+            echo "prompt injection leak unexpectedly passed"
+            exit 1
+          fi
+          grep -q "E-IFLOW-ARG" /tmp/injection-leak.txt
+          grep -q "mail.forward" /tmp/injection-leak.txt
 
       - name: Pattern registry
         working-directory: patterns

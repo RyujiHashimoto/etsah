@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 
 ### Added
 
+- A prompt-injection pair: `examples/prompt_injection_leak.prout` is rejected with `E-IFLOW-ARG`, and `examples/prompt_injection_safe.prout` keeps the fictional vault token inside while the guard asks before external mail and blocks a refund above the daily JPY cap.
 - `limit calls` and `limit spend` declare a per-period call cap and a decimal spend cap, with a currency, on an agent, a task, or an op. `prout guard` counts them in a ledger file and blocks a call that would pass the cap, including one with a signed approval. A spend op names the decimal argument with `spend from`. A spend task with no decimal cap is a warning, `W-BUDGET`.
 - `prout approve` issues an HMAC-SHA256 approval for one ASK call. `prout guard` forwards that call only when the signature matches the approver, contract `audit_id`, gate, tool, and argument hash, and the nonce has not been used. The shared key comes from the environment or a file and is not logged. The old non-empty token remains only behind `--allow-legacy-approval-token`.
 - English README. The previous Japanese README is preserved in full as `README.ja.md`.

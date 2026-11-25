@@ -2,7 +2,7 @@
 
 > PROUT is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
 
-Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (353 tests, all passing).
+Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 prout.py check` on `.prout` files. `python3 -m unittest discover -s tests` is the test command (355 tests, all passing).
 
 Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `prout.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
 
@@ -31,6 +31,7 @@ Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor t
 - [examples/ai_tasks.prout](examples/ai_tasks.prout): Passing `agent` / `task` contracts. The broken twin is [examples/ai_tasks_broken.prout](examples/ai_tasks_broken.prout).
 - [examples/refund_fixed.prout](examples/refund_fixed.prout): Passing refund contract. The broken twin is [examples/refund_broken.prout](examples/refund_broken.prout).
 - [examples/information_flow_safe.prout](examples/information_flow_safe.prout): Passing information-flow example (`--allow-net email --allow-net analytics`). The leaking twin is [examples/information_flow_leak.prout](examples/information_flow_leak.prout).
+- [examples/prompt_injection_safe.prout](examples/prompt_injection_safe.prout): Fictional inquiry Q-4401. The safe contract keeps a vault token inside. The leaking twin is [examples/prompt_injection_leak.prout](examples/prompt_injection_leak.prout) and fails with `E-IFLOW-ARG`. Steps are in [README.md](README.md).
 - [examples/staffing.prout](examples/staffing.prout) and [examples/staffing_dates.prout](examples/staffing_dates.prout): Staffing contracts. Broken twins sit beside them.
 
 ## Optional

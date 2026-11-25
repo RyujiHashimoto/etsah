@@ -12,7 +12,7 @@ Repository: https://github.com/RyujiHashimoto/prout-lang
 
 A rename to Etsah is planned in a separate change; this tree uses `python3 prout.py`, the `.prout` extension, and the `prout-mcp` console script.
 
-`python3 -m unittest discover -s tests` reports 353 tests, all passing, on Python 3.12.
+`python3 -m unittest discover -s tests` reports 355 tests, all passing, on Python 3.12.
 
 ## Build, test, and run
 
