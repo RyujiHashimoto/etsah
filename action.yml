@@ -1,0 +1,66 @@
+name: Etsah check
+description: Check Etsah files and publish diagnostics as GitHub annotations. The job fails when the checker reports an error.
+author: Ryuji Hashimoto (J-PROUT Inc.)
+
+inputs:
+  glob:
+    description: >
+      Newline-separated globs, relative to the workspace. A {a,b} group
+      expands once. The default matches .etsah and .prout files.
+    required: false
+    default: "**/*.{etsah,prout}"
+  scope:
+    description: >
+      pull-request (default) checks files the pull request changes. On any
+      other event it checks every match, because there is no pull request
+      diff. all always checks every match. scope all fails when nothing matches.
+    required: false
+    default: pull-request
+  allow-net:
+    description: >
+      Comma- or whitespace-separated host names. Each one is passed to the
+      checker as --allow-net. Empty keeps the checker default.
+    required: false
+    default: ""
+  deny-net:
+    description: >
+      Comma- or whitespace-separated host names. Each one is passed to the
+      checker as --deny-net. Empty leaves the checker default in place.
+    required: false
+    default: ""
+  python-version:
+    description: Python version installed with actions/setup-python before the check.
+    required: false
+    default: "3.12"
+
+outputs:
+  errors:
+    description: Number of error diagnostics.
+    value: ${{ steps.check.outputs.errors }}
+  warnings:
+    description: Number of warning diagnostics.
+    value: ${{ steps.check.outputs.warnings }}
+  checked:
+    description: Comma-separated workspace-relative paths that were checked.
+    value: ${{ steps.check.outputs.checked }}
+  error-codes:
+    description: Comma-separated error codes.
+    value: ${{ steps.check.outputs.error-codes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Check Etsah files
+      id: check
+      shell: bash
+      env:
+        ETSAH_GLOB: ${{ inputs.glob }}
+        ETSAH_SCOPE: ${{ inputs.scope }}
+        ETSAH_ALLOW_NET: ${{ inputs.allow-net }}
+        ETSAH_DENY_NET: ${{ inputs.deny-net }}
+      run: python3 "${{ github.action_path }}/scripts/etsah_action.py"
