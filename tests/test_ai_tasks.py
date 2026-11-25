@@ -5,6 +5,9 @@ idempotency keys. Spend amounts are integer yen.
 """
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -830,6 +833,79 @@ class AstHash(unittest.TestCase):
         self.assertIn("5000 <= 1000 is false", text)
         self.assertIn("retries must be from 0 through 5, got 6", text)
         self.assertIn("escalation path produces external effects", text)
+
+    def test_ci_policy_diagnostics_include_an_english_fix_line(self) -> None:
+        broken = check((ROOT / "examples" / "ai_tasks_broken.etsah").read_text(encoding="utf-8"))
+        errors = [item for item in broken if item.severity == "error"]
+        expected = {
+            "emit to an external party has no approval gate": ("before emit(mail)", "mail.send"),
+            "net to an external party has no approval gate": ("before net(stripe)", "billing.post"),
+            "spend has no approval gate": ("before spend(payroll)", "payroll.transfer"),
+            "a contract change has no approval gate": ("before write(contracts)", "contracts.extend"),
+            "5000 <= 1000 is false": ("budget run 1000 period 1000", None),
+            "retries must be from 0 through 5, got 6": ("retry 5 escalate coordinator", None),
+            "escalation path produces external effects": ("retry 1 escalate payroll", "ping_customer"),
+        }
+        self.assertEqual(len(errors), len(expected))
+        for item in errors:
+            self.assertEqual(item.code, "E-POLICY")
+            match = next(pair for needle, pair in expected.items() if needle in item.message)
+            line, detail = match
+            self.assertIsNotNone(item.fix)
+            self.assertIn(line, item.fix)
+            self.assertTrue(
+                item.fix.startswith(
+                    (
+                        "Write this line on the gate: ",
+                        "Keep per-run at or below the period: ",
+                        "Use a count from 0 through 5: ",
+                        "Name a human role with no external effect: ",
+                    )
+                )
+            )
+            self.assertEqual(item.detail, detail)
+            rendered = item.render()
+            self.assertIn(f"fix: {item.fix}", rendered)
+            data = item.as_dict()
+            self.assertEqual(data["code"], "E-POLICY")
+            self.assertEqual(data["severity"], "error")
+            self.assertEqual(data["message"], item.message)
+            self.assertEqual(data["line"], item.line)
+            self.assertEqual(data["fix"], item.fix)
+            if detail is None:
+                self.assertNotIn("detail", data)
+            else:
+                self.assertEqual(data["detail"], detail)
+
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "etsah.py"),
+                "check",
+                "--json",
+                str(ROOT / "examples" / "ai_tasks_broken.etsah"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        payload = json.loads(proc.stdout)
+        fixes = [item["fix"] for item in payload["diagnostics"] if item["severity"] == "error"]
+        self.assertEqual(len(fixes), 7)
+        for fix in fixes:
+            self.assertTrue(fix)
+        plain = subprocess.run(
+            [sys.executable, str(ROOT / "etsah.py"), "check", str(ROOT / "examples" / "ai_tasks_broken.etsah")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(plain.returncode, 1, plain.stderr)
+        self.assertIn("fix: Write this line on the gate: before emit(mail)", plain.stdout)
+        self.assertIn("fix: Keep per-run at or below the period: budget run 1000 period 1000", plain.stdout)
+        self.assertIn("fix: Use a count from 0 through 5: retry 5 escalate coordinator", plain.stdout)
+        self.assertIn("fix: Name a human role with no external effect: retry 1 escalate payroll", plain.stdout)
 
 
 if __name__ == "__main__":

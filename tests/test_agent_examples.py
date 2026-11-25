@@ -47,12 +47,26 @@ class AgentExampleTests(unittest.TestCase):
                 "network target 'github' is not allowed by policy",
             ],
         )
+        self.assertEqual(
+            [item.fix for item in good.diagnostics],
+            [
+                "Use an allowlisted host: eff read(issues), net(stripe)",
+                "Use an allowlisted host: eff write(issues), net(stripe)",
+            ],
+        )
         broken = check_file(AGENTS / "github_triage_broken.etsah", allow_net=["github"])
         self.assertFalse(broken.ok)
         self.assertEqual([item.code for item in broken.diagnostics], ["E-POLICY", "E-POLICY"])
         text = "\n".join(item.message for item in broken.diagnostics)
         self.assertIn("network target 'gist' is not allowed by policy", text)
         self.assertIn("net effect needs a positive hourly rate limit", text)
+        self.assertEqual(
+            [item.fix for item in broken.diagnostics],
+            [
+                "Use an allowlisted host: eff net(github)",
+                "Set a positive hourly cap: limit net 1 hour",
+            ],
+        )
 
 
 if __name__ == "__main__":

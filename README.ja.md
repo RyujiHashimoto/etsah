@@ -54,7 +54,7 @@ open human-view.html
 
 `demo.sh` はここまでをまとめて実行します。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在386件で、すべて成功します。
+単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在391件で、すべて成功します。
 
 ```bash
 python3 -m unittest discover -s tests -v

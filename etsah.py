@@ -2262,9 +2262,21 @@ class Checker:
         for kind, target in op.effects:
             if kind == "net":
                 if target in self.deny_net:
-                    self.error("E-POLICY", f"network target {target!r} is denied by policy", op.line)
+                    self.error(
+                        "E-POLICY",
+                        f"network target {target!r} is denied by policy",
+                        op.line,
+                        self._allowlisted_net_fix(op, target),
+                        op.name,
+                    )
                 elif target not in self.allow_net:
-                    self.error("E-POLICY", f"network target {target!r} is not allowed by policy", op.line)
+                    self.error(
+                        "E-POLICY",
+                        f"network target {target!r} is not allowed by policy",
+                        op.line,
+                        self._allowlisted_net_fix(op, target),
+                        op.name,
+                    )
 
     def _base_type(self, ref: Any) -> str:
         return re.sub(r"<.*>", "", str(ref)).strip()
@@ -2522,6 +2534,7 @@ class Checker:
                     "E-POLICY",
                     f"{where}: per-run spend exceeds the period budget ({run} <= {period} is false)",
                     line,
+                    f"Keep per-run at or below the period: budget run {period} period {period}",
                 )
         elif run != 0 or period != 0:
             self.error(
@@ -2537,6 +2550,7 @@ class Checker:
                 "E-POLICY",
                 f"agent {agent.name}: {kind} effect needs a positive hourly rate limit",
                 agent.line,
+                f"Set a positive hourly cap: limit {kind} 1 hour",
             )
         elif not has_kind and limit != 0:
             self.error(
@@ -2597,6 +2611,35 @@ class Checker:
         if kind == "spend":
             return f"spend has no approval gate ({shown})"
         return f"a contract change has no approval gate ({shown})"
+
+    def _gate_fix(self, task: TaskDef, effect: tuple[str, str]) -> tuple[str, Optional[str]]:
+        """Suggested gate line, plus op names from the task body that cause the effect."""
+        names: list[str] = []
+        for name in sorted(self._called_op_names(task)):
+            op = self.ops.get(name)
+            if op is not None and effect in op.effects:
+                names.append(name)
+        fix = f"Write this line on the gate: before {format_effect(effect)}"
+        return fix, ", ".join(names) or None
+
+    def _allowlisted_net_fix(self, op: OpDef, bad: str) -> str:
+        host = sorted(self.allow_net)[0] if self.allow_net else "stripe"
+        parts: list[str] = []
+        for kind, current in op.effects:
+            if kind == "net" and current == bad:
+                parts.append(format_effect(("net", host)))
+            else:
+                parts.append(format_effect((kind, current)))
+        return "Use an allowlisted host: eff " + ", ".join(parts)
+
+    def _human_escalation_fix(self, task: TaskDef, target: str, agents: dict[str, AgentDef]) -> str:
+        role = "ROLE"
+        for gate in self.program.gates:
+            approver = gate.approver
+            if approver and approver not in agents and approver != target:
+                role = approver
+                break
+        return f"Name a human role with no external effect: retry {task.retry} escalate {role}"
 
     def _check_task_body(self, task: TaskDef) -> set[tuple[str, str]]:
         env = {name: typ for name, typ in task.params}
@@ -2743,6 +2786,7 @@ class Checker:
                     "E-POLICY",
                     f"task {task.name}: escalation path produces external effects ({listed})",
                     task.line,
+                    self._human_escalation_fix(task, target, agents),
                 )
             else:
                 self.error(
@@ -2761,6 +2805,8 @@ class Checker:
                 "E-POLICY",
                 f"task {task.name}: escalation path produces external effects ({listed})",
                 task.line,
+                self._human_escalation_fix(task, target, agents),
+                target,
             )
 
     def _check_one_task(
@@ -2784,6 +2830,7 @@ class Checker:
                 "E-POLICY",
                 f"task {task.name}: retries must be from 0 through {RETRY_MAX}, got {task.retry}",
                 task.line,
+                f"Use a count from 0 through {RETRY_MAX}: retry {RETRY_MAX} escalate {task.escalate}",
             )
         self._check_task_trigger(task)
         self._check_task_key(task)
@@ -2843,10 +2890,13 @@ class Checker:
             return
         if not task.gates:
             for effect in required:
+                fix, detail = self._gate_fix(task, effect)
                 self.error(
                     "E-POLICY",
                     f"task {task.name}: {self._gate_gap_message(effect, external)}",
                     task.line,
+                    fix,
+                    detail,
                 )
             return
         covered: dict[tuple[str, str], str] = {}
@@ -2875,10 +2925,13 @@ class Checker:
                 covered[effect] = name
         for effect in required:
             if effect not in covered:
+                fix, detail = self._gate_fix(task, effect)
                 self.error(
                     "E-POLICY",
                     f"task {task.name}: {self._gate_gap_message(effect, external)}",
                     task.line,
+                    fix,
+                    detail,
                 )
 
 
