@@ -235,7 +235,7 @@ docs/playground/         browser checker (static, Pyodide)
 
 ## Contributing
 
-New patterns are JSON in `patterns/registry/`. Human review is required, including when an agent wrote the patch. See [CONTRIBUTING.md](CONTRIBUTING.md).
+New patterns are JSON in `patterns/registry/`. Human review is required, including when an agent wrote the patch. See [CONTRIBUTING.md](CONTRIBUTING.md). Agents changing this repository should start with [AGENTS.md](AGENTS.md).
 
 ## License
 
