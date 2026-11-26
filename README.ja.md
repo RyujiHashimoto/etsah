@@ -33,32 +33,179 @@ AIが開発するなら、人間が作った言語の制約から自由になれ
 
 ## 動かす
 
-Python 3.12だけで動きます。追加の依存はありません。
+Python 3.12 と標準ライブラリで動きます。追加の実行時パッケージはありません。PyPI には公開していないので、クローンをインストールします。
 
 ```bash
 git clone https://github.com/RyujiHashimoto/prout-lang.git
 cd prout-lang
-
-# 契約言語：壊れた初稿は3件のエラーで止まる
-python3 etsah.py check examples/refund_broken.etsah
-
-# 修正版はエラー0件、実行時ガード1件
-python3 etsah.py check examples/refund_fixed.etsah
-
-# ASTから人間向けGUIを生成
-python3 render.py
-open human-view.html
+python3 -m venv .venv
+.venv/bin/python -m pip install .
 ```
+
+Debian と Ubuntu では、`python3 -m venv` に `python3.12-venv` パッケージが要ります。Windows ではプログラムの場所が `.venv\Scripts\python` と `.venv\Scripts\etsah`（同様に `etsahc` と `etsah-mcp`）です。
+
+インストールすると `etsah`、`etsahc`、`etsah-mcp` がその環境に入ります。以下の例は Linux と macOS のパスです。クローンのディレクトリで実行してください。初回のインストールは次の行で終わります。
+
+```text
+Successfully installed prout-lang-0.1.0
+```
+
+`pip install .` は、ビルド用の setuptools を一時環境へ取得することがあります。インストール後のプログラムに、第三者の依存はありません。
+
+### 最初の検査
+
+`examples/refund_fixed.etsah` は、架空の注文を返金する契約の修正版です。チェッカーはソースを読むだけで、決済 API は呼びません。
+
+```bash
+.venv/bin/etsah check examples/refund_fixed.etsah
+```
+
+```text
+Etsah check: examples/refund_fixed.etsah
+AST hash: bae8501e8b3f
+[WARNING] W-PRE (line 45): precondition of refund needs a runtime guard: (order.status == "paid")
+
+0 error(s), 1 warning(s)
+```
+
+終了コードは 0 です。警告は、実行時に確認する条件です。表示は英語です。
 
 ![人間向けビュー](docs/human-view.png)
 
-`demo.sh` はここまでをまとめて実行します。
+この図は、同じ返金契約の人間向けビューです（`docs/human-view.png`）。
 
-単体テストは標準ライブラリの `unittest` だけを使います。追加の依存はありません。現在399件で、すべて成功します。
+### エージェントの方針
+
+`examples/agents/support_reply.etsah` は架空のサポート窓口です（Harbor Lane Support、チケット T-1042）。タスクはチケットを読めます。顧客へのメールは外部の `emit(mail)` で、タスクは `gate approve_reply` を指名します。チェッカーはソースを読むだけで、メールは送りません。
 
 ```bash
-python3 -m unittest discover -s tests -v
+.venv/bin/etsah check examples/agents/support_reply.etsah
 ```
+
+```text
+Etsah check: examples/agents/support_reply.etsah
+AST hash: 270d77fe2df0
+
+1 task(s):
+  draft_reply — Read a ticket and send the reply through the approval gate
+    agent: support_reply
+    trigger: webhook "support-tickets"
+    effects: read(tickets), emit(mail)
+    gate: approve_reply, approver support_lead, before emit(mail), on_approved mail.send_reply
+    retry: 2, escalate support_lead
+    key: ticket_id
+    budget: agent run 0 / period 0 yen
+    limits: net 0/hour, emit 20/hour
+audit id: 270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0 (display 270d77fe2df0)
+OK — no issues
+
+0 error(s), 0 warning(s)
+```
+
+終了コードは 0 です。
+
+`check --json` はオブジェクトを 1 つ出します。`diagnostics` は空で、`manifest.signature` は `null` です。
+
+```bash
+.venv/bin/etsah check --json examples/agents/support_reply.etsah
+```
+
+```json
+{
+  "hash": "270d77fe2df0",
+  "diagnostics": [],
+  "audit_id": "270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0",
+  "plan": [
+    "1 task(s):",
+    "  draft_reply — Read a ticket and send the reply through the approval gate",
+    "    agent: support_reply",
+    "    trigger: webhook \"support-tickets\"",
+    "    effects: read(tickets), emit(mail)",
+    "    gate: approve_reply, approver support_lead, before emit(mail), on_approved mail.send_reply",
+    "    retry: 2, escalate support_lead",
+    "    key: ticket_id",
+    "    budget: agent run 0 / period 0 yen",
+    "    limits: net 0/hour, emit 20/hour",
+    "audit id: 270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0 (display 270d77fe2df0)"
+  ],
+  "manifest": {
+    "hash": "270d77fe2df0",
+    "audit_id": "270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0",
+    "agents": [
+      {
+        "name": "support_reply",
+        "allow": [
+          [
+            "emit",
+            "mail"
+          ],
+          [
+            "read",
+            "tickets"
+          ]
+        ],
+        "budget_run": 0,
+        "budget_period": 0,
+        "limit_net": 0,
+        "limit_emit": 20,
+        "gates": [
+          "approve_reply"
+        ]
+      }
+    ],
+    "signature": null
+  }
+}
+```
+
+終了コードは 0 です。
+
+`examples/agents/support_reply_broken.etsah` は、同じ窓口でゲートをタスクから外したものです。検査の終了コードは 1 です。診断の行は次のとおりです。
+
+```text
+[ERROR] E-POLICY (line 35): task draft_reply: emit to an external party has no approval gate (emit(mail))
+```
+
+### テスト
+
+```bash
+.venv/bin/python -m unittest discover -s tests
+```
+
+単体テストは標準ライブラリの `unittest` だけを使います。成功すると最後の行が `OK` になり、終了コードは 0 です。
+
+### パターンと MCP サーバ
+
+```bash
+.venv/bin/etsahc build patterns/examples/expense.etsah --out patterns/build/expense
+```
+
+```text
+Etsah Patterns: expense
+stack: nextjs, postgres  freedom: guided
+entities: 2  patterns: 3  custom: 1
+spec lines: 28  generated lines: 1,264  expansion: 45.1x
+OK — no issues
+wrote patterns/build/expense/report.html
+wrote patterns/build/expense/demo.html
+wrote patterns/build/expense/manifest.json
+```
+
+28 行の経費仕様を展開し、`patterns/build/expense/demo.html` を書きます。ブラウザでそのファイルを開いてください。サーバは要りません。申請、承認、差し戻し、却下を操作できます。承認された処理は、承認の後にだけ動きます。`patterns/build/` は gitignore です。
+
+```bash
+.venv/bin/etsah-mcp --help
+```
+
+```text
+usage: etsah-mcp [mcp]
+       etsah-mcp guard --contract FILE [--agent NAME] [--allow-net HOST] [--deny-net HOST] [--approval-key-file FILE] [--nonce-file FILE] [--approval-token TOKEN] [--allow-legacy-approval-token] -- UPSTREAM...
+       etsah-mcp approve --contract FILE --gate NAME --op NAME --approver ID (--args JSON | --args-file FILE) (--ttl SECONDS | --expires-at UNIX)
+```
+
+引数なしの `etsah-mcp` は stdio のサーバです。改行区切りの JSON-RPC を読み、標準入力が閉じると戻ります。
+
+英語の 5 分ガイドは [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md)、比較は [docs/en/comparison.md](docs/en/comparison.md) です。
 
 ## プルリクエストの検査
 
