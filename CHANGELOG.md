@@ -7,6 +7,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/). It has not
 ### Fixed
 
 - `pip install .` can run `etsahc`. The compiler imports `staffing_rules` from the installed package, and still imports it as a neighbor when `python3 etsahc.py` is run from `patterns/`.
+- The pattern registry, example specs, and bench files are declared as package data, so an installed `etsahc` or `proutc` loads them from the installed copy. CI installs the package in a fresh virtualenv outside the checkout and smoke-tests `etsah`, `etsahc`, `etsah-mcp`, `prout`, `proutc`, and `prout-mcp`. The legacy commands still warn on stderr.
 
 ### Added
 

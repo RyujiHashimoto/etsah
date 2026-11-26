@@ -18,6 +18,63 @@ jobs:
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
 
+      - name: Installed commands
+        run: |
+          set -eu
+          venv="${RUNNER_TEMP}/etsah-install"
+          work="${RUNNER_TEMP}/etsah-install-work"
+          rm -rf "$venv" "$work"
+          python3 -m venv "$venv"
+          # Stay outside the checkout so the commands cannot import the
+          # working tree. A missing module or data file fails here.
+          (
+            cd "$RUNNER_TEMP"
+            "$venv/bin/pip" install "$GITHUB_WORKSPACE" >"$RUNNER_TEMP/etsah-pip.txt" 2>&1
+          )
+          if grep -q "Package would be ignored" "$RUNNER_TEMP/etsah-pip.txt"; then
+            echo "setuptools left pattern data out of the package list"
+            cat "$RUNNER_TEMP/etsah-pip.txt"
+            exit 1
+          fi
+          "$venv/bin/python" - <<'PY'
+          import etsah_patterns.staffing_rules as rules
+          assert rules.__name__ == "etsah_patterns.staffing_rules", rules.__name__
+          PY
+          shop="$("$venv/bin/python" -c 'import etsah_patterns, pathlib; print(pathlib.Path(etsah_patterns.__file__).resolve().parent / "examples" / "shop.etsah")')"
+          staff="$("$venv/bin/python" -c 'import etsah_patterns, pathlib; print(pathlib.Path(etsah_patterns.__file__).resolve().parent / "examples" / "staffing.etsah")')"
+          test -s "$shop"
+          test -s "$staff"
+          mkdir -p "$work"
+          (
+            cd "$work"
+            "$venv/bin/etsah" check "$GITHUB_WORKSPACE/examples/refund_fixed.etsah"
+            "$venv/bin/etsahc" build "$shop" --out "$work/etsahc-shop"
+            "$venv/bin/etsahc" build "$staff" --out "$work/etsahc-staff"
+            "$venv/bin/etsahc" find "申請 承認" >"$work/find.out"
+            "$venv/bin/etsah-mcp" --help >"$work/etsah-mcp.out"
+            "$venv/bin/etsah-mcp" </dev/null
+            "$venv/bin/prout" check "$GITHUB_WORKSPACE/examples/refund_fixed.etsah" \
+              >"$work/prout.out" 2>"$work/prout.err"
+            "$venv/bin/proutc" build "$shop" --out "$work/proutc-shop" \
+              >"$work/proutc.out" 2>"$work/proutc.err"
+            "$venv/bin/prout-mcp" --help >"$work/prout-mcp.out" 2>"$work/prout-mcp.err"
+            "$venv/bin/prout-mcp" </dev/null >"$work/prout-mcp-stdio.out" 2>"$work/prout-mcp-stdio.err"
+          )
+          grep -q approval "$work/find.out"
+          grep -q etsah-mcp "$work/etsah-mcp.out"
+          grep -q "新名称は etsah" "$work/prout.err"
+          grep -q "新名称は etsah" "$work/proutc.err"
+          grep -q "新名称は etsah" "$work/prout-mcp.err"
+          grep -q "新名称は etsah" "$work/prout-mcp-stdio.err"
+          grep -q "Etsah check:" "$work/prout.out"
+          grep -q "Etsah Patterns:" "$work/proutc.out"
+          grep -q "etsah-mcp" "$work/prout-mcp.out"
+          # The deprecation warning stays on stderr.
+          if grep -q "新名称は etsah" "$work/prout.out" "$work/proutc.out" "$work/prout-mcp.out"; then
+            echo "deprecation warning leaked to stdout"
+            exit 1
+          fi
+
       - name: Action accepts a valid contract
         id: etsah-action-pass
         uses: ./
