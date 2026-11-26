@@ -241,6 +241,37 @@ class TestImplicitFlow(unittest.TestCase):
         )
         self.assertEqual(codes(diags, "error"), [])
 
+    def test_condition_call_can_carry_the_label(self) -> None:
+        diags = run(
+            """
+            op is_blocked(c: Customer) -> Bool @pii
+              eff read(customers)
+              impl native
+
+            flow classify(id: Id) -> String
+              eff read(customers)
+              let c = customers.get(id)
+              if is_blocked(c)
+                return "blocked"
+              else
+                return "allowed"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-RET", "E-IFLOW-RET"])
+
+    def test_pc_does_not_escape_a_branch_without_a_return(self) -> None:
+        diags = run(
+            """
+            flow f(id: Id) -> String
+              eff read(customers)
+              let c = customers.get(id)
+              if c.email == "x"
+                let ignored = "yes"
+              return "public"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), [])
+
 
 class TestBranchEffects(unittest.TestCase):
     def test_branch_effects_are_unioned(self) -> None:
