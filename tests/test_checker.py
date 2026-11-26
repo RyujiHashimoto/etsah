@@ -573,6 +573,59 @@ class TestCli(unittest.TestCase):
         self.assertEqual(broken.returncode, 2, broken.stderr)
         self.assertIn("line", broken.stderr)
 
+    def test_unreadable_path_exits_2_without_a_traceback(self) -> None:
+        script = str(ROOT / "etsah.py")
+        missing = "/tmp/no-such-etsah-file.etsah"
+
+        def assert_one_error(proc: subprocess.CompletedProcess[str]) -> None:
+            self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+            self.assertEqual(proc.stdout, "")
+            self.assertNotIn("Traceback", proc.stderr)
+            self.assertTrue(proc.stderr.startswith("[ERROR] "))
+            self.assertEqual(proc.stderr.count("\n"), 1)
+
+        for cmd in ("check", "ast"):
+            missing_proc = subprocess.run(
+                [sys.executable, script, cmd, missing],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert_one_error(missing_proc)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            for cmd in ("check", "ast"):
+                directory_proc = subprocess.run(
+                    [sys.executable, script, cmd, str(directory)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert_one_error(directory_proc)
+
+            bad = directory / "bad.etsah"
+            bad.write_bytes(b"\xff\xfe")
+            for cmd in ("check", "ast"):
+                decode_proc = subprocess.run(
+                    [sys.executable, script, cmd, str(bad)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert_one_error(decode_proc)
+
+        imported = subprocess.run(
+            [sys.executable, script, "import", "mcp", missing],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(imported.returncode, 2, imported.stderr)
+        self.assertTrue(imported.stderr.startswith("[ERROR] "))
+        self.assertNotIn("Traceback", imported.stderr)
+        self.assertEqual(imported.stdout, "")
+
     def test_ai_task_examples_pin_check_json_keys(self) -> None:
         passing = subprocess.run(
             [sys.executable, str(ROOT / "etsah.py"), "check", "--json", str(ROOT / "examples" / "ai_tasks.etsah")],
