@@ -2,7 +2,8 @@
 
 The English quickstart and the Japanese 「動かす」 section are the install
 path. This checks the example files, relative links, and the install command
-those sections tell a reader to run.
+those sections tell a reader to run. It also requires the Windows translation
+of the refund check. That translation is text only; CI does not run it.
 """
 from __future__ import annotations
 
@@ -58,3 +59,35 @@ class ReadmeQuickstartTests(unittest.TestCase):
             self.assertNotIn("python3 etsah.py", body)
             self.assertNotIn("python3 patterns/etsahc.py", body)
             self.assertIsNone(LEGACY_COMMAND.search(body), name)
+            self.assertIn("ubuntu-latest", body)
+            self.assertIn(".venv\\Scripts\\python -m pip install .", body)
+            self.assertRegex(
+                body,
+                r"(?m)^\.venv\\Scripts\\etsah check examples/refund_fixed\.etsah$",
+            )
+            self.assertRegex(
+                body,
+                r"(?m)^\.venv\\Scripts\\etsah check examples/agents/support_reply\.etsah$",
+            )
+            self.assertRegex(
+                body,
+                r"(?m)^\.venv\\Scripts\\etsah check --json examples/agents/support_reply\.etsah$",
+            )
+            self.assertIn(
+                r".\.venv\Scripts\etsah check examples/refund_fixed.etsah",
+                body,
+            )
+            self.assertIn(
+                r".\.venv\Scripts\etsah check examples/agents/support_reply.etsah",
+                body,
+            )
+            self.assertIn(
+                r".\.venv\Scripts\etsah check --json examples/agents/support_reply.etsah",
+                body,
+            )
+            if name == "README.md":
+                self.assertIn("path translation of the Linux block", body)
+                self.assertIn("not a recorded run", body)
+            else:
+                self.assertIn("パスだけ置き換えたもの", body)
+                self.assertIn("実行結果の記録ではありません", body)

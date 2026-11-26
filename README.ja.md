@@ -44,7 +44,7 @@ python3 -m venv .venv
 
 Debian と Ubuntu では、`python3 -m venv` に `python3.12-venv` パッケージが要ります。Windows ではプログラムの場所が `.venv\Scripts\python` と `.venv\Scripts\etsah`（同様に `etsahc` と `etsah-mcp`）です。
 
-インストールすると `etsah`、`etsahc`、`etsah-mcp` がその環境に入ります。以下の例は Linux と macOS のパスです。クローンのディレクトリで実行してください。初回のインストールは次の行で終わります。
+インストールすると `etsah`、`etsahc`、`etsah-mcp` がその環境に入ります。Windows と書いてある箇所以外は、Linux と macOS のパスです。クローンのディレクトリで実行してください。初回のインストールは次の行で終わります。
 
 ```text
 Successfully installed prout-lang-0.1.0
@@ -164,6 +164,30 @@ OK — no issues
 
 ```text
 [ERROR] E-POLICY (line 35): task draft_reply: emit to an external party has no approval gate (emit(mail))
+```
+
+### Windows
+
+CI は `ubuntu-latest` だけです。以下の Windows の行は、上の Linux のコマンドをパスだけ置き換えたものです。実行結果の記録ではありません。
+
+コマンドプロンプト:
+
+```cmd
+python -m venv .venv
+.venv\Scripts\python -m pip install .
+.venv\Scripts\etsah check examples/refund_fixed.etsah
+.venv\Scripts\etsah check examples/agents/support_reply.etsah
+.venv\Scripts\etsah check --json examples/agents/support_reply.etsah
+```
+
+PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install .
+.\.venv\Scripts\etsah check examples/refund_fixed.etsah
+.\.venv\Scripts\etsah check examples/agents/support_reply.etsah
+.\.venv\Scripts\etsah check --json examples/agents/support_reply.etsah
 ```
 
 ### テスト

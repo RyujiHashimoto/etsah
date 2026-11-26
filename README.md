@@ -40,7 +40,7 @@ python3 -m venv .venv
 
 On Debian and Ubuntu, `python3 -m venv` needs the `python3.12-venv` package. On Windows, the programs are `.venv\Scripts\python` and `.venv\Scripts\etsah` (and `.venv\Scripts\etsahc`, `.venv\Scripts\etsah-mcp`).
 
-The install provides `etsah`, `etsahc`, and `etsah-mcp`. The examples below use the Linux and macOS paths. Run them from the clone. A fresh install ends with:
+The install provides `etsah`, `etsahc`, and `etsah-mcp`. Unless a block is labeled Windows, the commands below use the Linux and macOS paths. Run them from the clone. A fresh install ends with:
 
 ```text
 Successfully installed prout-lang-0.1.0
@@ -156,6 +156,30 @@ The exit code is 0.
 
 ```text
 [ERROR] E-POLICY (line 35): task draft_reply: emit to an external party has no approval gate (emit(mail))
+```
+
+### Windows
+
+CI runs on `ubuntu-latest` only. These Windows lines are the path translation of the Linux block above. They are not a recorded run.
+
+Command Prompt:
+
+```cmd
+python -m venv .venv
+.venv\Scripts\python -m pip install .
+.venv\Scripts\etsah check examples/refund_fixed.etsah
+.venv\Scripts\etsah check examples/agents/support_reply.etsah
+.venv\Scripts\etsah check --json examples/agents/support_reply.etsah
+```
+
+PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install .
+.\.venv\Scripts\etsah check examples/refund_fixed.etsah
+.\.venv\Scripts\etsah check examples/agents/support_reply.etsah
+.\.venv\Scripts\etsah check --json examples/agents/support_reply.etsah
 ```
 
 ### Tests
