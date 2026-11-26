@@ -2689,7 +2689,10 @@ class Checker:
         return fix, ", ".join(names) or None
 
     def _allowlisted_net_fix(self, op: OpDef, bad: str) -> str:
-        host = sorted(self.allow_net)[0] if self.allow_net else "stripe"
+        candidates = self.allow_net - self.deny_net
+        if not candidates:
+            return "Remove the net effect, or name a host that is not denied."
+        host = sorted(candidates)[0]
         parts: list[str] = []
         for kind, current in op.effects:
             if kind == "net" and current == bad:

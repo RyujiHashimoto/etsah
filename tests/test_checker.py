@@ -464,6 +464,36 @@ class TestPolicy(unittest.TestCase):
     def test_deny_wins_over_allow(self) -> None:
         diags = self._net("stripe", allow_net=["stripe"], deny_net=["stripe"])
         self.assertEqual(codes(diags, "error"), ["E-POLICY"])
+        self.assertEqual(diags[0].message, "network target 'stripe' is denied by policy")
+        self.assertNotIn("net(stripe)", diags[0].fix or "")
+        self.assertEqual(
+            diags[0].fix,
+            "Remove the net effect, or name a host that is not denied.",
+        )
+
+    def test_denied_host_is_not_suggested_when_another_host_remains(self) -> None:
+        diags = self._net("stripe", allow_net=["acme", "stripe"], deny_net=["stripe"])
+        self.assertEqual(codes(diags, "error"), ["E-POLICY"])
+        self.assertEqual(diags[0].message, "network target 'stripe' is denied by policy")
+        self.assertEqual(diags[0].fix, "Use an allowlisted host: eff net(acme)")
+        self.assertNotIn("net(stripe)", diags[0].fix or "")
+
+    def test_fix_names_no_host_when_every_allowlisted_host_is_denied(self) -> None:
+        diags = self._net(
+            "stripe",
+            allow_net=["acme", "stripe"],
+            deny_net=["acme", "stripe"],
+        )
+        self.assertEqual(diags[0].message, "network target 'stripe' is denied by policy")
+        fix = diags[0].fix or ""
+        self.assertNotIn("stripe", fix)
+        self.assertNotIn("acme", fix)
+        self.assertEqual(fix, "Remove the net effect, or name a host that is not denied.")
+
+    def test_not_allowed_still_suggests_an_allowlisted_host(self) -> None:
+        diags = self._net("paypal")
+        self.assertEqual(diags[0].message, "network target 'paypal' is not allowed by policy")
+        self.assertEqual(diags[0].fix, "Use an allowlisted host: eff net(stripe)")
 
 
 class TestMoney(unittest.TestCase):
