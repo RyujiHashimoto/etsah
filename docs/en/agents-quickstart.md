@@ -151,3 +151,5 @@ It does not run cron, send mail, charge a card, cancel a subscription, or store 
 The period printed on a task plan uses `Asia/Tokyo`. That is not a per-file setting.
 
 The `agent` and `task` rules are in `SPEC.md`. The design notes for this layer are in `docs/ai_automation.md`.
+
+Codes the checkers already emit are listed in [docs/diagnostics.md](../diagnostics.md).
