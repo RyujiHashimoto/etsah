@@ -29,41 +29,175 @@ task draft_reply(ticket_id: Id) -> Bool
 
 ## Quickstart
 
-Python 3.12 and the standard library. No extra packages.
+Python 3.12 and the standard library. No extra packages. The package is not on PyPI. Clone the repository and install that checkout.
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
-python3 etsah.py check examples/agents/support_reply.etsah
-python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/build/expense
+git clone https://github.com/RyujiHashimoto/prout-lang.git
+cd prout-lang
+python3 -m venv .venv
+.venv/bin/python -m pip install .
 ```
 
-The second command checks a fictional support desk (Harbor Lane Support, ticket T-1042). The task may read the ticket. Emailing the customer is `emit(mail)`, marked external, and the task names `gate approve_reply`. The check exits 0. The checker reads the source. It does not send mail.
+On Debian and Ubuntu, `python3 -m venv` needs the `python3.12-venv` package. On Windows, the programs are `.venv\Scripts\python` and `.venv\Scripts\etsah` (and `.venv\Scripts\etsahc`, `.venv\Scripts\etsah-mcp`).
 
-`examples/agents/support_reply_broken.etsah` is the same desk with the gate left off the task. That check exits 1 with `E-POLICY`.
+The install provides `etsah`, `etsahc`, and `etsah-mcp`. The examples below use the Linux and macOS paths. Run them from the clone. A fresh install ends with:
 
-The third command expands a 28-line expense spec and writes `patterns/build/expense/demo.html`. Open that file. No server. Submit, approve, send back, and reject. The approved step runs only after approval. `patterns/build/` is gitignored.
+```text
+Successfully installed prout-lang-0.1.0
+```
+
+`pip install .` may download the build backend (setuptools) into a temporary build environment. The installed program has no third-party dependencies.
+
+### A first check
+
+`examples/refund_fixed.etsah` is a repaired refund for a fictional order. The checker reads the source. It does not call a payment API.
+
+```bash
+.venv/bin/etsah check examples/refund_fixed.etsah
+```
+
+```text
+Etsah check: examples/refund_fixed.etsah
+AST hash: bae8501e8b3f
+[WARNING] W-PRE (line 45): precondition of refund needs a runtime guard: (order.status == "paid")
+
+0 error(s), 1 warning(s)
+```
+
+The exit code is 0. The warning names a runtime guard.
+
+### An agent policy
+
+`examples/agents/support_reply.etsah` is a fictional support desk (Harbor Lane Support, ticket T-1042). The task may read the ticket. Emailing the customer is `emit(mail)`, marked external, and the task names `gate approve_reply`. The checker reads the source. It does not send mail.
+
+```bash
+.venv/bin/etsah check examples/agents/support_reply.etsah
+```
+
+```text
+Etsah check: examples/agents/support_reply.etsah
+AST hash: 270d77fe2df0
+
+1 task(s):
+  draft_reply — Read a ticket and send the reply through the approval gate
+    agent: support_reply
+    trigger: webhook "support-tickets"
+    effects: read(tickets), emit(mail)
+    gate: approve_reply, approver support_lead, before emit(mail), on_approved mail.send_reply
+    retry: 2, escalate support_lead
+    key: ticket_id
+    budget: agent run 0 / period 0 yen
+    limits: net 0/hour, emit 20/hour
+audit id: 270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0 (display 270d77fe2df0)
+OK — no issues
+
+0 error(s), 0 warning(s)
+```
+
+The exit code is 0.
+
+`check --json` prints one object. `diagnostics` is empty, and `manifest.signature` is `null`.
+
+```bash
+.venv/bin/etsah check --json examples/agents/support_reply.etsah
+```
+
+```json
+{
+  "hash": "270d77fe2df0",
+  "diagnostics": [],
+  "audit_id": "270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0",
+  "plan": [
+    "1 task(s):",
+    "  draft_reply — Read a ticket and send the reply through the approval gate",
+    "    agent: support_reply",
+    "    trigger: webhook \"support-tickets\"",
+    "    effects: read(tickets), emit(mail)",
+    "    gate: approve_reply, approver support_lead, before emit(mail), on_approved mail.send_reply",
+    "    retry: 2, escalate support_lead",
+    "    key: ticket_id",
+    "    budget: agent run 0 / period 0 yen",
+    "    limits: net 0/hour, emit 20/hour",
+    "audit id: 270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0 (display 270d77fe2df0)"
+  ],
+  "manifest": {
+    "hash": "270d77fe2df0",
+    "audit_id": "270d77fe2df04db5def3664c3a29f2a7a37e730661277ce2a4243f6b629ef3f0",
+    "agents": [
+      {
+        "name": "support_reply",
+        "allow": [
+          [
+            "emit",
+            "mail"
+          ],
+          [
+            "read",
+            "tickets"
+          ]
+        ],
+        "budget_run": 0,
+        "budget_period": 0,
+        "limit_net": 0,
+        "limit_emit": 20,
+        "gates": [
+          "approve_reply"
+        ]
+      }
+    ],
+    "signature": null
+  }
+}
+```
+
+The exit code is 0.
+
+`examples/agents/support_reply_broken.etsah` is the same desk with the gate left off the task. That check exits 1. The diagnostic line is:
+
+```text
+[ERROR] E-POLICY (line 35): task draft_reply: emit to an external party has no approval gate (emit(mail))
+```
+
+### Tests
+
+```bash
+.venv/bin/python -m unittest discover -s tests
+```
+
+Tests use the standard library's `unittest`. A passing run ends with `OK` and exits 0.
+
+### Pattern build and the MCP server
+
+```bash
+.venv/bin/etsahc build patterns/examples/expense.etsah --out patterns/build/expense
+```
+
+```text
+Etsah Patterns: expense
+stack: nextjs, postgres  freedom: guided
+entities: 2  patterns: 3  custom: 1
+spec lines: 28  generated lines: 1,264  expansion: 45.1x
+OK — no issues
+wrote patterns/build/expense/report.html
+wrote patterns/build/expense/demo.html
+wrote patterns/build/expense/manifest.json
+```
+
+The command expands a 28-line expense spec and writes `patterns/build/expense/demo.html`. Open that file in a browser. No server. Submit, approve, send back, and reject. The approved step runs only after approval. `patterns/build/` is gitignored.
+
+```bash
+.venv/bin/etsah-mcp --help
+```
+
+```text
+usage: etsah-mcp [mcp]
+       etsah-mcp guard --contract FILE [--agent NAME] [--allow-net HOST] [--deny-net HOST] [--approval-key-file FILE] [--nonce-file FILE] [--approval-token TOKEN] [--allow-legacy-approval-token] -- UPSTREAM...
+       etsah-mcp approve --contract FILE --gate NAME --op NAME --approver ID (--args JSON | --args-file FILE) (--ttl SECONDS | --expires-at UNIX)
+```
+
+`etsah-mcp` with no arguments is the stdio server. It reads newline-delimited JSON-RPC and returns when stdin closes.
 
 Five-minute tour: [docs/en/agents-quickstart.md](docs/en/agents-quickstart.md). How this differs from a Cedar or OPA policy plus a wrapper: [docs/en/comparison.md](docs/en/comparison.md).
-
-```bash
-python3 -m unittest discover -s tests -v
-```
-
-Tests use stdlib `unittest` only.
-
-### Install the commands locally
-
-The package is not on PyPI. From a clone:
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install .
-.venv/bin/etsah check examples/agents/support_reply.etsah
-.venv/bin/etsahc build patterns/examples/expense.etsah --out patterns/build/expense
-.venv/bin/etsah-mcp
-```
-
-`etsah`, `etsahc`, and `etsah-mcp` are console scripts. `etsah-mcp` is the same stdio server as `python3 etsah.py mcp`. Nothing here uploads the package.
 
 ## Check a pull request
 
