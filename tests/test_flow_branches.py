@@ -3,6 +3,8 @@
 An ``if`` condition guards the values produced inside its branches. A public
 value returned under a ``pii`` condition is therefore a ``pii`` return, and
 the checker reports ``E-IFLOW-RET`` unless the condition is declassified.
+A branch that can return keeps that label on the statements after the ``if``.
+An effect that runs under the label must go to a sink that accepts it.
 """
 from __future__ import annotations
 
@@ -39,10 +41,15 @@ PRELUDE = textwrap.dedent(
 )
 
 
-def run(body: str, declassify: str | None = None, **kwargs):
+def run(body: str, declassify: str | None = None, sinks: str = "", **kwargs):
     policy = "policy\n  sink net(email) accepts pii\n"
     if declassify:
         policy += f"  declassify pii in {declassify} require role support\n"
+    if sinks:
+        extra = textwrap.dedent(sinks).strip("\n")
+        policy += textwrap.indent(extra, "  ")
+        if not policy.endswith("\n"):
+            policy += "\n"
     return check(PRELUDE + policy + textwrap.dedent(body), allow_net=["email"], **kwargs)
 
 
@@ -268,6 +275,106 @@ class TestImplicitFlow(unittest.TestCase):
               if c.email == "x"
                 let ignored = "yes"
               return "public"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), [])
+
+    def test_missing_else_taints_the_following_return(self) -> None:
+        diags = run(
+            """
+            flow f(id: Id) -> String
+              eff read(customers)
+              let c = customers.get(id)
+              if c.email == "x"
+                return "blocked"
+              return "allowed"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-RET", "E-IFLOW-RET"])
+
+    def test_nested_return_taints_the_following_return(self) -> None:
+        diags = run(
+            """
+            flow f(id: Id, flag: Bool) -> String
+              eff read(customers)
+              let c = customers.get(id)
+              if c.email == "x"
+                if flag
+                  return "blocked"
+              return "allowed"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-RET", "E-IFLOW-RET"])
+
+    def test_high_condition_cannot_drive_a_public_sink(self) -> None:
+        diags = run(
+            """
+            op note(msg: String) -> Bool
+              eff write(log)
+              sends msg -> write(log)
+              impl native
+
+            flow f(id: Id) -> String
+              eff read(customers), write(log)
+              let c = customers.get(id)
+              if c.email == "x"
+                let saved = note("checked")
+              return "done"
+            """
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-SINK"])
+
+    def test_early_return_taints_a_later_public_sink(self) -> None:
+        diags = run(
+            """
+            op note(msg: String) -> Bool
+              eff write(log)
+              sends msg -> write(log)
+              impl native
+
+            flow f(id: Id) -> Bool @pii
+              eff read(customers), write(log)
+              let c = customers.get(id)
+              if c.email == "x"
+                return true
+              return note("open")
+            """
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-SINK"])
+
+    def test_nested_early_return_keeps_the_inner_label(self) -> None:
+        diags = run(
+            """
+            label secret
+
+            op note(msg: String) -> Bool
+              eff write(log)
+              sends msg -> write(log)
+              impl native
+
+            flow f(id: Id, hidden: Bool @secret) -> Bool @pii @secret
+              eff read(customers), write(log)
+              let c = customers.get(id)
+              if c.email == "x"
+                if hidden
+                  return true
+              return note("open")
+            """,
+            sinks="""
+              sink write(log) accepts pii
+            """,
+        )
+        self.assertEqual(codes(diags, "error"), ["E-IFLOW-SINK"])
+
+    def test_sink_that_accepts_the_condition_label_is_allowed(self) -> None:
+        diags = run(
+            """
+            flow f(id: Id) -> String
+              eff read(customers), net(email)
+              let c = customers.get(id)
+              if c.email == "x"
+                let sent = ping()
+              return "done"
             """
         )
         self.assertEqual(codes(diags, "error"), [])

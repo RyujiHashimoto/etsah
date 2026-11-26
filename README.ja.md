@@ -511,7 +511,7 @@ else
   return "allowed"
 ```
 
-`examples/implicit_flow_leak.etsah` は `E-IFLOW-RET` で失敗し、`examples/implicit_flow_safe.etsah` は `W-DECLASS` 1件だけで通ります。
+`examples/implicit_flow_leak.etsah` は `E-IFLOW-RET` で失敗し、`examples/implicit_flow_safe.etsah` は `W-DECLASS` 1件だけで通ります。`else` を書かずに片方だけ `return` する場合も、その後ろの公開の戻り値は同じラベルで検査します。条件が `pii` の分岐から、`pii` を受け取らない sink を呼ぶと `E-IFLOW-SINK` になります。
 
 ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（代入・ループ・例外、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
 

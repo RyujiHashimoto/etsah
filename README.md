@@ -406,7 +406,7 @@ Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can 
 - Contract language: types, `op`, `flow`, `agent`, `task`, `gate`, effects, `pre` / `post`, `impl`.
 - Effect completeness, network allow list, human gates for external mail, payment, and contract changes, integer-yen budgets, hourly rate limits, retry bounds, and a required audit hash.
 - `Decimal` and calendar `Date` in preconditions. `1/2` is still not given one meaning.
-- Information-flow labels, including implicit flow through `if` / `else` branches. A condition's labels become the program-counter label of the values returned inside it. Programs that do not use labels keep their previous AST hash.
+- Information-flow labels, including implicit flow through `if` / `else` branches. A condition's labels become the program-counter label of the values returned inside it, of the statements that follow a branch which can return, and of the sinks those statements run. Programs that do not use labels keep their previous AST hash.
 - Diagnostics an agent can repair from: code, location, expected, actual, suggestion.
 - Human HTML from the AST (`render.py`) and a static browser playground (`docs/playground/`).
 - Import of MCP and OpenAI tool lists into `op` declarations (`etsah import`).

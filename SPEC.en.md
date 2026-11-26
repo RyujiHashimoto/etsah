@@ -82,7 +82,7 @@ flow classify(id: Id) -> String
     return "allowed"
 ```
 
-A variable bound with `let` is scoped to its branch. If both branches return, any statement after the `if` is unreachable. If one branch falls through, a later `return` is needed for the flow as a whole to return. Effects are the union of the condition and both branches.
+A variable bound with `let` is scoped to its branch. If both branches return, any statement after the `if` is unreachable. If one branch falls through, a later `return` is needed for the flow as a whole to return. If a branch can return, statements after the `if` carry the condition's labels. Effects are the union of the condition and both branches.
 
 `if` is available only inside a flow. A task body has only `let` and `return`.
 
@@ -331,7 +331,7 @@ if blocked
   return "blocked"
 ```
 
-The PC label is now empty and only `W-DECLASS` remains. A branch-local variable does not escape the branch. With no `else`, execution continues after the branch.
+The PC label is now empty and only `W-DECLASS` remains. A branch-local variable does not escape the branch. If a branch can return, statements after the `if` carry that condition's labels and the labels of any nested condition that guards the return. If neither branch returns, the following statements keep the previous PC. A `write`, `net`, `spend`, or `emit` that runs under a PC label must be a sink that accepts that label; otherwise the checker reports `E-IFLOW-SINK`.
 
 ### Checks and diagnostics
 

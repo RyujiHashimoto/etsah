@@ -1961,7 +1961,7 @@ class Checker:
         self.check_type_exists(flow.ret, flow.line, "return type")
         self.check_ref_labels(flow.ret, flow.line, "return type")
         inferred: set[tuple[str, str]] = set()
-        returns = self._check_flow_block(flow, flow.body, env, frozenset(), inferred)
+        returns, _abrupt = self._check_flow_block(flow, flow.body, env, frozenset(), inferred)
         if not returns:
             self.error(
                 "E-FLOW",
@@ -1983,6 +1983,19 @@ class Checker:
                 fix = "eff " + ", ".join(format_effect(e) for e in sorted(inferred))
             self.error("E-EFF", f"flow {flow.name} effects do not match implementation ({'; '.join(bits)})", flow.line, fix)
 
+    def _check_pc_sinks(self, expr: Optional[Expr], pc: frozenset[str]) -> None:
+        """A non-read effect that runs under ``pc`` is a sink for those labels."""
+        if not pc or not self.has_labels or expr is None:
+            return
+        for call in self.calls_in(expr):
+            op = self.ops.get(call.name)
+            if op is None:
+                continue
+            for effect in op.effects:
+                if effect[0] == "read":
+                    continue
+                self.check_sink(effect, pc, call.line or expr.line)
+
     def _check_flow_block(
         self,
         flow: FlowDef,
@@ -1990,16 +2003,21 @@ class Checker:
         env: dict[str, TypeRef],
         pc: frozenset[str],
         inferred: set[tuple[str, str]],
-    ) -> bool:
-        """Check one block and report whether every path in it returns.
+    ) -> tuple[bool, frozenset[str]]:
+        """Check one block.
 
-        ``pc`` is the program-counter label: the union of the conditions that
-        guard this block. A value produced under a secret condition is at least
-        as secret as the condition, even when the value itself is public.
+        Returns ``(always_returns, abrupt_labels)``. ``abrupt_labels`` is empty
+        when every path returns. Otherwise it is the set of condition labels
+        that guard a ``return`` on some path, which the statements after this
+        block must carry. ``pc`` is that program-counter label for the block
+        itself.
         """
-        returned = False
+        entry_pc = pc
+        abrupt: set[str] = set()
+        always = False
+        ever = False
         for stmt in stmts:
-            if returned:
+            if always:
                 self.error(
                     "E-FLOW",
                     f"statement after return in flow {flow.name} is unreachable",
@@ -2018,8 +2036,10 @@ class Checker:
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
                     self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
             elif stmt.kind == "return":
-                returned = True
+                always = True
+                ever = True
                 t = self.type_of(stmt.expr, env)
                 if t != "Unknown" and not self.compatible(flow.ret, t):
                     self.error("E-TYPE", f"return expects {flow.ret}, got {t}", stmt.line)
@@ -2030,6 +2050,7 @@ class Checker:
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
                     self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
             elif stmt.kind == "if":
                 cond = self.type_of(stmt.expr, env)
                 if cond not in ("Bool", "Unknown"):
@@ -2038,16 +2059,30 @@ class Checker:
                 for c in self.calls_in(stmt.expr):
                     self.check_call_contracts(c, env)
                     self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
                 branch_pc = pc | cond.labels
-                then_returns = self._check_flow_block(
+                then_always, then_abrupt = self._check_flow_block(
                     flow, stmt.body, dict(env), branch_pc, inferred
                 )
-                else_returns = self._check_flow_block(
+                else_always, else_abrupt = self._check_flow_block(
                     flow, stmt.orelse, dict(env), branch_pc, inferred
                 )
-                if stmt.orelse and then_returns and else_returns:
-                    returned = True
-        return returned
+                if stmt.orelse and then_always and else_always:
+                    always = True
+                    ever = True
+                else:
+                    extra = set(then_abrupt) | set(else_abrupt)
+                    if then_always or else_always or then_abrupt or else_abrupt:
+                        extra |= set(cond.labels)
+                        ever = True
+                    if extra:
+                        pc = pc | frozenset(extra)
+                        abrupt |= extra
+        if always:
+            return True, frozenset()
+        if ever:
+            abrupt |= set(entry_pc)
+        return False, frozenset(abrupt)
 
     def check_call_contracts(self, c: Expr, env: dict[str, str]) -> None:
         op = self.ops.get(c.name)
