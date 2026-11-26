@@ -198,6 +198,12 @@ python -m venv .venv
 
 単体テストは標準ライブラリの `unittest` だけを使います。成功すると最後の行が `OK` になり、終了コードは 0 です。
 
+`tests/` はパッケージではないので、`tests.` で始めると `support` を読み込めず、クラス単位は次のコマンドです。
+
+```bash
+PYTHONPATH=tests python3 -m unittest test_checker.TestCli
+```
+
 ### パターンと MCP サーバ
 
 ```bash

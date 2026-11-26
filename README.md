@@ -190,6 +190,12 @@ python -m venv .venv
 
 Tests use the standard library's `unittest`. A passing run ends with `OK` and exits 0.
 
+`tests/` is not a package, so a name that starts with `tests.` never puts that directory on the module path and the import of `support` fails. Run one class with `tests` on `PYTHONPATH`:
+
+```bash
+PYTHONPATH=tests python3 -m unittest test_checker.TestCli
+```
+
 ### Pattern build and the MCP server
 
 ```bash

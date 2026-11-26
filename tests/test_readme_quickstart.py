@@ -54,6 +54,8 @@ class ReadmeQuickstartTests(unittest.TestCase):
             self.assertIn("examples/agents/support_reply.etsah", body)
             self.assertIn("check --json", body)
             self.assertIn("unittest discover -s tests", body)
+            self.assertIn("PYTHONPATH=tests", body)
+            self.assertIn("python3 -m unittest test_checker.TestCli", body)
             self.assertIn("etsahc", body)
             self.assertIn("etsah-mcp", body)
             self.assertNotIn("python3 etsah.py", body)
@@ -91,3 +93,11 @@ class ReadmeQuickstartTests(unittest.TestCase):
             else:
                 self.assertIn("パスだけ置き換えたもの", body)
                 self.assertIn("実行結果の記録ではありません", body)
+
+    def test_contributing_documents_one_test_class(self) -> None:
+        text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        self.assertIn("python3 -m unittest discover -s tests", text)
+        self.assertIn("PYTHONPATH=tests python3 -m unittest test_checker.TestCli", text)
+        self.assertIn("set PYTHONPATH=tests", text)
+        self.assertIn('$env:PYTHONPATH="tests"', text)
+        self.assertIn("CI has not run them", text)

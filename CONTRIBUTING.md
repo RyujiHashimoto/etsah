@@ -39,6 +39,28 @@ python3 growth_report.py
 
 CI runs these commands. A green local run is usually a green CI run. Python 3.12, standard library only.
 
+`tests/` is not a package, so `python3 -m unittest tests.test_checker.TestCli` fails to import `support`. One class:
+
+```bash
+PYTHONPATH=tests python3 -m unittest test_checker.TestCli
+```
+
+CI runs on `ubuntu-latest` only. The Windows lines below set `PYTHONPATH` and then run the same class. CI has not run them.
+
+Command Prompt:
+
+```cmd
+set PYTHONPATH=tests
+python -m unittest test_checker.TestCli
+```
+
+PowerShell:
+
+```powershell
+$env:PYTHONPATH="tests"
+python -m unittest test_checker.TestCli
+```
+
 `pip install .` exposes the `etsah`, `etsahc`, and `etsah-mcp` console scripts. See the README. The package is not published. Do not upload it to PyPI from a contribution.
 
 Optional local install, from the repository root:
@@ -111,6 +133,7 @@ If a change alters the meaning of syntax, types, effects, or preconditions in `e
 手順、レビュー基準、版の上げ方は英語の本文が正です。
 
 - テストは `python3 -m unittest discover -s tests -v`。依存パッケージはありません。
+- クラス一つは `PYTHONPATH=tests python3 -m unittest test_checker.TestCli`。`tests.` で始めると `support` が見つかりません。
 - 新しいパターンは `patterns/registry/<name>.json` を足し、`python3 etsahc.py index` で索引を更新して Pull Request にします。同じ形が二度以上出てから追加します。
 - AI が書いた Pull Request も、人間のレビューが必須です。
 - 質問は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
