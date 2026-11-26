@@ -70,6 +70,22 @@ A flow's effects must equal the union of the effects of the ops it calls. That i
 
 A flow must end with `return`. A flow with no `return` is an error (`E-FLOW`). Statements written after `return` are unreachable and are also an error.
 
+A flow may branch with `if` / `else`. The condition is a `Bool`, and the body is indented two more spaces. `else` may be omitted.
+
+```
+flow classify(id: Id) -> String
+  eff read(customers)
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"
+    return "blocked"
+  else
+    return "allowed"
+```
+
+A variable bound with `let` is scoped to its branch. If both branches return, any statement after the `if` is unreachable. If one branch falls through, a later `return` is needed for the flow as a whole to return. If a branch can return, statements after the `if` carry the condition's labels. Effects are the union of the condition and both branches.
+
+`if` is available only inside a flow. A task body has only `let` and `return`.
+
 ### Agents and tasks
 
 Work given to an AI is two layers: an `agent` (the envelope of effects it may use) and a `task` (one job inside that envelope). A `gate` holds an external effect until a person allows it. `policy` names which effects are external, a payment, or a contract change. Indentation is two spaces, as for every other declaration. Budget numbers are integer yen.
@@ -291,6 +307,32 @@ flow masked_tracking(id: Id) -> Bool
 
 The reason is 1 to 200 characters and contains no newline. An allowed `declassify` stays in the audit log as `W-DECLASS`. A place, role, or label outside policy is `E-DECLASS`. Declassifying a whole record, or using `declassify` inside `pre` or `post`, is rejected.
 
+### Branches and implicit flow
+
+When an `if` condition carries a label, values produced inside that branch carry the same label. This is the program-counter (PC) label. Nested conditions add their labels to it.
+
+```
+flow classify(id: Id) -> String
+  eff read(customers)
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"
+    return "blocked"
+  else
+    return "allowed"
+```
+
+The returned strings are public, but which one is returned reveals the e-mail address. A `return` is checked as `L(expr) ∪ PC ⊆ L(declared return)`, so both returns are `E-IFLOW-RET`. A `let` inside the branch also carries the PC label, so `let answer = "yes"` followed by `return answer` is caught the same way.
+
+When revealing the condition is intended, declassify the condition itself.
+
+```
+let blocked = declassify(c.email == "blocked@example.com", pii, "公開してよい判定結果")
+if blocked
+  return "blocked"
+```
+
+The PC label is now empty and only `W-DECLASS` remains. A branch-local variable does not escape the branch. If a branch can return, statements after the `if` carry that condition's labels and the labels of any nested condition that guards the return. If neither branch returns, the following statements keep the previous PC. A `write`, `net`, `spend`, or `emit` that runs under a PC label must be a sink that accepts that label; otherwise the checker reports `E-IFLOW-SINK`.
+
 ### Checks and diagnostics
 
 The order is arguments (`E-IFLOW-ARG`), return values (`E-IFLOW-RET`), contract expressions (`E-IFLOW-CONTRACT`), sinks (`E-IFLOW-SINK`), `sends` (`E-SINK`, `E-SINK-UNBOUND`), policy (`E-POLICY`), and `declassify` (`E-DECLASS`, `W-DECLASS`). Diagnostics carry a line and a suggested fix. `--json` puts "which value flowed into which argument" in `context`.
@@ -299,4 +341,4 @@ A program with no label declaration, no annotation, and no information-flow poli
 
 ### Limits
 
-Implicit flow (a branch on a secret affecting a public value) is not tracked. Labeled collections, label polymorphism, runtime enforcement, and authenticating the caller of `declassify` are not implemented. The body of `impl native` is trusted. The check stops a flow that crosses a declared boundary. It does not prove noninterference.
+Branches exist only as early `return`s. There is no assignment, loop, or exception, so a flow that updates a variable and joins after the branch cannot be written. Labeled collections, label polymorphism, runtime enforcement, and authenticating the caller of `declassify` are not implemented. The body of `impl native` is trusted. The check stops a flow that crosses a declared boundary. It does not prove noninterference.

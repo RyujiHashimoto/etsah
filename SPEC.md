@@ -70,6 +70,22 @@ flow handle_refund(order_id: Id) -> Receipt
 
 フローは `return` で終わらなければならない。`return` がないフローはエラー（E-FLOW）であり、`return` の後ろに書かれた文も到達不能としてエラーになる。
 
+フローは `if` / `else` で分岐できる。条件は `Bool` で、本体は2スペース深くする。`else` は省略できる。
+
+```
+flow classify(id: Id) -> String
+  eff read(customers)
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"
+    return "blocked"
+  else
+    return "allowed"
+```
+
+`let` で束縛した変数のスコープは、その分岐の中だけである。両方の分岐が `return` すれば、その `if` より後ろの文は到達不能になる。どちらかの分岐が返らない場合、フロー全体が返るには `if` の後ろに `return` が必要になる。片方の分岐が `return` できるとき、その後ろの文も条件のラベルを帯びる。効果は、条件式と両方の分岐が呼ぶ op の和集合である。
+
+`if` は flow の中だけで使える。task の本体は `let` と `return` だけである。
+
 ### エージェントとタスク
 
 AIに任せる仕事は、`agent`（持ってよい効果の封筒）と `task`（その中の一つの仕事）の二段で書く。`gate` は人が許可するまで外部効果を止め、`policy` はどの効果が社外か、支払いか、契約の変更かを名指しする。インデントはほかの宣言と同じくスペース2つ。予算の数値は整数円である。
@@ -295,6 +311,32 @@ flow masked_tracking(id: Id) -> Bool
 
 理由は 1〜200 文字で改行を含まない。許可された `declassify` は `W-DECLASS` として監査ログに残り、ポリシーにない場所・役割・ラベルは `E-DECLASS` になる。レコード全体の `declassify` と契約式（`pre` / `post`）内の `declassify` は拒否する。
 
+### 分岐と暗黙のフロー
+
+`if` の条件がラベルを持つとき、その分岐の中で作られる値は条件と同じラベルを帯びる。これをプログラムカウンタ（PC）ラベルと呼ぶ。条件のラベルは、ネストした `if` で和集合になる。
+
+```
+flow classify(id: Id) -> String
+  eff read(customers)
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"
+    return "blocked"
+  else
+    return "allowed"
+```
+
+戻り値の文字列自体は公開でも、どちらを返したかでメールアドレスが分かる。`return` の検査は `L(式) ∪ PC ⊆ L(戻り値型)` で行うため、このフローは両方の `return` で `E-IFLOW-RET` になる。分岐内の `let` も PC ラベルを帯びるので、`let answer = "yes"` を `return answer` しても同じように検出する。
+
+条件を公開してよいと判断した場合は、条件式そのものを `declassify` する。
+
+```
+let blocked = declassify(c.email == "blocked@example.com", pii, "判定結果だけを公開する")
+if blocked
+  return "blocked"
+```
+
+これで PC ラベルは空になり、`W-DECLASS` だけが残る。分岐内の変数は分岐の外へ漏れない。片方の分岐が `return` できるとき、`if` の後ろの文は、その条件と、戻りを守っているネストした条件のラベルを帯びる。どちらの分岐も返さないときは、後ろの文の PC は上がらない。PC の下で走る `write` / `net` / `spend` / `emit` は、そのラベルを受け入れる sink でなければならない。受け入れないときは `E-IFLOW-SINK` になる。
+
 ### 検査と診断
 
 検査は、引数（`E-IFLOW-ARG`）、戻り値（`E-IFLOW-RET`）、契約式（`E-IFLOW-CONTRACT`）、sink（`E-IFLOW-SINK`）、`sends`（`E-SINK`、`E-SINK-UNBOUND`）、ポリシー（`E-POLICY`）、`declassify`（`E-DECLASS`、`W-DECLASS`）の順に走る。診断には行番号と修正案を付け、`--json` では `context` に「どの値がどの引数へ流れたか」を入れる。
@@ -303,4 +345,4 @@ flow masked_tracking(id: Id) -> Bool
 
 ### 現時点の限界
 
-暗黙のフロー（`if secret then ...` の分岐結果が公開値に影響する場合）は追わない。ラベル付きのコレクション、ラベル多相、実行時の強制、`declassify` の呼び出し元認証も未実装である。`impl native` の内部は信頼する。つまり、この検査は「宣言された境界を越えた流れ」を止めるものであり、情報の非干渉性を証明するものではない。
+分岐は `return` による早期脱出だけで、代入・ループ・例外はない。そのため「分岐の後で変数を更新して合流する」形の暗黙フローは表現できない。ラベル付きのコレクション、ラベル多相、実行時の強制、`declassify` の呼び出し元認証も未実装である。`impl native` の内部は信頼する。つまり、この検査は「宣言された境界を越えた流れ」を止めるものであり、情報の非干渉性を証明するものではない。

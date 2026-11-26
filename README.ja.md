@@ -501,7 +501,19 @@ python3 etsah.py check examples/information_flow_leak.etsah \
   --allow-net email --allow-net analytics
 ```
 
-ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（暗黙のフロー、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
+分岐を越える漏れも止まります。`if` の条件が `pii` を持つと、その分岐の中で返す公開値にも条件のラベルが付きます。`if c.email == ...` で `"blocked"` と `"allowed"` を返し分けると、文字列自体は公開でも、どちらを返したかでメールアドレスが分かるため `E-IFLOW-RET` になります。条件を公開してよい場合は、条件式を `declassify` してください。
+
+```etsah
+let blocked = declassify(c.email == "blocked@example.com", pii, "判定結果だけを公開する")
+if blocked
+  return "blocked"
+else
+  return "allowed"
+```
+
+`examples/implicit_flow_leak.etsah` は `E-IFLOW-RET` で失敗し、`examples/implicit_flow_safe.etsah` は `W-DECLASS` 1件だけで通ります。`else` を書かずに片方だけ `return` する場合も、その後ろの公開の戻り値は同じラベルで検査します。条件が `pii` の分岐から、`pii` を受け取らない sink を呼ぶと `E-IFLOW-SINK` になります。
+
+ラベル宣言も注釈もないプログラムでは検査を省略するため、既存の AST ハッシュは変わりません。式のラベル推論、sink の解決、`sends` の必須条件、診断コード、現時点の限界（代入・ループ・例外、コレクション、ラベル多相）は [docs/information-flow.md](docs/information-flow.md) と [SPEC.md](SPEC.md) にまとめています。
 
 ## 参加する
 

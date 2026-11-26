@@ -526,16 +526,40 @@ flow receipt(id: Id) -> Receipt
 
 `c.email` が `pii`、`send_receipt` の `to` が `pii`、`net(email)` が `pii` を許可するので通る。`c.api_key` を渡すと、`to` のラベル上限 `{pii}` を `{secret}` が超えるため `E-IFLOW-ARG`。仮に `to` を `@secret` にしても、`net(email)` が `secret` を拒否すれば `E-IFLOW-SINK`。
 
-### 6.10 暗黙フロー（v0.2）
+### 6.10 暗黙フロー（v0.2 で実装）
 
-現在の flow は直線的で `if` がないため、v0.1 では暗黙フローを扱わない。将来 `if` を追加するときは、条件式のラベルをプログラムカウンタ（PC）ラベルに加え、分岐内で代入・return される値に PC ラベルを合成する。
+flow に `if` / `else` を追加し、条件式のラベルをプログラムカウンタ（PC）ラベルとして分岐内の値に合成する。実装は `etsah.py` の `_check_flow_block` にあり、`pc` を再帰的に渡す。
 
 ```
-if customer.is_vip:        # is_vip が pii なら PC = {pii}
-  return "vip"             # 結果は pii を含む
+flow classify(id: Id) -> String
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"   # 条件は pii
+    return "blocked"                     # L(式) ∪ PC = {pii} なので E-IFLOW-RET
+  else
+    return "allowed"
 ```
 
-v0.1 の `&&` / `||` は短絡評価をせず、両辺のラベルの和集合を結果に付けることで保守的に扱う。
+規則は次のとおり。
+
+- `if` の条件は `Bool`。条件のラベルを `PC` に加える。
+- 分岐内の `let` は、束縛する値のラベルに `PC` を加える。
+- 分岐内の `return` は `L(式) ∪ PC ⊆ L(戻り値型)` を検査する。
+- ネストした `if` は `PC` を和集合で引き継ぐ。
+- 分岐内の変数スコープは分岐内だけ。両方の分岐が `return` すれば、`if` の後ろは到達不能。
+- 効果は、条件式と両方の分岐の和集合。
+- 片方の分岐が `return` できるとき、`if` の後ろの文は、その条件と、戻りを守るネストした条件のラベルを帯びる。どちらの分岐も返さないとき、後ろの文の PC は上がらない。
+- PC の下で実行する `write` / `net` / `spend` / `emit` は、そのラベルを受け入れる sink でなければならない。受け入れない sink は `E-IFLOW-SINK`。
+- `if` は flow のみ。task の本体は `let` と `return` だけ。
+
+条件を公開してよい場合は、条件式そのものを `declassify` する。`declassify` はラベルを1つ外すので、`Bool` の比較結果にも使える。許可された場合は `W-DECLASS` が残り、`PC` は空になる。
+
+```
+let blocked = declassify(c.email == "blocked@example.com", pii, "判定結果だけを公開する")
+if blocked
+  return "blocked"
+```
+
+代入・ループ・例外はないため、「分岐の後で変数を更新して合流する」形の暗黙フローは表現できない。`&&` / `||` は短絡評価をせず、両辺のラベルの和集合を結果に付ける保守的な扱いのままである。
 
 ## 7. 診断
 
@@ -917,7 +941,7 @@ op save_customer(customer: Customer) -> Id
 
 ### 11.0 実装状況（2026年11月）
 
-v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。AIタスクの検査と合わせ、スイート全体は231件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
+v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。v0.2 の分岐と PC ラベルは `tests/test_flow_branches.py` の29件で確認する。スイート全体は448件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
 
 | 項目 | 状態 |
 |---|---|
@@ -927,6 +951,7 @@ v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_
 | 式のラベル推論と引数・戻り値・契約の検査 | 実装済み |
 | sink 解決と `sends` の必須条件 | 実装済み |
 | `declassify` とポリシー検査 | 実装済み |
+| `if` / `else` と PC ラベル（暗黙フロー） | 実装済み |
 | AST ハッシュの後方互換 | 実装済み |
 | サンプル2件と CI | 実装済み |
 | `SPEC.md` / `README.md` | 実装済み |
@@ -945,8 +970,8 @@ v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_
 
 ### 11.2 v0.2（分岐とパターン層）
 
-- `if` / `else` を flow に追加し、PC ラベルを実装する。
-- パターン manifest の `data_policy`、マージ、`security.json`、レポートバッジを実装する。
+- `if` / `else` を flow に追加し、PC ラベルを実装する。**実装済み**（2026年11月）。
+- パターン manifest の `data_policy`、マージ、`security.json`、レポートバッジを実装する。**未実装**。
 - `patterns/etsahc.py` の `build` に `security.json` を追加する。
 - パターンの `auth.roles` と `declassify.require role` を照合する。
 
@@ -1014,7 +1039,7 @@ v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_
 
 - ラベルは「宣言の正しさ」に依存する。機密フィールドのラベル漏れは検出できない。
 - 静的なラベルだけでは、custom コードや native 実装の内部までは守れない。実行時の能力ブローカーと `Labeled<T>` が必要。
-- v0.1 では暗黙フローを扱わない。分岐・例外・タイミングなどによる漏洩は将来の課題。
+- 分岐は早期 `return` だけで、代入・ループ・例外がない。早期 `return` の後ろの文と、分岐中の sink は PC ラベルで検査する。分岐の後で変数を更新して合流する形は書けない。例外・タイミングによる漏洩は将来の課題。
 - ラベルは暗号化ではない。`secret` とラベルしても、保存時・通信時の暗号化は別途必要。
 - ネイティブ op の `sends` は宣言を信頼する。悪意ある native 実装は、ランタイムの能力制限でしか止められない。
 - 完全な情報フロー制御は決定不能な部分を含む。Etsah は「高リスクなフローを止める実用的な型システム」を目指す。

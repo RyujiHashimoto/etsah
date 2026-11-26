@@ -51,15 +51,16 @@ def first_call(e):
     return None
 
 
-def flow_steps(flow, ops):
+def body_steps(body, ops, depth=0):
     steps = []
-    for stmt in flow.body:
+    for stmt in body:
         if stmt.kind == "let":
             call = first_call(stmt.expr)
             op = ops.get(call.name) if call else None
             steps.append(
                 {
                     "kind": "call",
+                    "depth": depth,
                     "var": stmt.name,
                     "expr": fmt_expr(stmt.expr),
                     "op": call.name if call else "?",
@@ -69,8 +70,18 @@ def flow_steps(flow, ops):
                 }
             )
         elif stmt.kind == "return":
-            steps.append({"kind": "return", "expr": fmt_expr(stmt.expr)})
+            steps.append({"kind": "return", "depth": depth, "expr": fmt_expr(stmt.expr)})
+        elif stmt.kind == "if":
+            steps.append({"kind": "if", "depth": depth, "expr": fmt_expr(stmt.expr)})
+            steps.extend(body_steps(stmt.body, ops, depth + 1))
+            if stmt.orelse:
+                steps.append({"kind": "else", "depth": depth})
+                steps.extend(body_steps(stmt.orelse, ops, depth + 1))
     return steps
+
+
+def flow_steps(flow, ops):
+    return body_steps(flow.body, ops)
 
 
 def effect_chip(effect) -> str:
@@ -105,10 +116,27 @@ def build_html(fixed_src: str, flow, ops, fixed_diags, broken_diags, digest: str
     # Flow cards
     step_html = []
     for i, s in enumerate(steps, 1):
+        depth = s.get("depth", 0)
+        indent = f' style="margin-left:{depth * 18}px"' if depth else ""
+        if s["kind"] in ("if", "else"):
+            code = f"if {s['expr']}" if s["kind"] == "if" else "else"
+            kicker = "BRANCH" if s["kind"] == "if" else "ELSE"
+            step_html.append(
+                f"""
+                <li class="step"{indent}>
+                  <div class="step-no">{i}</div>
+                  <div class="step-body">
+                    <div class="step-kicker">{kicker}</div>
+                    <div class="step-code"><code>{esc(code)}</code></div>
+                  </div>
+                </li>
+                """
+            )
+            continue
         if s["kind"] == "return":
             step_html.append(
                 f"""
-                <li class="step">
+                <li class="step"{indent}>
                   <div class="step-no">{i}</div>
                   <div class="step-body">
                     <div class="step-kicker">RETURN</div>
@@ -123,7 +151,7 @@ def build_html(fixed_src: str, flow, ops, fixed_diags, broken_diags, digest: str
         chips = "".join(effect_chip(e) for e in s["effects"])
         step_html.append(
             f"""
-            <li class="step">
+            <li class="step"{indent}>
               <div class="step-no">{i}</div>
               <div class="step-body">
                 <div class="step-kicker">STEP {i}</div>

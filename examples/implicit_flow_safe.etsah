@@ -1,0 +1,48 @@
+# Implicit flow, handled: the comparison is declassified before it can
+# decide a public answer, and a public flag guards the pii sink.
+#
+#   python3 etsah.py check examples/implicit_flow_safe.etsah --allow-net email
+#
+# Expected: 0 errors, 1 warning (W-DECLASS for the audited declassification).
+
+label pii
+
+type Id
+type Customer {
+  id: Id
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+  declassify pii in classify require role support
+
+op customers.get(id: Id) -> Customer
+  doc "顧客を一件取得する"
+  eff read(customers)
+  impl native
+
+op send_receipt(to: String @pii) -> Bool
+  doc "領収書をメールで送る"
+  eff net(email)
+  sends to -> net(email)
+  impl native
+
+flow classify(id: Id) -> String
+  doc "判定結果だけを公開する。比較は監査付きで declassify する"
+  eff read(customers)
+  let c = customers.get(id)
+  let blocked = declassify(c.email == "blocked@example.com", pii, "拒否リスト判定の真偽だけを公開する")
+  if blocked
+    return "blocked"
+  else
+    return "allowed"
+
+flow email_receipt(id: Id, vip: Bool) -> Bool
+  doc "公開のフラグで分岐し、pii は pii を受け取る sink にだけ渡す"
+  eff read(customers), net(email)
+  let c = customers.get(id)
+  if vip
+    return send_receipt(c.email)
+  else
+    return false

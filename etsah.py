@@ -119,6 +119,8 @@ class Stmt:
     line: int = 0
     name: str = ""
     expr: Optional[Expr] = None
+    body: list["Stmt"] = field(default_factory=list)
+    orelse: list["Stmt"] = field(default_factory=list)
 
 
 @dataclass
@@ -817,24 +819,53 @@ class Parser:
             line.no,
         )
         while self.peek() and self.peek().indent == 2:
-            stmt = self.advance()
+            stmt = self.peek()
             text = stmt.text
             if text.startswith("doc "):
+                self.advance()
                 flow.doc = self.parse_string(text[4:], stmt.no)
             elif text.startswith("summary "):
+                self.advance()
                 flow.summary = self.parse_string(text[8:], stmt.no)
             elif text.startswith("eff "):
+                self.advance()
                 flow.effects = parse_effects(text[4:], stmt.no)
-            elif text.startswith("let "):
-                m2 = re.fullmatch(r"let\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
-                if not m2:
-                    raise ProutError(f"bad let statement {text!r}", stmt.no)
-                flow.body.append(Stmt("let", stmt.no, m2.group(1), parse_expr(m2.group(2), stmt.no)))
-            elif text.startswith("return "):
-                flow.body.append(Stmt("return", stmt.no, "", parse_expr(text[7:], stmt.no)))
             else:
-                raise ProutError(f"unknown flow statement {text!r}", stmt.no)
+                flow.body.extend(self._parse_flow_block(2))
         return flow
+
+    def _parse_flow_block(self, indent: int) -> list[Stmt]:
+        body: list[Stmt] = []
+        while self.peek() and self.peek().indent == indent:
+            line = self.advance()
+            text = line.text
+            if text.startswith("if "):
+                body.append(self._parse_if(line, indent))
+            elif text.startswith("let "):
+                matched = re.fullmatch(r"let\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
+                if not matched:
+                    raise ProutError(f"bad let statement {text!r}", line.no)
+                body.append(
+                    Stmt("let", line.no, matched.group(1), parse_expr(matched.group(2), line.no))
+                )
+            elif text.startswith("return "):
+                body.append(Stmt("return", line.no, "", parse_expr(text[7:], line.no)))
+            else:
+                raise ProutError(f"unknown flow statement {text!r}", line.no)
+        return body
+
+    def _parse_if(self, line: Line, indent: int) -> Stmt:
+        cond = parse_expr(line.text[3:].strip(), line.no)
+        then_body = self._parse_flow_block(indent + 2)
+        if not then_body:
+            raise ProutError("if requires a body indented by 2 spaces", line.no)
+        else_body: list[Stmt] = []
+        if self.peek() and self.peek().indent == indent and self.peek().text == "else":
+            self.advance()
+            else_body = self._parse_flow_block(indent + 2)
+            if not else_body:
+                raise ProutError("else requires a body indented by 2 spaces", line.no)
+        return Stmt("if", line.no, "", cond, then_body, else_body)
 
     def _props(self) -> list[Line]:
         props: list[Line] = []
@@ -1029,6 +1060,8 @@ class Parser:
                     )
             elif text.startswith("let ") or text.startswith("return "):
                 task.body.append(self._parse_body_stmt(text, prop.no))
+            elif text.startswith("if "):
+                raise ProutError("if is only available in flow, not in task", prop.no)
             else:
                 raise ProutError(f"unknown task property {text!r}", prop.no)
         return task
@@ -1928,37 +1961,8 @@ class Checker:
         self.check_type_exists(flow.ret, flow.line, "return type")
         self.check_ref_labels(flow.ret, flow.line, "return type")
         inferred: set[tuple[str, str]] = set()
-        seen_return = False
-        for stmt in flow.body:
-            if seen_return:
-                self.error(
-                    "E-FLOW",
-                    f"statement after return in flow {flow.name} is unreachable",
-                    stmt.line,
-                    fix="move this statement before the return, or remove it",
-                )
-                continue
-            if stmt.kind == "let":
-                t = self.type_of(stmt.expr, env)
-                if stmt.name in env:
-                    self.error("E-DUP", f"variable {stmt.name!r} is already defined", stmt.line)
-                env[stmt.name] = t
-                inferred |= self.effects_of_expr(stmt.expr)
-                for c in self.calls_in(stmt.expr):
-                    self.check_call_contracts(c, env)
-                    self.check_call_labels(c, env)
-            elif stmt.kind == "return":
-                seen_return = True
-                t = self.type_of(stmt.expr, env)
-                if t != "Unknown" and not self.compatible(flow.ret, t):
-                    self.error("E-TYPE", f"return expects {flow.ret}, got {t}", stmt.line)
-                if self.has_labels:
-                    self.check_return_labels(t, flow.ret, f"flow {flow.name}", stmt.line)
-                inferred |= self.effects_of_expr(stmt.expr)
-                for c in self.calls_in(stmt.expr):
-                    self.check_call_contracts(c, env)
-                    self.check_call_labels(c, env)
-        if not seen_return:
+        returns, _abrupt = self._check_flow_block(flow, flow.body, env, frozenset(), inferred)
+        if not returns:
             self.error(
                 "E-FLOW",
                 f"flow {flow.name} must end with a return statement",
@@ -1978,6 +1982,107 @@ class Checker:
             if inferred:
                 fix = "eff " + ", ".join(format_effect(e) for e in sorted(inferred))
             self.error("E-EFF", f"flow {flow.name} effects do not match implementation ({'; '.join(bits)})", flow.line, fix)
+
+    def _check_pc_sinks(self, expr: Optional[Expr], pc: frozenset[str]) -> None:
+        """A non-read effect that runs under ``pc`` is a sink for those labels."""
+        if not pc or not self.has_labels or expr is None:
+            return
+        for call in self.calls_in(expr):
+            op = self.ops.get(call.name)
+            if op is None:
+                continue
+            for effect in op.effects:
+                if effect[0] == "read":
+                    continue
+                self.check_sink(effect, pc, call.line or expr.line)
+
+    def _check_flow_block(
+        self,
+        flow: FlowDef,
+        stmts: list[Stmt],
+        env: dict[str, TypeRef],
+        pc: frozenset[str],
+        inferred: set[tuple[str, str]],
+    ) -> tuple[bool, frozenset[str]]:
+        """Check one block.
+
+        Returns ``(always_returns, abrupt_labels)``. ``abrupt_labels`` is empty
+        when every path returns. Otherwise it is the set of condition labels
+        that guard a ``return`` on some path, which the statements after this
+        block must carry. ``pc`` is that program-counter label for the block
+        itself.
+        """
+        entry_pc = pc
+        abrupt: set[str] = set()
+        always = False
+        ever = False
+        for stmt in stmts:
+            if always:
+                self.error(
+                    "E-FLOW",
+                    f"statement after return in flow {flow.name} is unreachable",
+                    stmt.line,
+                    fix="move this statement before the return, or remove it",
+                )
+                continue
+            if stmt.kind == "let":
+                t = self.type_of(stmt.expr, env)
+                if pc:
+                    t = TypeRef(str(t), t.labels | pc)
+                if stmt.name in env:
+                    self.error("E-DUP", f"variable {stmt.name!r} is already defined", stmt.line)
+                env[stmt.name] = t
+                inferred |= self.effects_of_expr(stmt.expr)
+                for c in self.calls_in(stmt.expr):
+                    self.check_call_contracts(c, env)
+                    self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
+            elif stmt.kind == "return":
+                always = True
+                ever = True
+                t = self.type_of(stmt.expr, env)
+                if t != "Unknown" and not self.compatible(flow.ret, t):
+                    self.error("E-TYPE", f"return expects {flow.ret}, got {t}", stmt.line)
+                if self.has_labels:
+                    checked = TypeRef(str(t), t.labels | pc) if pc else t
+                    self.check_return_labels(checked, flow.ret, f"flow {flow.name}", stmt.line)
+                inferred |= self.effects_of_expr(stmt.expr)
+                for c in self.calls_in(stmt.expr):
+                    self.check_call_contracts(c, env)
+                    self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
+            elif stmt.kind == "if":
+                cond = self.type_of(stmt.expr, env)
+                if cond not in ("Bool", "Unknown"):
+                    self.error("E-TYPE", f"if condition expects Bool, got {cond}", stmt.line)
+                inferred |= self.effects_of_expr(stmt.expr)
+                for c in self.calls_in(stmt.expr):
+                    self.check_call_contracts(c, env)
+                    self.check_call_labels(c, env)
+                self._check_pc_sinks(stmt.expr, pc)
+                branch_pc = pc | cond.labels
+                then_always, then_abrupt = self._check_flow_block(
+                    flow, stmt.body, dict(env), branch_pc, inferred
+                )
+                else_always, else_abrupt = self._check_flow_block(
+                    flow, stmt.orelse, dict(env), branch_pc, inferred
+                )
+                if stmt.orelse and then_always and else_always:
+                    always = True
+                    ever = True
+                else:
+                    extra = set(then_abrupt) | set(else_abrupt)
+                    if then_always or else_always or then_abrupt or else_abrupt:
+                        extra |= set(cond.labels)
+                        ever = True
+                    if extra:
+                        pc = pc | frozenset(extra)
+                        abrupt |= extra
+        if always:
+            return True, frozenset()
+        if ever:
+            abrupt |= set(entry_pc)
+        return False, frozenset(abrupt)
 
     def check_call_contracts(self, c: Expr, env: dict[str, str]) -> None:
         op = self.ops.get(c.name)
@@ -3051,6 +3156,15 @@ def _canonical_expr_list(exprs: list[Expr]) -> list[Expr]:
     )
 
 
+def stmt_to_dict(s: Stmt) -> dict:
+    d: dict[str, Any] = {"kind": s.kind, "name": s.name, "expr": expr_to_dict(s.expr)}
+    if s.kind == "if":
+        d["body"] = [stmt_to_dict(item) for item in s.body]
+        if s.orelse:
+            d["orelse"] = [stmt_to_dict(item) for item in s.orelse]
+    return d
+
+
 def program_to_dict(p: Program) -> dict:
     d: dict[str, Any] = {}
     if p.labels:
@@ -3120,10 +3234,7 @@ def program_to_dict(p: Program) -> dict:
             "effects": sorted(f.effects),
             "doc": f.doc,
             "summary": f.summary,
-            "body": [
-                {"kind": s.kind, "name": s.name, "expr": expr_to_dict(s.expr)}
-                for s in f.body
-            ],
+            "body": [stmt_to_dict(s) for s in f.body],
         }
         param_labels = {name: sorted(ref.labels) for name, ref in f.params if ref.labels}
         if param_labels:

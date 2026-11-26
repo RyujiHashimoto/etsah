@@ -1,0 +1,32 @@
+# Implicit flow: a pii condition decides a public answer.
+# The returned strings carry no pii label themselves, but the choice between
+# them reveals the e-mail address. The checker must reject this file.
+#
+#   python3 etsah.py check examples/implicit_flow_leak.etsah --allow-net email
+#
+# Expected: E-IFLOW-RET on both returns.
+
+label pii
+
+type Id
+type Customer {
+  id: Id
+  email: String @pii
+}
+
+policy
+  sink net(email) accepts pii
+
+op customers.get(id: Id) -> Customer
+  doc "顧客を一件取得する"
+  eff read(customers)
+  impl native
+
+flow classify(id: Id) -> String
+  doc "メールアドレスが拒否リストにあるかを、公開の文字列で答える"
+  eff read(customers)
+  let c = customers.get(id)
+  if c.email == "blocked@example.com"
+    return "blocked"
+  else
+    return "allowed"
