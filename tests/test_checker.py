@@ -732,6 +732,61 @@ class TestCli(unittest.TestCase):
         allowed = self._run(source, "check", "--allow-net", "paypal")
         self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
 
+    def test_comma_in_allow_or_deny_net_exits_2(self) -> None:
+        script = str(ROOT / "etsah.py")
+        sample = str(ROOT / "examples" / "information_flow_safe.etsah")
+
+        def assert_comma_rejected(flag: str) -> None:
+            proc = subprocess.run(
+                [sys.executable, script, "check", sample, flag, "email,analytics"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+            self.assertEqual(proc.stdout, "")
+            self.assertEqual(
+                proc.stderr,
+                f"[ERROR] {flag} takes one host. Repeat the flag for each host. A comma is not a separator.\n",
+            )
+            self.assertNotIn("net(email,analytics)", proc.stdout)
+            self.assertNotIn("net(email,analytics)", proc.stderr)
+            self.assertNotIn("E-POLICY", proc.stdout)
+            self.assertNotIn("E-POLICY", proc.stderr)
+
+            as_json = subprocess.run(
+                [sys.executable, script, "check", sample, "--json", flag, "email,analytics"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(as_json.returncode, 2, as_json.stdout + as_json.stderr)
+            self.assertEqual(as_json.stdout, "")
+            self.assertEqual(
+                as_json.stderr,
+                f"[ERROR] {flag} takes one host. Repeat the flag for each host. A comma is not a separator.\n",
+            )
+
+        assert_comma_rejected("--allow-net")
+        assert_comma_rejected("--deny-net")
+
+        repeated = subprocess.run(
+            [
+                sys.executable,
+                script,
+                "check",
+                sample,
+                "--allow-net",
+                "email",
+                "--allow-net",
+                "analytics",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
