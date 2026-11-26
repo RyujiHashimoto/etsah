@@ -3367,7 +3367,20 @@ def main() -> None:
     try:
         program = Parser(text).parse()
     except ProutError as ex:
-        print(f"[ERROR] {ex.message} (line {ex.line})", file=sys.stderr)
+        diagnostic = Diagnostic(
+            code="E-PARSE",
+            severity="error",
+            message=ex.message,
+            line=ex.line,
+        )
+        if args.cmd == "check" and args.json:
+            payload = {
+                "hash": "",
+                "diagnostics": [diagnostic.as_dict()],
+            }
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(diagnostic.render(), file=sys.stderr)
         sys.exit(2)
 
     if args.cmd == "ast":
