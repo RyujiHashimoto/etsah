@@ -1,0 +1,21 @@
+# Fictional status ping. The host name lantern is invented.
+#
+#   python3 etsah.py check examples/lantern_status.etsah
+#   Expected exit: 1
+#   network target 'lantern' is not allowed by policy
+#
+#   python3 etsah.py check examples/lantern_status.etsah --allow-net lantern
+#   Expected exit: 0
+#
+#   python3 etsah.py check examples/lantern_status.etsah --allow-net lantern --deny-net lantern
+#   Expected exit: 1
+#   network target 'lantern' is denied by policy
+
+op lantern.ping() -> Bool
+  doc "Ping the fictional lantern status board"
+  eff net(lantern)
+  impl native
+
+flow ping_once() -> Bool
+  eff net(lantern)
+  return lantern.ping()

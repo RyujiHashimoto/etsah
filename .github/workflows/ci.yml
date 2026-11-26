@@ -222,6 +222,20 @@ jobs:
           grep -q "E-POLICY" /tmp/combined-policy.txt
           grep -q "has no approval gate" /tmp/combined-policy.txt
 
+      - name: Deny net overrides allow net
+        run: |
+          if python3 etsah.py check examples/lantern_status.etsah > /tmp/lantern-bare.txt 2>&1; then
+            echo "bare lantern check unexpectedly passed"
+            exit 1
+          fi
+          grep -q "network target 'lantern' is not allowed by policy" /tmp/lantern-bare.txt
+          python3 etsah.py check examples/lantern_status.etsah --allow-net lantern
+          if python3 etsah.py check examples/lantern_status.etsah --allow-net lantern --deny-net lantern > /tmp/lantern-deny.txt 2>&1; then
+            echo "denied lantern check unexpectedly passed"
+            exit 1
+          fi
+          grep -q "network target 'lantern' is denied by policy" /tmp/lantern-deny.txt
+
       - name: Pattern registry
         working-directory: patterns
         run: |
