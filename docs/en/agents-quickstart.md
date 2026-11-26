@@ -50,6 +50,8 @@ print(result.plans[0].text)
 
 `allow_net` replaces the default host list. An omitted or empty list keeps the default, which is `stripe`.
 
+`deny_net` rejects a host even when the allow list includes it. `examples/lantern_status.etsah` is the command-line form: `--deny-net lantern` fails the check even with `--allow-net lantern`.
+
 ```python
 from etsah_api import check_file
 

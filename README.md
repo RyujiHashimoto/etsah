@@ -228,7 +228,7 @@ The language is Etsah. For one minor version, the old commands `prout`, `proutc`
 | Effects (`read`, `write`, `net`, `spend`, `emit`) match the operations a flow or task calls | `E-EFF` |
 | A task's effects stay inside its agent's `allow` list | `E-POLICY` |
 | External `emit` / `net`, every `spend`, and a `write` marked as a contract change name a human `gate` | `E-POLICY` |
-| Network targets sit on the allow list (default `stripe`; override with `--allow-net`) | `E-POLICY` |
+| Network targets sit on the allow list (default `stripe`; override with `--allow-net`). A host given with `--deny-net` is rejected even when `--allow-net` names it too (`examples/lantern_status.etsah`). | `E-POLICY` |
 | Spend budgets are integer yen, and per-run does not exceed the period. Hourly `net` and `emit` limits are static | Declared and checked. Those running totals are not counted. `limit calls` and `limit spend` are counted by `etsah guard` |
 | `audit ast_hash` on the agent | Required. The full id is 64 hex digits. `etsah check` prints the 12-digit prefix |
 | Preconditions in linear arithmetic, including `Decimal` and calendar `Date` | False is `E-PRE`. Unproved is a visible `W-PRE` guard |
