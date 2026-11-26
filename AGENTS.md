@@ -21,6 +21,10 @@ The language is Etsah. For one minor version, `prout`, `proutc`, and `prout-mcp`
 Python 3.12, standard library only. `pyproject.toml` lists no
 third-party dependencies. Nothing is published to PyPI. CI is the
 `verify` job in `.github/workflows/ci.yml` and uses Python 3.12.
+That job also creates a virtualenv outside the checkout, runs
+`pip install .`, and smoke-tests `etsah`, `etsahc`, `etsah-mcp`,
+`prout`, `proutc`, and `prout-mcp` from that install. The legacy
+commands must warn on stderr.
 
 ```bash
 git clone https://github.com/RyujiHashimoto/prout-lang.git

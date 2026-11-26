@@ -36,7 +36,19 @@ prout-mcp = "prout_mcp.server:main"
 
 [tool.setuptools]
 py-modules = ["etsah", "etsah_api", "etsah_import", "prout", "prout_api", "prout_import", "render"]
-packages = ["etsah_patterns", "etsah_mcp", "prout_patterns", "prout_mcp"]
+# registry, examples, and bench hold data, not Python modules. They are
+# listed so setuptools ships those directories with the package. A data
+# directory that is not listed is treated as an undeclared package and
+# can be left out of the install.
+packages = [
+    "etsah_patterns",
+    "etsah_patterns.registry",
+    "etsah_patterns.examples",
+    "etsah_patterns.bench",
+    "etsah_mcp",
+    "prout_patterns",
+    "prout_mcp",
+]
 
 [tool.setuptools.package-dir]
 etsah_patterns = "patterns"
@@ -48,3 +60,6 @@ etsah_patterns = [
     "bench/*.etsah",
     "bench/*.json",
 ]
+"etsah_patterns.registry" = ["*.json"]
+"etsah_patterns.examples" = ["*.etsah"]
+"etsah_patterns.bench" = ["*.etsah", "*.json"]
