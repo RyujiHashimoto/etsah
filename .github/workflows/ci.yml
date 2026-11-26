@@ -207,6 +207,14 @@ jobs:
           fi
           grep -q "E-IFLOW-ARG" /tmp/iflow-leak.txt
           grep -q "track_event" /tmp/iflow-leak.txt
+          python3 etsah.py check examples/implicit_flow_safe.etsah --allow-net email
+          if python3 etsah.py check examples/implicit_flow_leak.etsah \
+            --allow-net email > /tmp/implicit-leak.txt 2>&1; then
+            echo "implicit flow leak unexpectedly passed"
+            exit 1
+          fi
+          grep -q "E-IFLOW-RET" /tmp/implicit-leak.txt
+          grep -q "classify" /tmp/implicit-leak.txt
           python3 etsah.py check examples/prompt_injection_safe.etsah
           if python3 etsah.py check examples/prompt_injection_leak.etsah > /tmp/injection-leak.txt 2>&1; then
             echo "prompt injection leak unexpectedly passed"

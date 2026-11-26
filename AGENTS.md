@@ -12,7 +12,7 @@ Repository: https://github.com/RyujiHashimoto/prout-lang
 
 The language is Etsah. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and write a deprecation warning to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. The repository URL stays https://github.com/RyujiHashimoto/prout-lang.
 
-`python3 -m unittest discover -s tests` reports 399 tests, all passing, on Python 3.12.
+`python3 -m unittest discover -s tests` reports 440 tests, all passing, on Python 3.12.
 
 `action.yml` is a composite action. Another repository calls it with `uses: RyujiHashimoto/prout-lang@main` after `actions/checkout`. Tags are not published. The `verify` job calls the same action with `uses: ./` on a passing file and on `examples/ai_tasks_broken.etsah`.
 

@@ -406,7 +406,7 @@ Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can 
 - Contract language: types, `op`, `flow`, `agent`, `task`, `gate`, effects, `pre` / `post`, `impl`.
 - Effect completeness, network allow list, human gates for external mail, payment, and contract changes, integer-yen budgets, hourly rate limits, retry bounds, and a required audit hash.
 - `Decimal` and calendar `Date` in preconditions. `1/2` is still not given one meaning.
-- Information-flow labels. Programs that do not use them keep their previous AST hash.
+- Information-flow labels, including implicit flow through `if` / `else` branches. A condition's labels become the program-counter label of the values returned inside it. Programs that do not use labels keep their previous AST hash.
 - Diagnostics an agent can repair from: code, location, expected, actual, suggestion.
 - Human HTML from the AST (`render.py`) and a static browser playground (`docs/playground/`).
 - Import of MCP and OpenAI tool lists into `op` declarations (`etsah import`).
@@ -416,7 +416,7 @@ Design and limits: [docs/staffing.md](docs/staffing.md). The contract layer can 
 
 ## Status
 
-Prototype. No release tag. Not published to PyPI. `build` emits a report, a demo, and a manifest. It does not emit API or database source. Cron does not run, budget counters are not stored, and there is no idempotency store. Information-flow checking does not follow implicit flow through branches.
+Prototype. No release tag. Not published to PyPI. `build` emits a report, a demo, and a manifest. It does not emit API or database source. Cron does not run, budget counters are not stored, and there is no idempotency store. Branches are early returns only; there is no assignment, loop, or exception.
 
 ## Documentation
 
