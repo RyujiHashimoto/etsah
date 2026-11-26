@@ -3362,6 +3362,17 @@ def main() -> None:
         _import_tools(args.kind, args.file)
         return
 
+    # One flag, one host. A comma is a mistake on the CLI; the action
+    # already splits its own comma-separated input before it calls us.
+    if args.cmd == "check":
+        for flag, values in (("--allow-net", args.allow_net), ("--deny-net", args.deny_net)):
+            if values and any("," in value for value in values):
+                print(
+                    f"[ERROR] {flag} takes one host. Repeat the flag for each host. A comma is not a separator.",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+
     try:
         text = open(args.file, encoding="utf-8").read()
     except (OSError, UnicodeDecodeError) as ex:
