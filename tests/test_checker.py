@@ -571,7 +571,25 @@ class TestCli(unittest.TestCase):
 
         broken = self._run("  type Broken\n", "check", dedent=False)
         self.assertEqual(broken.returncode, 2, broken.stderr)
+        self.assertIn("E-PARSE", broken.stderr)
         self.assertIn("line", broken.stderr)
+        self.assertNotIn("Traceback", broken.stdout)
+        self.assertNotIn("Traceback", broken.stderr)
+
+        broken_json = self._run("  type Broken\n", "check", "--json", dedent=False)
+        self.assertEqual(broken_json.returncode, 2, broken_json.stdout + broken_json.stderr)
+        self.assertNotIn("Traceback", broken_json.stdout)
+        self.assertNotIn("Traceback", broken_json.stderr)
+        parsed = json.loads(broken_json.stdout)
+        self.assertEqual(set(parsed), {"hash", "diagnostics"})
+        self.assertEqual(parsed["hash"], "")
+        self.assertEqual(len(parsed["diagnostics"]), 1)
+        item = parsed["diagnostics"][0]
+        self.assertEqual(item["code"], "E-PARSE")
+        self.assertEqual(item["severity"], "error")
+        self.assertIsInstance(item["line"], int)
+        self.assertTrue(item["message"])
+        self.assertEqual(set(item), {"code", "severity", "line", "message"})
 
     def test_unreadable_path_exits_2_without_a_traceback(self) -> None:
         script = str(ROOT / "etsah.py")
