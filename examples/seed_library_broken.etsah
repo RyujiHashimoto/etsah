@@ -1,0 +1,27 @@
+# Maple Shelf: the flow drops write(loans), so the effects are incomplete.
+#
+#   python3 etsah.py check examples/seed_library_broken.etsah
+#
+# Expected: exit 1 (E-EFF, missing write(loans)).
+
+type PacketId
+type Packet {
+  id: PacketId
+  name: String
+}
+
+op shelf.lookup(id: PacketId) -> Packet
+  doc "Look up fictional packet MS-204 on the Maple Shelf"
+  eff read(catalog)
+  impl native
+
+op loans.record(packet: Packet) -> Bool
+  doc "Record that Maple Shelf packet MS-204 went out on loan"
+  eff write(loans)
+  impl native
+
+flow lend_packet(id: PacketId) -> Bool
+  eff read(catalog)
+  let packet = shelf.lookup(id)
+  let recorded = loans.record(packet)
+  return recorded
