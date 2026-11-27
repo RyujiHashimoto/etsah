@@ -1,6 +1,6 @@
 # Code of Conduct
 
-日本語: 参加者とメンテナンス担当は、嫌がらせのないコミュニティを保ちます。報告は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues) へ。`oss@j-prout.co.jp` はオーナー確認前の仮アドレスで、確認されるまで監視されている連絡先ではありません。以下は Contributor Covenant 2.1 です。
+日本語: 参加者とメンテナンス担当は、嫌がらせのないコミュニティを保ちます。報告は [GitHub Issues](https://github.com/RyujiHashimoto/etsah/issues) へ。`oss@j-prout.co.jp` はオーナー確認前の仮アドレスで、確認されるまで監視されている連絡先ではありません。以下は Contributor Covenant 2.1 です。
 
 # Contributor Covenant Code of Conduct
 
@@ -40,7 +40,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement by opening a GitHub Issue at <https://github.com/RyujiHashimoto/prout-lang/issues>. The address `oss@j-prout.co.jp` is reserved for the owner to confirm. Until the owner confirms that the mailbox is monitored, reports should go to GitHub Issues. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement by opening a GitHub Issue at <https://github.com/RyujiHashimoto/etsah/issues>. The address `oss@j-prout.co.jp` is reserved for the owner to confirm. Until the owner confirms that the mailbox is monitored, reports should go to GitHub Issues. All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

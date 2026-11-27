@@ -2,7 +2,7 @@
 
 > Etsah is a contract language (DSL) for AI agents: declare effects (read, write, net, spend, emit), budgets, and approval gates, then check the contract statically before anything runs. Author: Ryuji Hashimoto (J-PROUT Inc.). MIT license.
 
-Repository: https://github.com/RyujiHashimoto/prout-lang. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 etsah.py check` on `.etsah` files. `python3 -m unittest discover -s tests` is the test command.
+Repository: https://github.com/RyujiHashimoto/etsah. Python 3.12, standard library only. The package is not on PyPI. From a clone, run `python3 etsah.py check` on `.etsah` files. `python3 -m unittest discover -s tests` is the test command.
 
 Start with [AGENTS.md](AGENTS.md) if you will change the tree. Do not refactor the validator in `etsah.py`. Do not publish to PyPI, push a release tag, register names, or post announcements (including MCP registry listings) without approval from Ryuji Hashimoto (J-PROUT Inc.). AI contributors are welcome on the same terms as human contributors.
 

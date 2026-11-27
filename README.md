@@ -5,7 +5,7 @@
 [日本語](README.ja.md) · [Spec (English)](SPEC.en.md) · [Spec (Japanese)](SPEC.md)
 
 [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![ci](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/prout-lang/actions/workflows/ci.yml)
+[![ci](https://github.com/RyujiHashimoto/etsah/actions/workflows/ci.yml/badge.svg)](https://github.com/RyujiHashimoto/etsah/actions/workflows/ci.yml)
 [![playground](https://img.shields.io/badge/playground-try%20it-2f6f4e)](docs/playground/index.html)
 
 It stops an agent from emailing a customer, charging a card, changing a contract, or calling a host that is not allowlisted, before any of those calls run. An AI writes the specification. A separate checker verifies it. A human reads the summary and the GUI.
@@ -32,8 +32,8 @@ task draft_reply(ticket_id: Id) -> Bool
 Python 3.12 and the standard library. No extra packages. The package is not on PyPI. Clone the repository and install that checkout.
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git
+cd etsah
 python3 -m venv .venv
 .venv/bin/python -m pip install .
 ```
@@ -242,14 +242,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: RyujiHashimoto/prout-lang@main
+      - uses: RyujiHashimoto/etsah@main
 ```
 
 `glob` replaces the file set. `scope` is `pull-request` (the default) or `all`. On an event other than a pull request, the default scope checks every match. `allow-net` and `deny-net` are comma-separated host names and are passed through to the checker. This repository's CI calls the action with `uses: ./` on a passing file and on a broken file.
 
 ## Renamed from prout
 
-The language is Etsah. For one minor version, the old commands `prout`, `proutc`, and `prout-mcp` still run and write `新名称は etsah` to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. `PROUT_*` environment variables are still read when the matching `ETSAH_*` variable is unset, and approval tokens that start with `prout1.` still verify. The repository URL is unchanged.
+The language is Etsah. For one minor version, the old commands `prout`, `proutc`, and `prout-mcp` still run and write `新名称は etsah` to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. `PROUT_*` environment variables are still read when the matching `ETSAH_*` variable is unset, and approval tokens that start with `prout1.` still verify. The repository URL is https://github.com/RyujiHashimoto/etsah.
 
 ## What the checker enforces
 
