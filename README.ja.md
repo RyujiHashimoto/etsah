@@ -12,7 +12,7 @@ Ryuji Hashimoto (J-PROUT Inc.)
 
 ## prout からの改名
 
-言語名は Etsah です。一つマイナー版のあいだ、旧コマンド `prout`、`proutc`、`prout-mcp` は動き、stderr に `新名称は etsah` と出します。`.prout` ファイルも検査できます。`import prout` などの旧モジュール名は、新しいモジュールを再エクスポートする薄い互換層です。`ETSAH_*` が無いとき、対応する `PROUT_*` 環境変数も読みます。`prout1.` で始まる承認トークンも検証できます。リポジトリの URL は変えていません。
+言語名は Etsah です。一つマイナー版のあいだ、旧コマンド `prout`、`proutc`、`prout-mcp` は動き、stderr に `新名称は etsah` と出します。`.prout` ファイルも検査できます。`import prout` などの旧モジュール名は、新しいモジュールを再エクスポートする薄い互換層です。`ETSAH_*` が無いとき、対応する `PROUT_*` 環境変数も読みます。`prout1.` で始まる承認トークンも検証できます。リポジトリの URL は https://github.com/RyujiHashimoto/etsah です。
 
 ## 出発点
 
@@ -36,8 +36,8 @@ AIが開発するなら、人間が作った言語の制約から自由になれ
 Python 3.12 と標準ライブラリで動きます。追加の実行時パッケージはありません。PyPI には公開していないので、クローンをインストールします。
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git
+cd etsah
 python3 -m venv .venv
 .venv/bin/python -m pip install .
 ```
@@ -250,7 +250,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: RyujiHashimoto/prout-lang@main
+      - uses: RyujiHashimoto/etsah@main
 ```
 
 `glob` で対象を変えられます。`scope` は `pull-request`（既定）または `all` です。プルリクエスト以外のイベントでは、既定の scope は一致したファイルをすべて検査します。`allow-net` と `deny-net` はカンマ区切りのホスト名で、チェッカーへ渡します。このリポジトリの CI は `uses: ./` で、合格する例と壊した例の両方を動かします。

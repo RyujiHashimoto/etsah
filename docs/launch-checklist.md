@@ -47,7 +47,7 @@ Pages は無効のままです。有効にしていません。
 
 ## 4. Discussions を有効にする
 
-2026-11-23 時点で Discussions は無効です。有効化は設定変更なので、ここでは行っていません。有効にしたあとの入口は `https://github.com/RyujiHashimoto/prout-lang/discussions` です。質問の既定は、それまで GitHub Issues のままにしています。
+2026-11-23 時点で Discussions は無効です。有効化は設定変更なので、ここでは行っていません。有効にしたあとの入口は `https://github.com/RyujiHashimoto/etsah/discussions` です。質問の既定は、それまで GitHub Issues のままにしています。
 
 ## 5. リリースタグ v0.1.0
 
@@ -82,7 +82,7 @@ The agent declares effects (read, write, net, spend, emit). A separate checker r
 
 What you can run today, with Python 3.12 and no dependencies:
 
-  git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
+  git clone https://github.com/RyujiHashimoto/etsah.git && cd etsah
   python3 etsah.py check examples/refund_fixed.etsah
   python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/build/expense
 
@@ -95,7 +95,7 @@ Etsah does not replace Python, Rust, or SQL. impl can be any of them. The contra
 A staffing-desk spec is included as one industry example. Statutory numbers are configuration, not built into the language.
 
 MIT. Ryuji Hashimoto (J-PROUT Inc.)
-https://github.com/RyujiHashimoto/prout-lang
+https://github.com/RyujiHashimoto/etsah
 ```
 
 ### r/ProgrammingLanguages
@@ -130,7 +130,7 @@ It is deliberately not a superset of existing languages. 1/2, generics syntax, a
 
 Python 3.12, standard library only, MIT:
 
-https://github.com/RyujiHashimoto/prout-lang
+https://github.com/RyujiHashimoto/etsah
 
 English README, with the Japanese original kept as README.ja.md. SPEC.md (Japanese) is the contract spec; SPEC.en.md is a translation.
 ```
@@ -162,7 +162,7 @@ main で今日動くのは次です。
 
 Python 3.12 だけで動きます。
 
-git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git && cd etsah
 python3 etsah.py check examples/refund_fixed.etsah
 python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/build/expense
 
@@ -173,7 +173,7 @@ python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/
 人材派遣の勤怠・抵触日・請求単価は、産業の一例です。法令の数値は言語に埋め込んでいません。
 
 MIT。仕様の原文は日本語の SPEC.md、英語訳は SPEC.en.md です。
-https://github.com/RyujiHashimoto/prout-lang
+https://github.com/RyujiHashimoto/etsah
 ```
 
 ### Qiita
@@ -192,7 +192,7 @@ Etsah は、AIエージェントが実行前にやってよいことを契約と
 
 動かし方。Python 3.12。追加のパッケージはありません。
 
-    git clone https://github.com/RyujiHashimoto/prout-lang.git && cd prout-lang
+    git clone https://github.com/RyujiHashimoto/etsah.git && cd etsah
     python3 etsah.py check examples/refund_fixed.etsah
     python3 patterns/etsahc.py build patterns/examples/expense.etsah --out patterns/build/expense
 
@@ -204,7 +204,7 @@ Etsah は、AIエージェントが実行前にやってよいことを契約と
 
 読み方。英語 README が入口です。日本語の全文は README.ja.md に残してあります。契約の仕様は SPEC.md（日本語が原文）と SPEC.en.md（訳）です。人材派遣の例は docs/staffing.md にまとめました。言語の中心ではなく、一つの産業例です。
 
-MIT です。https://github.com/RyujiHashimoto/prout-lang
+MIT です。https://github.com/RyujiHashimoto/etsah
 
 ### X
 
@@ -218,7 +218,7 @@ Today: effect checks, a network allow list, preconditions, an AST hash, and an a
 In progress: spend/rate budgets and required human gates for external email, payment, and contract changes.
 
 MIT, Python stdlib only.
-https://github.com/RyujiHashimoto/prout-lang
+https://github.com/RyujiHashimoto/etsah
 ```
 
 日本語:
@@ -231,7 +231,7 @@ Etsah は、AIエージェントが実行前に許される効果と承認を宣
 支出の上限と、外部メール・支払い・契約変更のゲートは、静的検査です。cron と残数のカウンタはまだ動きません。
 
 MIT。Python の標準ライブラリだけ。
-https://github.com/RyujiHashimoto/prout-lang
+https://github.com/RyujiHashimoto/etsah
 ```
 
 ## 8. good first issue の候補

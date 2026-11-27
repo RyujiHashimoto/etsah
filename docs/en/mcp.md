@@ -106,7 +106,7 @@ Put this in `claude_desktop_config.json`. Replace the path with the checkout.
   "mcpServers": {
     "etsah": {
       "command": "python3",
-      "args": ["/path/to/prout-lang/etsah.py", "mcp"]
+      "args": ["/path/to/etsah/etsah.py", "mcp"]
     }
   }
 }
@@ -120,10 +120,10 @@ A guarded upstream server, with fictional ticket mail held for approval:
     "harbor-lane": {
       "command": "python3",
       "args": [
-        "/path/to/prout-lang/etsah.py",
+        "/path/to/etsah/etsah.py",
         "guard",
         "--contract",
-        "/path/to/prout-lang/examples/agents/support_reply.etsah",
+        "/path/to/etsah/examples/agents/support_reply.etsah",
         "--",
         "python3",
         "/path/to/upstream_server.py"
@@ -175,7 +175,7 @@ Any client that launches a stdio server can use:
 ```json
 {
   "command": "python3",
-  "args": ["/path/to/prout-lang/etsah.py", "mcp"]
+  "args": ["/path/to/etsah/etsah.py", "mcp"]
 }
 ```
 

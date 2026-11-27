@@ -342,7 +342,7 @@ class ActionMetadataTests(unittest.TestCase):
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         japanese = (ROOT / "README.ja.md").read_text(encoding="utf-8")
         for text in (english, japanese):
-            self.assertIn("RyujiHashimoto/prout-lang@main", text)
+            self.assertIn("RyujiHashimoto/etsah@main", text)
             self.assertIn("uses: ./", text)
         self.assertIn("Tags are not published", english)
         self.assertIn("タグは未公開", japanese)

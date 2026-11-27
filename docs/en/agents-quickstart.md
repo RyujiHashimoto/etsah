@@ -7,8 +7,8 @@ This is a five-minute path from a tool list to a check that fails before an agen
 The same check runs in the browser at [docs/playground/index.html](../playground/index.html). That page goes live once GitHub Pages is enabled. It does not enable Pages by itself. How this differs from Cedar, OPA, Guardrails, and effect systems is in [comparison.md](comparison.md).
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git
+cd etsah
 ```
 
 The checker reads source. It does not run the agent.

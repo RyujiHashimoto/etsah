@@ -2,7 +2,7 @@
 
 Etsah is a prototype of a language in which an AI writes, an AI verifies, and a human reads. The useful contributions are a **new pattern in the registry** and a **smaller, more general form of a pattern that already exists**.
 
-Questions go to [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues). Vulnerability reports follow [SECURITY.md](SECURITY.md). Conduct reports follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Questions go to [GitHub Issues](https://github.com/RyujiHashimoto/etsah/issues). Vulnerability reports follow [SECURITY.md](SECURITY.md). Conduct reports follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 `oss@j-prout.co.jp` is a placeholder for the owner to confirm. It is not a monitored contact until the owner says so. Use GitHub Issues until then.
 
@@ -15,8 +15,8 @@ The contract spec's original is [SPEC.md](SPEC.md) (Japanese). [SPEC.en.md](SPEC
 ## Development
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git
+cd etsah
 
 python3 etsah.py check examples/refund_fixed.etsah
 python3 etsah.py check examples/ai_tasks.etsah
@@ -136,7 +136,7 @@ If a change alters the meaning of syntax, types, effects, or preconditions in `e
 - クラス一つは `PYTHONPATH=tests python3 -m unittest test_checker.TestCli`。`tests.` で始めると `support` が見つかりません。
 - 新しいパターンは `patterns/registry/<name>.json` を足し、`python3 etsahc.py index` で索引を更新して Pull Request にします。同じ形が二度以上出てから追加します。
 - AI が書いた Pull Request も、人間のレビューが必須です。
-- 質問は [GitHub Issues](https://github.com/RyujiHashimoto/prout-lang/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
+- 質問は [GitHub Issues](https://github.com/RyujiHashimoto/etsah/issues)。脆弱性は [SECURITY.md](SECURITY.md)。
 - `oss@j-prout.co.jp` はオーナー確認前の仮アドレスです。確認されるまでは Issues を使ってください。
 - 検査器の意味を変えるときは `SPEC.md` と `SPEC.en.md` を同じ Pull Request で更新してください。ドキュメントだけの変更で `etsah.py` を整形し直さないでください。
 

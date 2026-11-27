@@ -8,13 +8,13 @@ general-purpose programming language and not a framework.
 
 Author: Ryuji Hashimoto (J-PROUT Inc.)
 License: MIT (see `LICENSE`)
-Repository: https://github.com/RyujiHashimoto/prout-lang
+Repository: https://github.com/RyujiHashimoto/etsah
 
-The language is Etsah. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and write a deprecation warning to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. The repository URL stays https://github.com/RyujiHashimoto/prout-lang.
+The language is Etsah. For one minor version, `prout`, `proutc`, and `prout-mcp` still run and write a deprecation warning to stderr. `.prout` files still check. `import prout` and the other old module names re-export the `etsah` modules. The repository URL stays https://github.com/RyujiHashimoto/etsah.
 
 `python3 -m unittest discover -s tests` reports 448 tests, all passing, on Python 3.12.
 
-`action.yml` is a composite action. Another repository calls it with `uses: RyujiHashimoto/prout-lang@main` after `actions/checkout`. Tags are not published. The `verify` job calls the same action with `uses: ./` on a passing file and on `examples/ai_tasks_broken.etsah`.
+`action.yml` is a composite action. Another repository calls it with `uses: RyujiHashimoto/etsah@main` after `actions/checkout`. Tags are not published. The `verify` job calls the same action with `uses: ./` on a passing file and on `examples/ai_tasks_broken.etsah`.
 
 ## Build, test, and run
 
@@ -27,8 +27,8 @@ That job also creates a virtualenv outside the checkout, runs
 commands must warn on stderr.
 
 ```bash
-git clone https://github.com/RyujiHashimoto/prout-lang.git
-cd prout-lang
+git clone https://github.com/RyujiHashimoto/etsah.git
+cd etsah
 
 python3 -m unittest discover -s tests
 

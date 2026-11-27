@@ -6,9 +6,9 @@ Etsah is a local prototype: a contract checker and a pattern compiler. It does n
 
 Prefer a private report through GitHub:
 
-<https://github.com/RyujiHashimoto/prout-lang/security/advisories/new>
+<https://github.com/RyujiHashimoto/etsah/security/advisories/new>
 
-The owner has to enable private vulnerability reporting before that page accepts reports. This repository's settings were not changed by the documentation pull request. Until private reporting is enabled, open a [GitHub Issue](https://github.com/RyujiHashimoto/prout-lang/issues) that names the component and the impact. Leave exploit detail, payloads, and proof-of-concept steps out of the public issue.
+The owner has to enable private vulnerability reporting before that page accepts reports. This repository's settings were not changed by the documentation pull request. Until private reporting is enabled, open a [GitHub Issue](https://github.com/RyujiHashimoto/etsah/issues) that names the component and the impact. Leave exploit detail, payloads, and proof-of-concept steps out of the public issue.
 
 `oss@j-prout.co.jp` is a placeholder for the owner to confirm. It is not a monitored security contact until the owner says so.
 

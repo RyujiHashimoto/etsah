@@ -104,7 +104,7 @@ python3 etsah.py approve \
   "mcpServers": {
     "etsah": {
       "command": "python3",
-      "args": ["/path/to/prout-lang/etsah.py", "mcp"]
+      "args": ["/path/to/etsah/etsah.py", "mcp"]
     }
   }
 }
@@ -118,10 +118,10 @@ python3 etsah.py approve \
     "harbor-lane": {
       "command": "python3",
       "args": [
-        "/path/to/prout-lang/etsah.py",
+        "/path/to/etsah/etsah.py",
         "guard",
         "--contract",
-        "/path/to/prout-lang/examples/agents/support_reply.etsah",
+        "/path/to/etsah/examples/agents/support_reply.etsah",
         "--",
         "python3",
         "/path/to/upstream_server.py"
@@ -173,7 +173,7 @@ stdio のサーバを起動できるクライアントなら、次で足りま�
 ```json
 {
   "command": "python3",
-  "args": ["/path/to/prout-lang/etsah.py", "mcp"]
+  "args": ["/path/to/etsah/etsah.py", "mcp"]
 }
 ```
 
