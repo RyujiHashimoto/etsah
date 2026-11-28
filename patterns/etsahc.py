@@ -481,7 +481,9 @@ def _validate_data_policy(policy: dict) -> list[str]:
             errors.append(f"data_policy source {source!r} needs a non-empty label list")
             continue
         for label in source_labels:
-            if label not in known:
+            if not isinstance(label, str):
+                errors.append(f"data_policy source {source!r} labels must be strings")
+            elif label not in known:
                 errors.append(f"data_policy source {source!r} uses undeclared label {label!r}")
 
     sinks = policy.get("sinks", {})
@@ -500,7 +502,9 @@ def _validate_data_policy(policy: dict) -> list[str]:
             errors.append(f"data_policy sink {effect!r} accepts must be a list")
             continue
         for label in accepts:
-            if label not in known:
+            if not isinstance(label, str):
+                errors.append(f"data_policy sink {effect!r} accepts labels must be strings")
+            elif label not in known:
                 errors.append(f"data_policy sink {effect!r} accepts undeclared label {label!r}")
 
     rejects = policy.get("rejects", {})
@@ -515,7 +519,9 @@ def _validate_data_policy(policy: dict) -> list[str]:
             errors.append(f"data_policy reject {effect!r} must be a label list")
             continue
         for label in rejected:
-            if label not in known:
+            if not isinstance(label, str):
+                errors.append(f"data_policy reject {effect!r} labels must be strings")
+            elif label not in known:
                 errors.append(f"data_policy reject {effect!r} uses undeclared label {label!r}")
 
     declassify = policy.get("declassify", [])
@@ -529,7 +535,9 @@ def _validate_data_policy(policy: dict) -> list[str]:
         label = rule.get("label")
         scope = rule.get("in") or rule.get("scope")
         roles = rule.get("roles", [rule.get("role")] if rule.get("role") else [])
-        if label not in known:
+        if not isinstance(label, str):
+            errors.append("data_policy declassify label must be a string")
+        elif label not in known:
             errors.append(f"data_policy declassify uses undeclared label {label!r}")
         if not isinstance(scope, str) or not re.fullmatch(r"[A-Za-z_]\w*", scope):
             errors.append("data_policy declassify needs an `in` scope")
@@ -1586,12 +1594,14 @@ def _app_sink_rule(app: App, effect: str) -> tuple[set[str], set[str]]:
     return accepts, rejects
 
 
-def _match_declassify(app: App, label: str, scope: str, roles: list[str]) -> Optional[dict]:
+def _match_declassify(app: App, label: str, scope: str, roles: list[str]) -> Optional[list[str]]:
+    """Return the roles allowed by both the pattern and the app, if any."""
     for rule in app.policy.declassify:
         if rule.get("label") != label or rule.get("in") != scope:
             continue
-        if set(roles) & set(rule.get("roles", [])):
-            return rule
+        allowed = sorted(set(roles) & set(rule.get("roles", [])))
+        if allowed:
+            return allowed
     return None
 
 
@@ -1745,7 +1755,8 @@ def analyze_security(app: App, registry: dict[str, PatternManifest]) -> Security
                     use.line,
                 )
                 continue
-            if not _match_declassify(app, label, scope, roles):
+            allowed_roles = _match_declassify(app, label, scope, roles)
+            if not allowed_roles:
                 problem(
                     "E-POLICY",
                     f"pattern {use.name} requires declassify {label} in {scope} "
@@ -1753,7 +1764,7 @@ def analyze_security(app: App, registry: dict[str, PatternManifest]) -> Security
                     use.line,
                 )
                 continue
-            entry = {"label": label, "in": scope, "roles": sorted(roles)}
+            entry = {"label": label, "in": scope, "roles": allowed_roles}
             if entry not in report.declassify:
                 report.declassify.append(entry)
             flow["declassify"].append(entry)

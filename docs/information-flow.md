@@ -977,7 +977,7 @@ app expense_flow
 
 ### 11.0 実装状況（2026年11月）
 
-v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。v0.2 の分岐と PC ラベルは `tests/test_flow_branches.py` の29件で確認する。パターン層の `data_policy`、`security.json`、ロール整合は `tests/test_data_policy.py` の30件で確認する。スイート全体は478件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
+v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。v0.2 の分岐と PC ラベルは `tests/test_flow_branches.py` の29件で確認する。パターン層の `data_policy`、`security.json`、ロール整合は `tests/test_data_policy.py` の33件で確認する。スイート全体は481件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
 
 | 項目 | 状態 |
 |---|---|
