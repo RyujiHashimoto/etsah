@@ -104,7 +104,7 @@ app expense_flow
     approver: manager
 ```
 
-パターンのマニフェストは `data_policy` で、読み込み元、要求する sink と許可ラベル、拒否ラベル、declassify を宣言する。アプリの `policy` とマージし、パターンが要求するラベルをアプリが許可していなければ `E-POLICY` で止まる。ラベル付きデータに `data_policy` のないパターンを適用した場合も `E-POLICY` になる（fail closed）。custom ブロックは実装を信頼するため、`W-POLICY` の警告と `security.json` の `unresolved` に残る。
+パターンのマニフェストは `data_policy` で、読み込み元、要求する sink と許可ラベル、拒否ラベル、declassify を宣言する。アプリの `policy` とマージし、パターンが要求するラベルをアプリが許可していなければ `E-POLICY` で止まる。ラベル付きデータに `data_policy` のないパターンを適用した場合も `E-POLICY` になる（fail closed）。`auth` が `roles` を宣言しているときは、アプリの `policy` とパターンの `data_policy` にある `declassify` のロールがその集合に含まれるかも検査し、含まれなければ `E-POLICY` にする。custom ブロックは実装を信頼するため、`W-POLICY` の警告と `security.json` の `unresolved` に残る。
 
 `build` は `security.json` を出力する。`labels`、パターンごとの `flows`、マージ後の `sinks`、`declassify`、検査に成功した `guarantees`、検査できていない `unresolved`、エラーの有無を示す `verified` を読める。`report.html` にもラベル、sink、declassify、未解決件数を表示する。
 

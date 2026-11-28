@@ -361,7 +361,8 @@ class TestPolicyMerge(unittest.TestCase):
             "sinks": {"net(email)": {"accepts": ["pii"]}},
             "declassify": [{"label": "pii", "in": "masked", "roles": ["support"]}],
         }
-        registry = {"mask": _manifest("mask", data_policy=policy)}
+        registry = dict(self.registry)
+        registry["mask"] = _manifest("mask", data_policy=policy)
         app = parse_app(
             snippet(
                 """
@@ -388,7 +389,8 @@ class TestPolicyMerge(unittest.TestCase):
             "sinks": {"net(email)": {"accepts": ["pii"]}},
             "declassify": [{"label": "pii", "in": "masked", "roles": ["support"]}],
         }
-        registry = {"mask": _manifest("mask", data_policy=policy)}
+        registry = dict(self.registry)
+        registry["mask"] = _manifest("mask", data_policy=policy)
         app = parse_app(
             snippet(
                 """
@@ -412,6 +414,130 @@ class TestPolicyMerge(unittest.TestCase):
             security.declassify,
             [{"label": "pii", "in": "masked", "roles": ["support"]}],
         )
+
+    def test_app_declassify_role_must_be_in_auth_roles(self) -> None:
+        app = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity User
+                    id: Id
+                    email: Email @pii
+                  policy
+                    labels pii
+                    declassify pii in masked require role support
+                  pattern auth
+                    provider: clerk
+                    roles: employee, manager
+                """
+            )
+        )
+        errors = [d for d in validate(app, self.registry) if d.severity == "error"]
+        self.assertTrue(any("auth.roles" in error.message for error in errors))
+        self.assertTrue(any("support" in error.message for error in errors))
+
+    def test_app_declassify_role_passes_when_auth_declares_it(self) -> None:
+        app = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity User
+                    id: Id
+                    email: Email @pii
+                  policy
+                    labels pii
+                    declassify pii in masked require role support
+                  pattern auth
+                    provider: clerk
+                    roles: employee, manager, support
+                """
+            )
+        )
+        self.assertEqual([d for d in validate(app, self.registry) if d.severity == "error"], [])
+
+    def test_pattern_declassify_role_must_be_in_auth_roles(self) -> None:
+        policy = {
+            "labels": ["pii"],
+            "sources": {"entity": ["pii"]},
+            "sinks": {"net(email)": {"accepts": ["pii"]}},
+            "declassify": [{"label": "pii", "in": "masked", "roles": ["support"]}],
+        }
+        registry = dict(self.registry)
+        registry["mask"] = _manifest("mask", data_policy=policy)
+        app = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity User
+                    id: Id
+                    email: Email @pii
+                  policy
+                    labels pii
+                    sink net(email) accepts pii
+                  pattern auth
+                    provider: clerk
+                    roles: employee, manager
+                  pattern mask Users
+                    entity: User
+                """
+            )
+        )
+        errors = [d for d in validate(app, registry) if d.severity == "error"]
+        self.assertTrue(any("pattern mask" in error.message for error in errors))
+        self.assertTrue(any("auth.roles" in error.message for error in errors))
+
+    def test_pattern_declassify_role_passes_when_auth_declares_it(self) -> None:
+        policy = {
+            "labels": ["pii"],
+            "sources": {"entity": ["pii"]},
+            "sinks": {"net(email)": {"accepts": ["pii"]}},
+            "declassify": [{"label": "pii", "in": "masked", "roles": ["support"]}],
+        }
+        registry = dict(self.registry)
+        registry["mask"] = _manifest("mask", data_policy=policy)
+        app = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity User
+                    id: Id
+                    email: Email @pii
+                  policy
+                    labels pii
+                    sink net(email) accepts pii
+                    declassify pii in masked require role support
+                  pattern auth
+                    provider: clerk
+                    roles: employee, manager, support
+                  pattern mask Users
+                    entity: User
+                """
+            )
+        )
+        self.assertEqual([d for d in validate(app, registry) if d.severity == "error"], [])
+
+    def test_role_check_is_skipped_without_auth_roles(self) -> None:
+        app = parse_app(
+            snippet(
+                """
+                app demo
+                  stack nextjs
+                  entity User
+                    id: Id
+                    email: Email @pii
+                  policy
+                    labels pii
+                    declassify pii in masked require role support
+                  pattern auth
+                    provider: clerk
+                """
+            )
+        )
+        self.assertEqual([d for d in validate(app, self.registry) if d.severity == "error"], [])
 
     def test_hash_is_stable_and_sensitive(self) -> None:
         one = parse_app("app demo\n  stack nextjs\n  entity User\n    id: Id\n")

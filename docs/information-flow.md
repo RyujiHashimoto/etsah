@@ -917,6 +917,8 @@ app expense_flow
 
 パターンが要求する sink をアプリが許可しない場合、`E-POLICY`。パターンが `declassify` を要求し、アプリが許可しない場合も `E-POLICY`。
 
+`declassify` のロールは、`auth` パターンが `roles` を宣言している場合、その集合に含まれる必要がある。アプリの `policy.declassify` とパターンの `data_policy.declassify` の両方を検査し、含まれなければ `E-POLICY` にする。`auth` がない、または `roles` が空なら、契約層にロール宣言がないため検査しない。
+
 アプリの `policy` にその sink のルールがない場合、許可集合は空（public のみ）として扱う。パターンが `pii` を要求すれば交差は空になり、`E-POLICY` になる。これは fail closed の意図した動作である。
 
 アプリ側にワイルドカード `net(*) accepts pii` があり、パターンが `net(email) accepts pii` を要求する場合、まずアプリ側の `resolve(net(email))` を計算してから交差する。解決後の許可集合が `{pii}` なら交差は `{pii}`、空なら `E-POLICY`。
@@ -975,7 +977,7 @@ app expense_flow
 
 ### 11.0 実装状況（2026年11月）
 
-v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。v0.2 の分岐と PC ラベルは `tests/test_flow_branches.py` の29件で確認する。パターン層の `data_policy` と `security.json` は `tests/test_data_policy.py` の25件で確認する。スイート全体は473件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
+v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_flow.py` の43件が通る。v0.2 の分岐と PC ラベルは `tests/test_flow_branches.py` の29件で確認する。パターン層の `data_policy`、`security.json`、ロール整合は `tests/test_data_policy.py` の30件で確認する。スイート全体は478件。`examples/information_flow_safe.etsah` はエラー0・警告1（`W-DECLASS`）、`examples/information_flow_leak.etsah` は `E-IFLOW-ARG` で失敗し、どちらも CI で確認している。`examples/refund_fixed.etsah` のハッシュは `bae8501e8b3f` のまま変わらない。
 
 | 項目 | 状態 |
 |---|---|
@@ -1009,7 +1011,7 @@ v0.1 の静的検査は `etsah.py` に実装済みで、`tests/test_information_
 - `if` / `else` を flow に追加し、PC ラベルを実装する。**実装済み**（2026年11月）。
 - パターン manifest の `data_policy`、マージ、`security.json`、レポートバッジを実装する。**実装済み**（2026年11月）。
 - `patterns/etsahc.py` の `build` に `security.json` を追加する。**実装済み**。
-- パターンの `auth.roles` と `declassify.require role` を照合する。**未実装**。現在は `policy` のロール名を文字列として照合し、`auth.roles` との整合は別途検査していない。
+- パターンの `auth.roles` と `declassify.require role` を照合する。**実装済み**（2026年11月）。`auth.roles` が宣言されているとき、アプリ `policy` とパターン `data_policy` の両方の `declassify` ロールを検査する。
 
 ### 11.3 v0.3（実行時強制）
 

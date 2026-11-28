@@ -1634,6 +1634,17 @@ def analyze_security(app: App, registry: dict[str, PatternManifest]) -> Security
                 "E-POLICY",
                 f"app declassify label {rule.get('label')!r} is not declared on any field",
             )
+    auth_roles = _auth_roles(app)
+    if auth_roles:
+        for rule in app.policy.declassify:
+            for role in rule.get("roles", []):
+                if role not in auth_roles:
+                    problem(
+                        "E-POLICY",
+                        f"app declassify {rule.get('label')} in {rule.get('in')} "
+                        f"role {role!r} is not in auth.roles "
+                        f"({', '.join(sorted(auth_roles))})",
+                    )
 
     # Start from the app policy so sinks with no pattern use are still visible.
     for effect, rule in app.policy.sinks.items():
@@ -1724,6 +1735,16 @@ def analyze_security(app: App, registry: dict[str, PatternManifest]) -> Security
             label = rule.get("label", "")
             scope = rule.get("in") or rule.get("scope", "")
             roles = rule.get("roles") or ([rule["role"]] if rule.get("role") else [])
+            unknown_roles = [role for role in roles if auth_roles and role not in auth_roles]
+            if unknown_roles:
+                problem(
+                    "E-POLICY",
+                    f"pattern {use.name} requires declassify {label} in {scope} "
+                    f"for role {unknown_roles[0]!r}, which is not in auth.roles "
+                    f"({', '.join(sorted(auth_roles))})",
+                    use.line,
+                )
+                continue
             if not _match_declassify(app, label, scope, roles):
                 problem(
                     "E-POLICY",
